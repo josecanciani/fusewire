@@ -1,5 +1,4 @@
-
-![Alt text](media/fusewire-full-original.jpeg)
+<img src="media/fusewire-full-original.jpeg" width="350px">
 
 # Intro
 
