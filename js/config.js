@@ -48,7 +48,7 @@ export class Config {
             throw new FuseWireError('Configuration error: afterRender is not a function');
         }
         if (!this.config.fusewirePath) {
-            this.config.fusewirePath = this.getDocument().baseURI + 'fusewire';
+            this.config.fusewirePath = this.getDocument().baseURI + 'fusewire/js';
         }
         if (!this.config.fusewireTags) {
             this.config.fusewireTags = ['((', '))'];
