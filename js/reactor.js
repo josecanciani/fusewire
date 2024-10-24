@@ -96,7 +96,7 @@ export class Reactor {
         if (!this.instanceDao) {
             this.instanceDao = new InstanceDao(
                 this.config, this,
-                new TemplateDao(this.config, this.reactor),
+                new TemplateDao(this.config, this),
                 new Renderer(this.config, this.reactorRoot)
             );
         }
