@@ -1,15 +1,63 @@
-<img src="media/fusewire-full-original.jpeg" width="350px">
+# FuseWire Client Library
 
-# Intro
+Client-side component framework for building reactive web applications.
 
-FuseWire is a Component-based library to create browser apps
+## Features
 
-# Servers
+- Component-based architecture with lifecycle hooks
+- Template compilation with `fw-if` and `fw-each` directives
+- DOM morphing for efficient updates
+- CSS scoping per component
+- Nested component composition
+- Server integration support (optional)
 
-Even though Fusewire can be used as a client-only app, you may want to have a server side to download data and assets for your application. Here's a list of server implementations:
+## Installation
 
-* PHP: https://github.com/josecanciani/fusewire-php
+```bash
+npm install @fusewire/client
+```
 
-# Roadmap
+## Usage
 
-* Fill this readme file :)
+```js
+import { Component } from '@fusewire/client/component.js';
+import { Reactor } from '@fusewire/client/reactor.js';
+
+class Counter extends Component {
+  static componentName = 'Counter';
+  
+  increment() {
+    this.vars.count++;
+    this.react();
+  }
+}
+
+const reactor = new Reactor();
+reactor.start(
+  document.getElementById('app'),
+  Counter,
+  'main',
+  { count: 0 }
+);
+```
+
+## Documentation
+
+See the [FuseWire documentation](https://github.com/josecanciani/fusewire-js) for full details.
+
+## Development
+
+```bash
+# Run tests
+npm test
+
+# Lint code
+npm run lint
+
+# Format code
+npm run format
+```
+
+## License
+
+MIT

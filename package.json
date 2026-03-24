@@ -1,0 +1,36 @@
+{
+  "name": "@fusewire/client",
+  "version": "1.0.0",
+  "description": "FuseWire client-side component framework",
+  "type": "module",
+  "main": "./src/reactor.js",
+  "exports": {
+    "./component.js": "./src/component.js",
+    "./component-id.js": "./src/component-id.js",
+    "./reactor.js": "./src/reactor.js",
+    "./renderer.js": "./src/renderer.js",
+    "./instance.js": "./src/instance.js",
+    "./template.js": "./src/template.js",
+    "./template-compiler.js": "./src/template-compiler.js",
+    "./config.js": "./src/config.js",
+    "./errors": "./src/errors/error-hierarchy.js",
+    "./utils/dom-helpers.js": "./src/utils/dom-helpers.js"
+  },
+  "scripts": {
+    "test": "node --test test/**/*.test.js",
+    "lint": "oxlint src/",
+    "format": "oxfmt --write src/",
+    "format:check": "oxfmt --check src/"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.41.0",
+    "oxlint": "^1.56.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:josecanciani/fusewire.git"
+  },
+  "keywords": ["fusewire", "components", "reactive", "client-side"],
+  "author": "Jose Canciani",
+  "license": "MIT"
+}
