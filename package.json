@@ -17,7 +17,7 @@
     "./utils/dom-helpers.js": "./src/utils/dom-helpers.js"
   },
   "scripts": {
-    "test": "node --test test/**/*.test.js",
+    "test": "node --test test/*.test.js test/**/*.test.js",
     "lint": "oxlint src/",
     "format": "oxfmt --write src/",
     "format:check": "oxfmt --check src/"
