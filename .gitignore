@@ -1,6 +1,7 @@
 node_modules/
 .DS_Store
-*.log
-.env
-coverage/
 dist/
+package-lock.json
+config/*
+!config/*.template
+.devin/

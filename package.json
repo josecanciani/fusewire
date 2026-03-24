@@ -23,6 +23,7 @@
     "format:check": "oxfmt --check src/"
   },
   "devDependencies": {
+    "jsdom": "^29.0.1",
     "oxfmt": "^0.41.0",
     "oxlint": "^1.56.0"
   },
@@ -30,7 +31,12 @@
     "type": "git",
     "url": "git@github.com:josecanciani/fusewire.git"
   },
-  "keywords": ["fusewire", "components", "reactive", "client-side"],
+  "keywords": [
+    "fusewire",
+    "components",
+    "reactive",
+    "client-side"
+  ],
   "author": "Jose Canciani",
   "license": "MIT"
 }
