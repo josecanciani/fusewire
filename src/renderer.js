@@ -36,7 +36,7 @@ export class Renderer {
         }
 
         // 3. Inject CSS if not already present
-        this._injectCSS(componentId.name, compiledTemplate.cssCode);
+        this._injectCSS(componentId.name, compiledTemplate.css);
 
         // 4. Find and return child mount points
         return findChildMountPoints(container, componentId);

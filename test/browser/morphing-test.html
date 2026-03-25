@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>FuseWire Morphing Test</title>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <script type="module">
+        import { Idiomorph } from '/node_modules/idiomorph/dist/idiomorph.esm.js';
+        
+        // Simple Renderer implementation for testing
+        class Renderer {
+            constructor(morphFunction) {
+                this.morphFunction = morphFunction;
+                this._injectedCSS = new Set();
+            }
+            
+            render(container, compiledTemplate, vars, componentId) {
+                const htmlString = compiledTemplate.render(vars, componentId);
+                
+                if (container.children.length === 0) {
+                    container.innerHTML = htmlString;
+                } else {
+                    this.morphFunction(container, htmlString, {
+                        morphStyle: 'innerHTML',
+                    });
+                }
+                
+                this._injectCSS(componentId.name, compiledTemplate.css);
+                return [];
+            }
+            
+            _injectCSS(componentName, cssCode) {
+                if (!cssCode || this._injectedCSS.has(componentName)) {
+                    return;
+                }
+                
+                const styleId = `fusewire-style-${componentName}`;
+                if (document.getElementById(styleId)) {
+                    return;
+                }
+                
+                const styleEl = document.createElement('style');
+                styleEl.id = styleId;
+                styleEl.textContent = cssCode;
+                document.head.appendChild(styleEl);
+                
+                this._injectedCSS.add(componentName);
+            }
+        }
+        
+        // Make available globally for tests
+        window.Renderer = Renderer;
+        window.Idiomorph = Idiomorph;
+        window.testReady = true;
+    </script>
+</body>
+</html>

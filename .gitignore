@@ -5,3 +5,4 @@ package-lock.json
 config/*
 !config/*.template
 .devin/
+test-results/
