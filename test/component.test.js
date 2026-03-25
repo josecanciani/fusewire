@@ -1,0 +1,251 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+import { Component } from '../src/component.js';
+
+describe('Component', () => {
+	describe('Constructor', () => {
+		it('creates instance with default values', () => {
+			const comp = new Component();
+			assert.strictEqual(comp.id, '');
+			assert.deepStrictEqual(comp.vars, {});
+			assert.strictEqual(comp.container, null);
+		});
+
+		it('creates instance with id and vars', () => {
+			const comp = new Component('main', { count: 0 });
+			assert.strictEqual(comp.id, 'main');
+			assert.deepStrictEqual(comp.vars, { count: 0 });
+		});
+
+		it('sets static componentName', () => {
+			assert.strictEqual(Component.componentName, 'Component');
+		});
+	});
+
+	describe('Lifecycle Hooks', () => {
+		it('has default hydrate hook', async () => {
+			const comp = new Component();
+			await comp.hydrate(); // Should not throw
+		});
+
+		it('has default update hook', () => {
+			const comp = new Component();
+			comp.update({}); // Should not throw
+		});
+
+		it('has default destroy hook', () => {
+			const comp = new Component();
+			comp.destroy(); // Should not throw
+		});
+
+		it('has default afterRender hook', () => {
+			const comp = new Component();
+			comp.afterRender(); // Should not throw
+		});
+
+		it('allows overriding hooks', async () => {
+			class TestComponent extends Component {
+				static componentName = 'TestComponent';
+				
+				constructor(id, vars) {
+					super(id, vars);
+					this.hydrateCalled = false;
+					this.updateCalled = false;
+					this.destroyCalled = false;
+					this.afterRenderCalled = false;
+				}
+
+				async hydrate() {
+					this.hydrateCalled = true;
+				}
+
+				update(oldVars) {
+					this.updateCalled = true;
+					this.oldVars = oldVars;
+				}
+
+				destroy() {
+					this.destroyCalled = true;
+				}
+
+				afterRender() {
+					this.afterRenderCalled = true;
+				}
+			}
+
+			const comp = new TestComponent('test', { count: 0 });
+
+			await comp.hydrate();
+			assert.strictEqual(comp.hydrateCalled, true);
+
+			comp.update({ count: 1 });
+			assert.strictEqual(comp.updateCalled, true);
+			assert.deepStrictEqual(comp.oldVars, { count: 1 });
+
+			comp.destroy();
+			assert.strictEqual(comp.destroyCalled, true);
+
+			comp.afterRender();
+			assert.strictEqual(comp.afterRenderCalled, true);
+		});
+	});
+
+	describe('react()', () => {
+		it('calls reactor.react when attached', () => {
+			const comp = new Component('test', {});
+			const reactCalls = [];
+
+			comp._reactor = {
+				react(component, mode) {
+					reactCalls.push({ component, mode });
+				},
+			};
+
+			comp.react('CSR');
+
+			assert.strictEqual(reactCalls.length, 1);
+			assert.strictEqual(reactCalls[0].component, comp);
+			assert.strictEqual(reactCalls[0].mode, 'CSR');
+		});
+
+		it('defaults to CSR mode', () => {
+			const comp = new Component('test', {});
+			const reactCalls = [];
+
+			comp._reactor = {
+				react(component, mode) {
+					reactCalls.push({ mode });
+				},
+			};
+
+			comp.react();
+
+			assert.strictEqual(reactCalls[0].mode, 'CSR');
+		});
+	});
+
+	describe('Subclassing', () => {
+		it('allows subclassing with custom componentName', () => {
+			class Counter extends Component {
+				static componentName = 'Counter';
+			}
+
+			assert.strictEqual(Counter.componentName, 'Counter');
+		});
+
+		it('inherits from Component', () => {
+			class Counter extends Component {
+				static componentName = 'Counter';
+			}
+
+			const counter = new Counter('main', { count: 0 });
+			assert.ok(counter instanceof Component);
+			assert.ok(counter instanceof Counter);
+		});
+
+		it('allows adding custom methods', () => {
+			class Counter extends Component {
+				static componentName = 'Counter';
+
+				increment() {
+					this.vars.count++;
+				}
+
+				decrement() {
+					this.vars.count--;
+				}
+			}
+
+			const counter = new Counter('main', { count: 5 });
+			counter.increment();
+			assert.strictEqual(counter.vars.count, 6);
+			counter.decrement();
+			assert.strictEqual(counter.vars.count, 5);
+		});
+	});
+
+	describe('Vars Management', () => {
+		it('allows direct vars mutation', () => {
+			const comp = new Component('test', { count: 0 });
+			comp.vars.count = 10;
+			assert.strictEqual(comp.vars.count, 10);
+		});
+
+		it('allows nested object vars', () => {
+			const comp = new Component('test', {
+				user: {
+					name: 'Alice',
+					profile: {
+						role: 'admin',
+					},
+				},
+			});
+
+			assert.strictEqual(comp.vars.user.name, 'Alice');
+			assert.strictEqual(comp.vars.user.profile.role, 'admin');
+		});
+	});
+
+	describe('migrateVars()', () => {
+		it('has default implementation that returns vars unchanged', () => {
+			const vars = { count: 5, name: 'test' };
+			const migrated = Component.migrateVars(vars);
+			assert.deepStrictEqual(migrated, vars);
+		});
+
+		it('can be overridden in subclass', () => {
+			class Counter extends Component {
+				static componentName = 'Counter';
+				static CURRENT_VERSION = 2;
+
+				static migrateVars(vars) {
+					// Example: renamed 'counter' to 'count' in v2
+					if ('counter' in vars && !('count' in vars)) {
+						return { ...vars, count: vars.counter };
+					}
+					return vars;
+				}
+			}
+
+			const oldVars = { counter: 10 };
+			const migrated = Counter.migrateVars(oldVars);
+
+			assert.strictEqual(migrated.count, 10);
+			assert.strictEqual(migrated.counter, 10); // Old field preserved
+		});
+
+		it('allows developer-maintained version tracking', () => {
+			class MyComponent extends Component {
+				static componentName = 'MyComponent';
+				static CURRENT_VERSION = 3;
+
+				static migrateVars(vars) {
+					const fromVersion = vars._version || 1;
+					let migrated = { ...vars };
+
+					if (fromVersion < 2) {
+						// v1 → v2: add new field
+						migrated.newField = 'default';
+					}
+
+					if (fromVersion < 3) {
+						// v2 → v3: rename field
+						migrated.renamedField = migrated.oldField;
+						delete migrated.oldField;
+					}
+
+					migrated._version = MyComponent.CURRENT_VERSION;
+					return migrated;
+				}
+			}
+
+			const oldVars = { _version: 1, oldField: 'value' };
+			const migrated = MyComponent.migrateVars(oldVars);
+
+			assert.strictEqual(migrated._version, 3);
+			assert.strictEqual(migrated.newField, 'default');
+			assert.strictEqual(migrated.renamedField, 'value');
+			assert.strictEqual(migrated.oldField, undefined);
+		});
+	});
+});
