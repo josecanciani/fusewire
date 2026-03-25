@@ -38,5 +38,8 @@
     "client-side"
   ],
   "author": "Jose Canciani",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "idiomorph": "^0.7.4"
+  }
 }
