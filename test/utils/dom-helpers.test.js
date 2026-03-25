@@ -126,35 +126,43 @@ describe('DOM Helpers', () => {
 	describe('findChildMountPoints', () => {
 		it('finds single direct child mount point', () => {
 			const container = document.createElement('div');
-			container.setAttribute('data-fusewire-id', 'Dashboard#10');
 			container.innerHTML =
 				'<div data-fusewire-id="UserList#main" data-fusewire-parent-id="Dashboard#10"></div>';
 
-			const mountPoints = findChildMountPoints(container);
+			const mountPoints = findChildMountPoints(container, 'Dashboard#10');
 			assert.strictEqual(mountPoints.length, 1);
-			assert.strictEqual(mountPoints[0].componentId.name, 'UserList');
-			assert.strictEqual(mountPoints[0].componentId.id, 'main');
+			assert.strictEqual(
+				mountPoints[0].getAttribute('data-fusewire-id'),
+				'UserList#main',
+			);
 		});
 
 		it('finds multiple direct child mount points', () => {
 			const container = document.createElement('div');
-			container.setAttribute('data-fusewire-id', 'Dashboard#10');
 			container.innerHTML = `
         <div data-fusewire-id="UserList#main" data-fusewire-parent-id="Dashboard#10"></div>
         <div data-fusewire-id="Counter" data-fusewire-parent-id="Dashboard#10"></div>
         <div data-fusewire-id="Widget#sidebar" data-fusewire-parent-id="Dashboard#10"></div>
       `;
 
-			const mountPoints = findChildMountPoints(container);
+			const mountPoints = findChildMountPoints(container, 'Dashboard#10');
 			assert.strictEqual(mountPoints.length, 3);
-			assert.strictEqual(mountPoints[0].componentId.name, 'UserList');
-			assert.strictEqual(mountPoints[1].componentId.name, 'Counter');
-			assert.strictEqual(mountPoints[2].componentId.name, 'Widget');
+			assert.strictEqual(
+				mountPoints[0].getAttribute('data-fusewire-id'),
+				'UserList#main',
+			);
+			assert.strictEqual(
+				mountPoints[1].getAttribute('data-fusewire-id'),
+				'Counter',
+			);
+			assert.strictEqual(
+				mountPoints[2].getAttribute('data-fusewire-id'),
+				'Widget#sidebar',
+			);
 		});
 
 		it('excludes nested mount points (only direct children)', () => {
 			const container = document.createElement('div');
-			container.setAttribute('data-fusewire-id', 'Dashboard#10');
 			container.innerHTML = `
         <div data-fusewire-id="Widget#w1" data-fusewire-parent-id="Dashboard#10">
           <div data-fusewire-id="Button#b1" data-fusewire-parent-id="Widget#w1"></div>
@@ -162,80 +170,88 @@ describe('DOM Helpers', () => {
         <div data-fusewire-id="Widget#w2" data-fusewire-parent-id="Dashboard#10"></div>
       `;
 
-			const mountPoints = findChildMountPoints(container);
+			const mountPoints = findChildMountPoints(container, 'Dashboard#10');
 			// Should only find Widget#w1 and Widget#w2, not Button#b1
 			assert.strictEqual(mountPoints.length, 2);
-			assert.strictEqual(mountPoints[0].componentId.name, 'Widget');
-			assert.strictEqual(mountPoints[0].componentId.id, 'w1');
-			assert.strictEqual(mountPoints[1].componentId.name, 'Widget');
-			assert.strictEqual(mountPoints[1].componentId.id, 'w2');
+			assert.strictEqual(
+				mountPoints[0].getAttribute('data-fusewire-id'),
+				'Widget#w1',
+			);
+			assert.strictEqual(
+				mountPoints[1].getAttribute('data-fusewire-id'),
+				'Widget#w2',
+			);
 		});
 
 		it('returns empty array for container with no child mount points', () => {
 			const container = document.createElement('div');
-			container.setAttribute('data-fusewire-id', 'Dashboard#10');
 			container.innerHTML = '<div>No mount points</div>';
 
-			const mountPoints = findChildMountPoints(container);
+			const mountPoints = findChildMountPoints(container, 'Dashboard#10');
 			assert.deepStrictEqual(mountPoints, []);
 		});
 
 		it('returns empty array for empty container', () => {
 			const container = document.createElement('div');
-			container.setAttribute('data-fusewire-id', 'Dashboard#10');
-			const mountPoints = findChildMountPoints(container);
+			const mountPoints = findChildMountPoints(container, 'Dashboard#10');
 			assert.deepStrictEqual(mountPoints, []);
 		});
 
 		it('returns empty array for non-mount-point container', () => {
 			const container = document.createElement('div');
-			const mountPoints = findChildMountPoints(container);
+			const mountPoints = findChildMountPoints(container, 'Dashboard#10');
 			assert.deepStrictEqual(mountPoints, []);
 		});
 
 		it('returns empty array for null container', () => {
-			const mountPoints = findChildMountPoints(null);
+			const mountPoints = findChildMountPoints(null, 'Dashboard#10');
 			assert.deepStrictEqual(mountPoints, []);
 		});
 
 		it('skips mount points with wrong parent id', () => {
 			const container = document.createElement('div');
-			container.setAttribute('data-fusewire-id', 'Dashboard#10');
 			container.innerHTML = `
         <div data-fusewire-id="ValidChild" data-fusewire-parent-id="Dashboard#10"></div>
         <div data-fusewire-id="WrongParent" data-fusewire-parent-id="OtherDashboard#20"></div>
         <div data-fusewire-id="NoParent"></div>
       `;
 
-			const mountPoints = findChildMountPoints(container);
+			const mountPoints = findChildMountPoints(container, 'Dashboard#10');
 			// Should only find the one with matching parent ID
 			assert.strictEqual(mountPoints.length, 1);
-			assert.strictEqual(mountPoints[0].componentId.name, 'ValidChild');
+			assert.strictEqual(
+				mountPoints[0].getAttribute('data-fusewire-id'),
+				'ValidChild',
+			);
 		});
 
 		it('returns element references', () => {
 			const container = document.createElement('div');
-			container.setAttribute('data-fusewire-id', 'Dashboard#10');
 			container.innerHTML =
 				'<div data-fusewire-id="Test" data-fusewire-parent-id="Dashboard#10"></div>';
 
-			const mountPoints = findChildMountPoints(container);
-			assert.ok(mountPoints[0].element instanceof global.HTMLElement);
+			const mountPoints = findChildMountPoints(container, 'Dashboard#10');
+			assert.ok(mountPoints[0] instanceof global.HTMLElement);
 			assert.strictEqual(
-				mountPoints[0].element.getAttribute('data-fusewire-id'),
+				mountPoints[0].getAttribute('data-fusewire-id'),
 				'Test',
 			);
 		});
 
 		it('handles special characters in parent id', () => {
 			const container = document.createElement('div');
-			container.setAttribute('data-fusewire-id', 'Dashboard#id-with-"quotes"');
 			container.innerHTML =
 				'<div data-fusewire-id="Child" data-fusewire-parent-id="Dashboard#id-with-&quot;quotes&quot;"></div>';
 
-			const mountPoints = findChildMountPoints(container);
+			const mountPoints = findChildMountPoints(
+				container,
+				'Dashboard#id-with-"quotes"',
+			);
 			assert.strictEqual(mountPoints.length, 1);
-			assert.strictEqual(mountPoints[0].componentId.name, 'Child');
+			assert.strictEqual(
+				mountPoints[0].getAttribute('data-fusewire-id'),
+				'Child',
+			);
 		});
 	});
 });
