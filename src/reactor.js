@@ -5,6 +5,10 @@ import { InstanceRegistry } from './instance.js';
 import { Renderer } from './renderer.js';
 import { Idiomorph } from './lib/idiomorph/idiomorph.esm.js';
 
+/** @typedef {import('./component.js').ComponentVars} ComponentVars */
+/** @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: Function, instanceRegistry?: InstanceRegistry}} ReactorConfig */
+/** @typedef {{loadHtml?: boolean, loadCss?: boolean, loadJs?: boolean, version?: string}} RegisterComponentOptions */
+
 /**
  * Reactor - Orchestrator for CSR_ONLY mode
  *
@@ -12,6 +16,11 @@ import { Idiomorph } from './lib/idiomorph/idiomorph.esm.js';
  * In Phase 1, supports client-side rendering only.
  */
 export class Reactor {
+  /**
+   * Create a new Reactor
+   * @param {string} appName - Application name (must be a valid CSS class name)
+   * @param {ReactorConfig} config - Configuration options
+   */
   constructor(appName = 'default', config = {}) {
     this._config = config;
     this._appName = appName;
@@ -47,11 +56,7 @@ export class Reactor {
    * Register a component by loading its files
    * @param {string} basePath - Base path for component files (e.g., '/components/Counter')
    * @param {string} name - Component name (e.g., 'Counter')
-   * @param {object} opts - Options
-   * @param {boolean} opts.loadHtml - Load .html file (default: true)
-   * @param {boolean} opts.loadCss - Load .css file (default: true)
-   * @param {boolean} opts.loadJs - Load .js file (default: true)
-   * @param {string} opts.version - Template version (default: 'v1')
+   * @param {RegisterComponentOptions} opts - Options
    * @returns {Promise<{ComponentClass, htmlCode, cssCode}>} Loaded component data
    */
   async registerComponent(basePath, name, opts = {}) {
@@ -111,7 +116,7 @@ export class Reactor {
    * @param {HTMLElement} container - Container to render into
    * @param {typeof import('./component.js').Component} ComponentClass - Component class
    * @param {string} id - Component instance ID
-   * @param {object} vars - Initial component variables
+   * @param {ComponentVars} vars - Initial component variables
    * @returns {Promise<import('./component.js').Component>} Component instance
    */
   async start(container, ComponentClass, id, vars) {

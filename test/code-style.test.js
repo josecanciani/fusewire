@@ -51,6 +51,25 @@ describe('Code Style', () => {
 		});
 	});
 
+	describe('JSDoc Types', () => {
+		it('does not use {*} wildcard type (use specific types instead)', () => {
+			for (const file of sourceFiles) {
+				const content = readFileSync(file, 'utf-8');
+				const lines = content.split('\n');
+
+				for (let i = 0; i < lines.length; i++) {
+					const line = lines[i];
+					// Match {*} in JSDoc @param, @returns, @type annotations
+					if (line.match(/@(?:param|returns|type)\s+\{\*\}/)) {
+						assert.fail(
+							`${file}:${i + 1} uses {*} wildcard type. Use a specific type instead.\nLine: ${line.trim()}`,
+						);
+					}
+				}
+			}
+		});
+	});
+
 	describe('String Quotes', () => {
 		it('prefers single quotes for strings (informational check)', () => {
 			// This is a simplified check - just flag obvious cases

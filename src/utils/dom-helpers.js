@@ -21,7 +21,7 @@ export function findChildMountPoints(container, parentComponentId) {
   const selector = `[data-fusewire-parent-id="${escapedParentId}"]`;
   const elements = container.querySelectorAll(selector);
 
-  return Array.from(elements);
+  return /** @type {HTMLElement[]} */ (Array.from(elements));
 }
 
 /**

@@ -1,6 +1,10 @@
 import { ComponentNotFoundError } from './errors/error-hierarchy.js';
 import { compileTemplate } from './template-compiler.js';
 
+/** @typedef {import('./component.js').Component} Component */
+/** @typedef {import('./component.js').ComponentVars} ComponentVars */
+/** @typedef {import('./component.js').ComponentConstructor} ComponentConstructor */
+
 /**
  * InstanceRegistry manages component instances and their lifecycle.
  *
@@ -21,10 +25,10 @@ export class InstanceRegistry {
   /**
    * Create a new component instance
    * @param {ComponentId} componentId - Component identifier
-   * @param {Function} ComponentClass - Component class constructor
-   * @param {object} vars - Initial vars
+   * @param {ComponentConstructor} ComponentClass - Component class constructor
+   * @param {ComponentVars} vars - Initial vars
    * @param {HTMLElement} container - DOM container
-   * @returns {Component} The created instance
+   * @returns {Promise<Component>} The created instance
    */
   async create(componentId, ComponentClass, vars, container) {
     const code = componentId.toCode();
@@ -73,7 +77,7 @@ export class InstanceRegistry {
   /**
    * Update an existing instance with new vars
    * @param {ComponentId} componentId - Component identifier
-   * @param {object} newVars - New variable values to merge
+   * @param {ComponentVars} newVars - New variable values to merge
    */
   async update(componentId, newVars) {
     const code = componentId.toCode();

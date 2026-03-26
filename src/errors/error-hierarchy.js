@@ -8,7 +8,9 @@ export class FuseWireError extends Error {
         this.code = code;
 
         // Maintains proper stack trace for where error was thrown (V8 only)
+    // @ts-ignore - V8-specific API, not in standard TypeScript DOM types
         if (Error.captureStackTrace) {
+      // @ts-ignore
             Error.captureStackTrace(this, this.constructor);
         }
     }

@@ -1,3 +1,6 @@
+/** @typedef {import('./template-compiler.js').CompiledTemplate} CompiledTemplate */
+/** @typedef {{version: string, htmlCode: string, cssCode?: string, jsUrl?: string}} TemplateData */
+
 /**
  * In-memory template storage with content-hash versioning
  * Stores HTML, CSS, and compiled templates for components
@@ -11,11 +14,7 @@ export class TemplateStore {
   /**
    * Store a template for a component
    * @param {string} componentName - Component name
-   * @param {object} template - Template data
-   * @param {string} template.version - Content hash version
-   * @param {string} template.htmlCode - HTML template code
-   * @param {string} [template.cssCode] - CSS code (optional)
-   * @param {string} [template.jsUrl] - JS module URL (optional)
+   * @param {TemplateData} template - Template data
    */
   set(componentName, { version, htmlCode, cssCode = '', jsUrl = '' }) {
     this._templates.set(componentName, {
@@ -31,7 +30,7 @@ export class TemplateStore {
   /**
    * Get template data for a component
    * @param {string} componentName - Component name
-   * @returns {object|null} Template data or null if not found
+   * @returns {TemplateData|null} Template data or null if not found
    */
   get(componentName) {
     return this._templates.get(componentName) || null;
@@ -68,7 +67,7 @@ export class TemplateStore {
   /**
    * Store compiled template
    * @param {string} componentName - Component name
-   * @param {object} compiledTemplate - Compiled template object
+   * @param {CompiledTemplate} compiledTemplate - Compiled template object
    */
   setCompiled(componentName, compiledTemplate) {
     this._compiled.set(componentName, compiledTemplate);
@@ -77,7 +76,7 @@ export class TemplateStore {
   /**
    * Get compiled template
    * @param {string} componentName - Component name
-   * @returns {object|null} Compiled template or null
+   * @returns {CompiledTemplate|null} Compiled template or null
    */
   getCompiled(componentName) {
     return this._compiled.get(componentName) || null;
@@ -95,7 +94,7 @@ export class TemplateStore {
    * Fetch template files and compute version hash
    * @param {string} componentName - Component name
    * @param {string} basePath - Base path for component files (e.g., '/components')
-   * @returns {Promise<object>} Template data with version
+   * @returns {Promise<TemplateData>} Template data with version
    */
   async fetch(componentName, basePath = '/components') {
     // Fetch HTML, CSS, and JS files

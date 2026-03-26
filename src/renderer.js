@@ -7,17 +7,19 @@ export class Renderer {
   /**
    * Create a new Renderer
    * @param {Function} morphFunction - DOM morphing function (e.g., Idiomorph.morph)
+   * @param {string} appName - Application name for CSS scoping
    */
-  constructor(morphFunction) {
+  constructor(morphFunction, appName = 'default') {
     this.morphFunction = morphFunction;
+    this._appName = appName;
     this._injectedCSS = new Set(); // Track which components have CSS injected
   }
 
   /**
    * Render a component to a container
    * @param {HTMLElement} container - Container to render into
-   * @param {object} compiledTemplate - Compiled template with render() and cssCode
-   * @param {object} vars - Component variables
+   * @param {CompiledTemplate} compiledTemplate - Compiled template with render() and css
+   * @param {ComponentVars} vars - Component variables
    * @param {import('./component-id.js').ComponentId} componentId - Component identifier
    * @returns {HTMLElement[]} Array of child mount point elements
    */

@@ -48,8 +48,17 @@ See the [FuseWire documentation](https://github.com/josecanciani/fusewire-js) fo
 ## Development
 
 ```bash
-# Run tests
+# Run tests (Node.js with JSDOM)
 npm test
+
+# Run browser tests (Playwright)
+npm run test:browser
+
+# Run all tests
+npm run test:all
+
+# Run examples (starts local server)
+npm run examples
 
 # Lint code
 npm run lint

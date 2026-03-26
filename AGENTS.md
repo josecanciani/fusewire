@@ -42,6 +42,7 @@ lib/fusewire/
 | `npm run format`        | Format source files with oxfmt     |
 | `npm run format:check`  | Check formatting without writing   |
 | `npm run jsdoc-check`   | Validate JSDoc documentation       |
+| `npm run typecheck`     | Type-check JS files with TypeScript |
 
 ## Testing Strategy
 
@@ -79,24 +80,26 @@ npm run test:all
 Before considering a change complete, run:
 
 ```bash
-npm run lint && npm run format:check && npm run jsdoc-check && npm test
+npm run lint && npm run format:check && npm run jsdoc-check && npm run typecheck && npm test
 ```
 
 Before committing or when changing morphing logic:
 
 ```bash
-npm run lint && npm run format:check && npm run jsdoc-check && npm run test:all
+npm run lint && npm run format:check && npm run jsdoc-check && npm run typecheck && npm run test:all
 ```
 
 ## Constraints
 
 - **Browser-compatible JavaScript only.** Use ES2020+ features that work in modern browsers.
 - **ES modules only.** All files use `import`/`export`. No CommonJS.
+- **No setters.** Avoid setter methods and `set` accessors. Prefer passing state at construction time (via constructor/config). Follow a functional pattern — objects should be configured once, not mutated after creation. Internal framework wiring (e.g., setting `_reactor` on instances) is acceptable.
 
 ## Code Style
 
 - **Indentation:** 4 spaces (not tabs)
 - **Quotes:** Single quotes for strings
+- **No hardcoded duplicates:** Never repeat a value that is already stored in a variable or derived from code. If a path, name, or label appears in log messages, error messages, or comments, reference the variable — don't hardcode the string a second time.
 - Enforced via oxfmt configuration and automated tests
 
 ## JSDoc Documentation
@@ -138,6 +141,43 @@ getByCode(code) {
 - **Conditionals:** `fw-if="condition"`
 - **Loops:** `fw-each="item in items"`
 - **Component references:** `((this))` in event handlers
+
+## Component Patterns
+
+### Data drives the UI
+
+The core principle of FuseWire is: **you manage data, the template manages the UI**. Never manually add/remove DOM elements, toggle visibility, or manage UI state in JS. Instead, set vars and call `this.react()`. The template decides what to render based on those vars.
+
+```javascript
+// WRONG: manually toggling UI
+this.container.querySelector('.details').style.display = 'block';
+
+// RIGHT: set a var, let the template handle it
+this.vars.showDetails = true;
+this.react();
+```
+
+### fw-if and fw-each: nesting support
+
+The template compiler handles nested same-tag elements correctly. You can freely nest `<div>` inside a `<div fw-if="...">`, use `<li fw-each>` inside another `<li fw-each>`, etc. The parser tracks tag depth to find the correct closing tag.
+
+### Child components via vars
+
+To include a child component, put its instance in vars. The template renders it as a mount point via `((varName))`. The engine auto-mounts child components: after rendering the parent, it finds mount points and creates/renders the child instances automatically. No manual `reactor.start()` or `afterRender()` is needed for child components.
+
+### Introspection over re-fetching
+
+When you need a component's source code (HTML, CSS), read it from the template store after registration instead of fetching files again:
+
+```javascript
+await this._reactor.registerComponent(path, name);
+const template = this._reactor._templateStore.get(name);
+// template.htmlCode, template.cssCode are available
+```
+
+### afterRender() for post-render DOM work
+
+`afterRender()` is called after the component's DOM has been rendered. Use it for work that needs the DOM to exist, such as attaching third-party widgets (e.g., Highcharts, CodeMirror) that require an existing DOM element for initialization. Use a guard flag to run one-time setup only once. Note: child component mounting is handled automatically by the engine -- `afterRender()` is NOT needed for that.
 
 ## Common Issues
 

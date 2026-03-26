@@ -1,10 +1,15 @@
 import { ComponentId } from './component-id.js';
 
+/** @typedef {import('./component.js').Component} Component */
+/** @typedef {import('./component.js').ComponentVars} ComponentVars */
+/** @typedef {import('./component.js').ComponentConstructor} ComponentConstructor */
+/** @typedef {{render: function(ComponentVars, ComponentId): string, css: string}} CompiledTemplate */
+
 /**
  * Extract property value from an object using dot notation
- * @param {object} data - Source object
+ * @param {ComponentVars} data - Source object
  * @param {string} path - Property path (e.g., "user.name")
- * @returns {*} The property value, or undefined if not found
+ * @returns {VarValue|Array<VarValue>|boolean|undefined} The property value, or undefined if not found
  */
 function getPropertyValue(data, path) {
   if (!path) return undefined;
@@ -28,7 +33,7 @@ function getPropertyValue(data, path) {
 
 /**
  * Check if a value is a Component instance
- * @param {*} value - Value to check
+ * @param {VarValue|Array<VarValue>} value - Value to check
  * @returns {boolean} True if value is a Component instance
  */
 function isComponent(value) {
@@ -57,19 +62,22 @@ function escapeHtml(str) {
 
 /**
  * Render a component as an empty mount point
- * @param {object} component - Component instance
+ * @param {Component} component - Component instance
  * @param {ComponentId} parentId - Parent component ID
  * @returns {string} Mount point HTML
  */
 function renderMountPoint(component, parentId) {
-  const childId = new ComponentId(component.constructor.componentName, component.id || '');
+  const childId = new ComponentId(
+    /** @type {ComponentConstructor} */ (component.constructor).componentName,
+    component.id || '',
+  );
   return `<div data-fusewire-id="${childId.toCode()}" data-fusewire-parent-id="${parentId.toCode()}"></div>`;
 }
 
 /**
  * Interpolate variables in a text string
  * @param {string} text - Text with ((...)) placeholders
- * @param {object} vars - Variable data
+ * @param {ComponentVars} vars - Variable data
  * @param {ComponentId} componentId - Component instance ID
  * @returns {string} Interpolated text
  */
@@ -107,9 +115,9 @@ function interpolateText(text, vars, componentId) {
 }
 
 /**
- * Process fw-if directive
+ * Process fw-if directive with nesting-aware tag matching
  * @param {string} html - HTML template
- * @param {object} vars - Variable data
+ * @param {ComponentVars} vars - Variable data
  * @returns {string} Processed HTML
  */
 function processConditionals(html, vars) {
@@ -133,9 +141,9 @@ function processConditionals(html, vars) {
 }
 
 /**
- * Process fw-each directive
+ * Process fw-each directive with nesting-aware tag matching
  * @param {string} html - HTML template
- * @param {object} vars - Variable data
+ * @param {ComponentVars} vars - Variable data
  * @param {ComponentId} componentId - Component instance ID
  * @returns {string} Processed HTML
  */
@@ -249,7 +257,7 @@ function addScopingClass(html, componentName) {
  * @param {string} htmlCode - HTML template code
  * @param {string} cssCode - CSS code (optional)
  * @param {string} appName - Application name for FuseWire.get() calls
- * @returns {object} Compiled template with render function and scoped CSS
+ * @returns {CompiledTemplate} Compiled template with render function and raw CSS
  */
 export function compileTemplate(htmlCode, cssCode = '', appName = 'default') {
   // Extract root class name for CSS scoping
@@ -258,7 +266,7 @@ export function compileTemplate(htmlCode, cssCode = '', appName = 'default') {
   return {
     /**
      * Render the template with given variables
-     * @param {object} vars - Component variables
+     * @param {ComponentVars} vars - Component variables
      * @param {ComponentId} componentId - Component instance ID
      * @returns {string} Rendered HTML
      */
@@ -296,8 +304,8 @@ export function compileTemplate(htmlCode, cssCode = '', appName = 'default') {
     },
 
     /**
-     * Get scoped CSS
-     * @returns {string} Scoped CSS string
+     * Get raw CSS (scoping is applied by Renderer at injection time)
+     * @returns {string} Raw CSS string
      */
     get css() {
       return scopeCSS(cssCode, rootClassName);

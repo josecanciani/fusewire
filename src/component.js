@@ -1,3 +1,9 @@
+/** @typedef {string|number|boolean|null} Scalar */
+/** @typedef {{[key: string]: Scalar}} ScalarObject */
+/** @typedef {Scalar|ScalarObject|Component} VarValue */
+/** @typedef {{[key: string]: (VarValue|Array<VarValue>)}} ComponentVars */
+/** @typedef {{new(code: string, vars: ComponentVars): Component, componentName: string}} ComponentConstructor */
+
 /**
  * Base class for all FuseWire components
  */
@@ -13,8 +19,8 @@ export class Component {
    * Migrate vars when template version changes
    * Override in subclasses to handle version migrations
    * @static
-   * @param {object} vars - Stored vars from previous template version
-   * @returns {object} Migrated vars
+   * @param {ComponentVars} vars - Stored vars from previous template version
+   * @returns {ComponentVars} Migrated vars
    */
   static migrateVars(vars) {
     // Default: no migration, return as-is
@@ -24,7 +30,7 @@ export class Component {
   /**
    * Create a new Component instance
    * @param {string} id - Instance identifier (optional)
-   * @param {object} vars - Component variables/data
+   * @param {ComponentVars} vars - Component variables/data
    */
   constructor(id = '', vars = {}) {
     this.id = id;
@@ -45,7 +51,7 @@ export class Component {
 
   /**
    * Update hook - called when vars change on existing instance
-   * @param {object} _oldVars - Previous vars object
+   * @param {ComponentVars} _oldVars - Previous vars object
    */
   update(_oldVars) {
     // Override in subclasses

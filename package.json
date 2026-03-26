@@ -26,7 +26,8 @@
     "lint": "oxlint src/",
     "format": "oxfmt --write src/",
     "format:check": "oxfmt --check src/",
-    "jsdoc-check": "eslint src/"
+    "jsdoc-check": "eslint src/",
+    "typecheck": "tsc -p jsconfig.json --noEmit"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
@@ -36,7 +37,8 @@
     "http-server": "^14.1.1",
     "jsdom": "^29.0.1",
     "oxfmt": "^0.41.0",
-    "oxlint": "^1.56.0"
+    "oxlint": "^1.56.0",
+    "typescript": "^6.0.2"
   },
   "dependencies": {
     "idiomorph": "^0.7.4"

@@ -1,3 +1,6 @@
+/** @typedef {import('./reactor.js').Reactor} Reactor */
+/** @typedef {import('./component.js').Component} Component */
+
 /**
  * FuseWire - Global registry for managing Reactor instances and components
  */
@@ -60,5 +63,6 @@ export const FuseWire = new FuseWireRegistry();
 
 // Make it available globally for templates
 if (typeof window !== 'undefined') {
+  // @ts-ignore - Custom global for template event handler access
   window.FuseWire = FuseWire;
 }

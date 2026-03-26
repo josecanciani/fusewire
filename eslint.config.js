@@ -7,6 +7,13 @@ export default [
     {
         files: ['src/**/*.js'],
         plugins: { jsdoc },
+        settings: {
+            jsdoc: {
+                preferredTypes: {
+                    object: false,
+                },
+            },
+        },
         rules: {
             // Require @param for all parameters
             'jsdoc/require-param': 'error',
@@ -24,16 +31,7 @@ export default [
                 'error',
                 {
                     definedTypes: [
-                        // Custom framework types
-                        'Component',
-                        'ComponentId',
-                        'Reactor',
-                        'Renderer',
-                        'InstanceRegistry',
-                        'TemplateStore',
-                        'FuseWireRegistry',
-                        'CompiledTemplate',
-                        // DOM types
+                        // DOM globals (browser built-ins, not project types)
                         'HTMLElement',
                         'HTMLDivElement',
                         'Element',
@@ -41,6 +39,7 @@ export default [
                         'Document',
                         'Window',
                         'Event',
+                        'Console',
                     ],
                 },
             ],

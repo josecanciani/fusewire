@@ -1,3 +1,6 @@
+/** @typedef {{enabled?: boolean, level?: string}} LoggingConfig */
+/** @typedef {{fusewireTags?: Array<string>, logging?: LoggingConfig}} FuseWireConfig */
+
 /**
  * FuseWire Client Configuration
  * 
@@ -29,7 +32,7 @@ export const config = {
 
 /**
  * Update configuration
- * @param {object} updates - Configuration updates (merged with defaults)
+ * @param {FuseWireConfig} updates - Configuration updates (merged with defaults)
  * 
  * Example:
  *   updateConfig({ logging: { level: 'debug' } })
