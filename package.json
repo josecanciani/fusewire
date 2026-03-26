@@ -12,6 +12,8 @@
     "./instance.js": "./src/instance.js",
     "./template.js": "./src/template.js",
     "./template-compiler.js": "./src/template-compiler.js",
+    "./template-store.js": "./src/template-store.js",
+    "./logger.js": "./src/logger.js",
     "./config.js": "./src/config.js",
     "./errors": "./src/errors/error-hierarchy.js",
     "./utils/dom-helpers.js": "./src/utils/dom-helpers.js"
@@ -20,16 +22,24 @@
     "test": "node --test test/*.test.js test/**/*.test.js",
     "test:browser": "playwright test",
     "test:all": "npm test && npm run test:browser",
+    "examples": "node examples-server.js",
     "lint": "oxlint src/",
     "format": "oxfmt --write src/",
-    "format:check": "oxfmt --check src/"
+    "format:check": "oxfmt --check src/",
+    "jsdoc-check": "eslint src/"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "eslint": "^10.1.0",
+    "eslint-plugin-jsdoc": "^62.8.1",
+    "express": "^5.2.1",
     "http-server": "^14.1.1",
     "jsdom": "^29.0.1",
     "oxfmt": "^0.41.0",
     "oxlint": "^1.56.0"
+  },
+  "dependencies": {
+    "idiomorph": "^0.7.4"
   },
   "repository": {
     "type": "git",
@@ -42,8 +52,5 @@
     "client-side"
   ],
   "author": "Jose Canciani",
-  "license": "MIT",
-  "dependencies": {
-    "idiomorph": "^0.7.4"
-  }
+  "license": "MIT"
 }

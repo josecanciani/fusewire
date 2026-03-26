@@ -41,6 +41,7 @@ lib/fusewire/
 | `npm run lint`          | Lint source files with oxlint      |
 | `npm run format`        | Format source files with oxfmt     |
 | `npm run format:check`  | Check formatting without writing   |
+| `npm run jsdoc-check`   | Validate JSDoc documentation       |
 
 ## Testing Strategy
 
@@ -78,20 +79,51 @@ npm run test:all
 Before considering a change complete, run:
 
 ```bash
-npm run lint && npm run format:check && npm test
+npm run lint && npm run format:check && npm run jsdoc-check && npm test
 ```
 
 Before committing or when changing morphing logic:
 
 ```bash
-npm run lint && npm run format:check && npm run test:all
+npm run lint && npm run format:check && npm run jsdoc-check && npm run test:all
 ```
 
 ## Constraints
 
 - **Browser-compatible JavaScript only.** Use ES2020+ features that work in modern browsers.
 - **ES modules only.** All files use `import`/`export`. No CommonJS.
-- **Code style:** Use 4 spaces for indentation (not tabs). Single quotes for strings. Style is enforced via automated tests in `test/code-style.test.js`.
+
+## Code Style
+
+- **Indentation:** 4 spaces (not tabs)
+- **Quotes:** Single quotes for strings
+- Enforced via oxfmt configuration and automated tests
+
+## JSDoc Documentation
+
+All functions must have JSDoc comments with:
+
+- **Description:** What the function does
+- **@param:** All parameters with specific types (no generic `{Object}` or `{Function}`)
+  - Use `{ComponentId}`, `{Component}`, `{Reactor}`, etc. for custom types
+  - Use `{HTMLElement}`, `{Element}`, `{string}`, `{number}`, `{boolean}` for standard types
+  - Use `{object}` (lowercase) for plain objects, `{Array.<Type>}` for typed arrays
+  - Always include parameter descriptions
+- **@returns:** Return type and description (if function returns a value)
+
+Enforced via ESLint with `eslint-plugin-jsdoc`. Run `npm run jsdoc-check` to validate.
+
+Example:
+```javascript
+/**
+ * Get an existing instance by component code string
+ * @param {string} code - Component code (e.g., "Counter#main")
+ * @returns {Component|null} The component instance or null if not found
+ */
+getByCode(code) {
+  // ...
+}
+```
 
 ## Conventions
 
