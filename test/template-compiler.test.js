@@ -328,7 +328,7 @@ describe('Template Compiler', () => {
             assert.ok(result.includes('data-fusewire-parent-id="Parent#main"'));
         });
 
-        it('renders array of components as mount points', () => {
+        it('renders array of components as mount points in reconciliation container', () => {
             const template = compileTemplate('<div>((cards))</div>');
             const componentId = new ComponentId('CardList', 'main');
             const cards = [
@@ -337,9 +337,42 @@ describe('Template Compiler', () => {
             ];
             const result = template.render({ cards }, componentId);
 
+            assert.ok(result.includes('data-fusewire-each="cards"'));
             assert.ok(result.includes('data-fusewire-id="Card#card1"'));
             assert.ok(result.includes('data-fusewire-id="Card#card2"'));
             assert.ok(result.includes('data-fusewire-parent-id="CardList#main"'));
+        });
+
+        it('reconciliation container wraps all mount points', () => {
+            const template = compileTemplate('<div>((items))</div>');
+            const componentId = new ComponentId('List', 'main');
+            const items = [
+                new ComponentReference('Item', 'a'),
+                new ComponentReference('Item', 'b'),
+                new ComponentReference('Item', 'c'),
+            ];
+            const result = template.render({ items }, componentId);
+
+            // Parse the output to verify container structure
+            const temp = document.createElement('div');
+            temp.innerHTML = result;
+            const eachContainer = temp.querySelector('[data-fusewire-each="items"]');
+            assert.ok(eachContainer);
+            // All three mount points inside the container
+            assert.strictEqual(eachContainer.children.length, 3);
+            assert.strictEqual(eachContainer.children[0].getAttribute('data-fusewire-id'), 'Item#a');
+            assert.strictEqual(eachContainer.children[1].getAttribute('data-fusewire-id'), 'Item#b');
+            assert.strictEqual(eachContainer.children[2].getAttribute('data-fusewire-id'), 'Item#c');
+        });
+
+        it('single component does not get reconciliation container', () => {
+            const template = compileTemplate('<div>((child))</div>');
+            const componentId = new ComponentId('Parent', 'main');
+            const child = new ComponentReference('Child', 'one');
+            const result = template.render({ child }, componentId);
+
+            assert.ok(!result.includes('data-fusewire-each'));
+            assert.ok(result.includes('data-fusewire-id="Child#one"'));
         });
     });
 

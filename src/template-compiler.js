@@ -170,13 +170,14 @@ function interpolateText(text, vars, componentId, constants) {
       return renderMountPoint(/** @type {Component|ComponentReference} */ (value), componentId);
     }
 
-    // Handle arrays of components
+    // Handle arrays of components - wrap in reconciliation container
     if (Array.isArray(value) && value.length > 0 && isComponent(value[0])) {
-      return value
+      const mountPoints = value
         .map((comp) =>
           renderMountPoint(/** @type {Component|ComponentReference} */ (comp), componentId),
         )
         .join('');
+      return `<div data-fusewire-each="${escapeHtml(path)}">${mountPoints}</div>`;
     }
 
     // Handle regular values (escape HTML)
