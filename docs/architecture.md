@@ -79,8 +79,7 @@ src/
    - Inject CSS (once per component name)
 
 3. Update
-   - Update vars
-   - Call update(oldVars) hook
+   - Merge new vars via Component.update(newVars)
    - Re-render
 
 4. Destroy
@@ -153,6 +152,17 @@ The `hydrate()` hook is async, allowing components to:
 - Set up event listeners
 - Perform expensive setup without blocking
 
+### Polymorphic update()
+
+Both `Component` and `ComponentReference` expose an `update(newVars)` method. This lets parent code call `child.update({ badge: '2' })` regardless of whether the child has been instantiated:
+
+- **Before mount**: The child is still a `ComponentReference`. `update()` shallow-merges vars locally; they will be used when the Component is created.
+- **After mount**: The framework replaces the reference in the parent's vars with the real `Component` instance. The same `update()` call now reaches `Component.update()`, which merges vars and triggers a re-render.
+
+Subclasses can override `update()` for custom logic (validation, derived state) and must call `super.update(newVars, react)`.
+
+The `react` parameter (default `true`) controls whether the update triggers an immediate re-render. The server-side flow (`InstanceRegistry.update()`) passes `false` because it manages rendering explicitly.
+
 ### DOM Morphing Over Virtual DOM
 
 Using idiomorph for DOM updates instead of virtual DOM:
@@ -197,6 +207,8 @@ Idiomorph minimizes DOM operations by:
 - Only applying necessary changes
 - Preserving unchanged subtrees
 - Reusing existing elements
+
+Child component mount points are excluded from morphing via the `beforeNodeMorphed` callback -- idiomorph matches them by attributes but never descends into their rendered content. Arrays of `ComponentReference` values are wrapped in reconciliation containers that bypass morphing entirely in favor of key-based append/remove. See [Render Optimization](render-optimization.md) for details.
 
 ### CSS Injection Deduplication
 CSS is injected once per component name (not per instance), preventing style duplication.

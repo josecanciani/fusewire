@@ -39,7 +39,7 @@ class FuseWireRegistry {
       return null;
     }
 
-    const instance = reactor._instanceRegistry.getByCode(componentCode);
+    const instance = reactor._instanceRegistry.get(componentCode);
 
     if (!instance) {
       console.error(`FuseWire: Component "${componentCode}" not found in reactor "${appName}"`);

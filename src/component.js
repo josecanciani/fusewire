@@ -62,11 +62,28 @@ export class Component {
   }
 
   /**
-   * Update hook - called when vars change on existing instance
-   * @param {ComponentVars} _oldVars - Previous vars object
+   * Update component vars via shallow merge (Object.assign semantics).
+   *
+   * Works the same way on both Component and ComponentReference — call
+   * `ref.update({ badge: '2' })` regardless of whether the child has been
+   * created yet. Before creation the ComponentReference merges vars locally;
+   * after creation the framework replaces the reference in the parent's vars
+   * with the real Component, so the same call reaches here.
+   *
+   * The server-side flow (InstanceRegistry) calls `update(newVars, false)`
+   * because it handles rendering itself. Developer code should use the
+   * default `react = true` so the component re-renders automatically.
+   *
+   * Subclasses can override to add custom logic (e.g. validation or
+   * derived state), and must call `super.update(newVars, react)` to
+   * apply the merge and trigger re-render.
+   *
+   * @param {ComponentVars} newVars - Vars to merge into the component
+   * @param {boolean} react - Whether to trigger a re-render (default true)
    */
-  update(_oldVars) {
-    // Override in subclasses
+  update(newVars, react = true) {
+    Object.assign(this.componentVars, newVars);
+    if (react) this.react();
   }
 
   /**
@@ -77,7 +94,9 @@ export class Component {
   }
 
   /**
-   * After render hook - called after DOM has been updated
+   * After render hook - called synchronously after the DOM has been updated.
+   * Called on every render (initial and re-renders via react()).
+   * Must be synchronous to avoid race conditions with subsequent renders.
    */
   afterRender() {
     // Override in subclasses

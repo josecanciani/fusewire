@@ -88,34 +88,26 @@ export class InstanceRegistry {
     await this.render(componentId);
 
     // Call afterRender hook
-    await instance.afterRender();
+    instance.afterRender();
 
     return instance;
   }
 
   /**
    * Get an existing instance
-   * @param {ComponentId} componentId - Component identifier
+   * @param {ComponentId|string} componentId - Component identifier or code string (e.g., "Counter#main" or "Counter")
    * @returns {Component|null} The component instance or null if not found
    */
   get(componentId) {
-    const code = componentId.toCode();
+    const code = typeof componentId === 'string' ? componentId : componentId.toCode();
     const entry = this._instances.get(code);
     return entry ? entry.instance : null;
   }
 
   /**
-   * Get an existing instance by component code string
-   * @param {string} code - Component code (e.g., "Counter#main")
-   * @returns {Component|null} The component instance or null if not found
-   */
-  getByCode(code) {
-    const entry = this._instances.get(code);
-    return entry ? entry.instance : null;
-  }
-
-  /**
-   * Update an existing instance with new vars
+   * Update an existing instance with new vars (server-side flow).
+   * Uses Component.update() with react=false because this method
+   * handles rendering explicitly.
    * @param {ComponentId} componentId - Component identifier
    * @param {ComponentVars} newVars - New variable values to merge
    */
@@ -128,19 +120,15 @@ export class InstanceRegistry {
     }
 
     const { instance } = entry;
-    const oldVars = { ...instance.componentVars };
 
-    // Update vars
-    Object.assign(instance.componentVars, newVars);
-
-    // Call update hook
-    await instance.update(oldVars);
+    // Merge vars without triggering react — we handle rendering below
+    instance.update(newVars, false);
 
     // Re-render
     await this.render(componentId);
 
     // Call afterRender hook
-    await instance.afterRender();
+    instance.afterRender();
   }
 
   /**
@@ -281,6 +269,13 @@ export class InstanceRegistry {
       let childInstance;
       if (decl instanceof ComponentReference) {
         childInstance = await this.createFromReference(decl, mountPoint);
+        // Replace the transient ComponentReference with the real Component in the
+        // parent's vars. From this point on, parent code that accesses the var
+        // (e.g. this.vars.logs.at(-1)) gets the Component directly and can call
+        // update() on it. The old reference is marked as replaced so that any
+        // stale usage throws.
+        this._replaceRefInVars(parentInstance.componentVars, decl, childInstance);
+        decl._replaced = true;
       } else {
         // Legacy: Component instance used as declaration
         childInstance = await this.create(
@@ -470,5 +465,29 @@ export class InstanceRegistry {
    */
   _isComponentDecl(value) {
     return value instanceof ComponentReference || value instanceof Component;
+  }
+
+  /**
+   * Replace a ComponentReference with the real Component instance in the parent's vars.
+   * Searches top-level values and array items by identity (===).
+   * @private
+   * @param {ComponentVars} vars - Parent component variables
+   * @param {ComponentReference} ref - The reference to replace
+   * @param {Component} instance - The real Component instance
+   */
+  _replaceRefInVars(vars, ref, instance) {
+    for (const [key, value] of Object.entries(vars)) {
+      if (value === ref) {
+        vars[key] = instance;
+        return;
+      }
+      if (Array.isArray(value)) {
+        const idx = value.indexOf(ref);
+        if (idx !== -1) {
+          value[idx] = instance;
+          return;
+        }
+      }
+    }
   }
 }

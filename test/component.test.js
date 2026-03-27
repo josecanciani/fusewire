@@ -37,9 +37,9 @@ describe('Component', () => {
 			await comp.hydrate(); // Should not throw
 		});
 
-		it('has default update hook', () => {
+		it('has default update method', () => {
 			const comp = new Component();
-			comp.update({}); // Should not throw
+			comp.update({}, false); // react=false since no reactor attached
 		});
 
 		it('has default destroy hook', () => {
@@ -66,9 +66,10 @@ describe('Component', () => {
 					this.hydrateCalled = true;
 				}
 
-				update(oldVars) {
+				update(newVars, react = true) {
 					this.updateCalled = true;
-					this.oldVars = oldVars;
+					this.receivedVars = newVars;
+					super.update(newVars, react);
 				}
 
 				destroy() {
@@ -85,15 +86,57 @@ describe('Component', () => {
 			await comp.hydrate();
 			assert.strictEqual(comp.hydrateCalled, true);
 
-			comp.update({ count: 1 });
+			comp.update({ count: 1 }, false);
 			assert.strictEqual(comp.updateCalled, true);
-			assert.deepStrictEqual(comp.oldVars, { count: 1 });
+			assert.deepStrictEqual(comp.receivedVars, { count: 1 });
+			assert.strictEqual(comp.vars.count, 1, 'vars should be merged');
 
 			comp.destroy();
 			assert.strictEqual(comp.destroyCalled, true);
 
 			comp.afterRender();
 			assert.strictEqual(comp.afterRenderCalled, true);
+		});
+	});
+
+	describe('update()', () => {
+		it('shallow-merges newVars into componentVars', () => {
+			const comp = new Component({ a: 1, b: 2 });
+			comp.update({ b: 99, c: 3 }, false);
+			assert.deepStrictEqual(comp.vars, { a: 1, b: 99, c: 3 });
+		});
+
+		it('triggers react() by default', () => {
+			const comp = new Component({ x: 0 });
+			comp.componentName = 'Test';
+			comp.componentId = 'u1';
+			const reactCalls = [];
+			comp._reactor = {
+				react(code, mode) {
+					reactCalls.push({ code, mode });
+				},
+			};
+
+			comp.update({ x: 5 });
+			assert.strictEqual(comp.vars.x, 5);
+			assert.strictEqual(reactCalls.length, 1);
+			assert.strictEqual(reactCalls[0].code, 'Test#u1');
+		});
+
+		it('does not react when react=false', () => {
+			const comp = new Component({ x: 0 });
+			comp.componentName = 'Test';
+			comp.componentId = 'u1';
+			const reactCalls = [];
+			comp._reactor = {
+				react(code, mode) {
+					reactCalls.push({ code, mode });
+				},
+			};
+
+			comp.update({ x: 5 }, false);
+			assert.strictEqual(comp.vars.x, 5);
+			assert.strictEqual(reactCalls.length, 0);
 		});
 	});
 

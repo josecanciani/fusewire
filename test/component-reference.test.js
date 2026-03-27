@@ -88,4 +88,35 @@ describe('ComponentReference', () => {
             assert.strictEqual(ref.version, '3.2.1');
         });
     });
+
+    describe('update()', () => {
+        it('shallow-merges newVars into vars', () => {
+            const ref = new ComponentReference('Counter', 'c1', { a: 1, b: 2 });
+            ref.update({ b: 99, c: 3 });
+            assert.deepStrictEqual(ref.vars, { a: 1, b: 99, c: 3 });
+        });
+
+        it('throws when called on a replaced reference', () => {
+            const ref = new ComponentReference('Counter', 'c1', { a: 1 });
+            ref._replaced = true;
+            assert.throws(
+                () => ref.update({ a: 2 }),
+                /update\(\) called on replaced reference/,
+            );
+        });
+
+        it('does not modify vars when replaced reference throws', () => {
+            const ref = new ComponentReference('Counter', 'c1', { a: 1 });
+            ref._replaced = true;
+            try { ref.update({ a: 2 }); } catch { /* expected */ }
+            assert.strictEqual(ref.vars.a, 1);
+        });
+    });
+
+    describe('_replaced flag', () => {
+        it('defaults to false', () => {
+            const ref = new ComponentReference('App');
+            assert.strictEqual(ref._replaced, false);
+        });
+    });
 });

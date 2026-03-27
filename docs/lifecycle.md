@@ -55,30 +55,29 @@ async hydrate() {
 
 ---
 
-### `update(oldVars)`
+### `update(newVars, react = true)`
 
-**When:** When vars change on an existing instance  
+**When:** Called to merge new vars into the component  
 **Type:** Synchronous  
-**Purpose:** React to var changes
+**Purpose:** Merge vars, optionally trigger re-render; override for custom logic
 
 ```js
-update(oldVars) {
-  if (oldVars.search !== this.vars.search) {
-    console.log('Search changed:', oldVars.search, '->', this.vars.search);
-    this.performSearch();
-  }
+update(newVars, react = true) {
+  const oldSearch = this.vars.search;
+  super.update(newVars, react);
   
-  if (oldVars.page !== this.vars.page) {
-    this.scrollToTop();
+  if (oldSearch !== this.vars.search) {
+    console.log('Search changed:', oldSearch, '->', this.vars.search);
+    this.performSearch();
   }
 }
 ```
 
 **Guidelines:**
-- Called **after** `hydrate()` completes
-- Synchronous to avoid race conditions
-- Compare `oldVars` with `this.vars` to detect specific changes
-- Don't trigger additional `react()` calls here (infinite loop risk)
+- Always call `super.update(newVars, react)` to apply the merge
+- Save any "before" values *before* calling `super.update()` if you need to compare
+- Default `react=true` triggers a re-render; the server-side flow passes `false`
+- Works polymorphically with `ComponentReference.update()` — parent code can call `child.update(...)` regardless of whether the child has been instantiated
 
 ---
 
@@ -156,11 +155,9 @@ destroy() {
 ### Update (vars change)
 
 ```
-1. Update vars
-2. hydrate()                    # Async, called again
-3. update(oldVars)              # Synchronous, after hydrate
-4. [re-render DOM]
-5. afterRender()
+1. update(newVars) merges vars
+2. [re-render DOM]
+3. afterRender()
 ```
 
 ### Destroy
@@ -191,8 +188,10 @@ class UserList extends Component {
 
 ```js
 class SearchBox extends Component {
-  update(oldVars) {
-    if (oldVars.query !== this.vars.query) {
+  update(newVars, react = true) {
+    const oldQuery = this.vars.query;
+    super.update(newVars, react);
+    if (oldQuery !== this.vars.query) {
       this.debounceSearch();
     }
   }
@@ -239,17 +238,19 @@ class Chart extends Component {
 
 ```js
 class BadExample extends Component {
-  update(oldVars) {
+  update(newVars, react = true) {
+    super.update(newVars, react);
     // DON'T DO THIS - infinite loop!
     this.react();
   }
 }
 
 class GoodExample extends Component {
-  update(oldVars) {
-    // Only react if you're changing DIFFERENT vars
-    if (oldVars.input !== this.vars.input) {
-      // This is safe if calculateOutput doesn't trigger another react
+  update(newVars, react = true) {
+    const oldInput = this.vars.input;
+    super.update(newVars, react);
+    // Only derive state if the relevant var changed
+    if (oldInput !== this.vars.input) {
       this.vars.output = this.calculateOutput(this.vars.input);
     }
   }
@@ -261,6 +262,7 @@ class GoodExample extends Component {
 ### ✅ Do
 
 - Keep `update()` synchronous and fast
+- Always call `super.update(newVars, react)` in overrides
 - Clean up resources in `destroy()`
 - Use `afterRender()` for DOM manipulation
 - Use `hydrate()` for async initialization
@@ -291,8 +293,9 @@ class DebugComponent extends Component {
     console.log('[hydrate] end', this.vars);
   }
   
-  update(oldVars) {
-    console.log('[update]', { oldVars, newVars: this.vars });
+  update(newVars, react = true) {
+    console.log('[update]', { newVars, currentVars: { ...this.vars } });
+    super.update(newVars, react);
   }
   
   afterRender() {
