@@ -427,4 +427,169 @@ describe('Reactor', () => {
             assert.strictEqual(reactor.basePath, '/custom/path');
         });
     });
+
+    describe('attachConsole()', () => {
+        it('forwards log calls to attached console', () => {
+            const logs = [];
+            const attached = {
+                log(...args) { logs.push(['log', ...args]); },
+                warn(...args) { logs.push(['warn', ...args]); },
+                error(...args) { logs.push(['error', ...args]); },
+            };
+
+            const reactor = createReactor('test-attach-1', {
+                morphFunction: mockMorph,
+                console: { log() {}, warn() {}, error() {} },
+            });
+            reactor.attachConsole(attached);
+
+            reactor.console.log('hello', 42);
+            reactor.console.warn('caution');
+            reactor.console.error('fail');
+
+            assert.deepStrictEqual(logs, [
+                ['log', 'hello', 42],
+                ['warn', 'caution'],
+                ['error', 'fail'],
+            ]);
+        });
+
+        it('still calls the default console after attach', () => {
+            const defaultLogs = [];
+            const defaultConsole = {
+                log(...args) { defaultLogs.push(['log', ...args]); },
+                warn(...args) { defaultLogs.push(['warn', ...args]); },
+                error(...args) { defaultLogs.push(['error', ...args]); },
+            };
+
+            const reactor = createReactor('test-attach-2', {
+                morphFunction: mockMorph,
+                console: defaultConsole,
+            });
+            reactor.attachConsole({ log() {}, warn() {}, error() {} });
+
+            reactor.console.log('test');
+            assert.deepStrictEqual(defaultLogs, [['log', 'test']]);
+        });
+
+        it('supports multiple attached consoles', () => {
+            const logs1 = [];
+            const logs2 = [];
+
+            const reactor = createReactor('test-attach-3', {
+                morphFunction: mockMorph,
+                console: { log() {}, warn() {}, error() {} },
+            });
+            reactor.attachConsole({
+                log(...args) { logs1.push(args); },
+                warn() {},
+                error() {},
+            });
+            reactor.attachConsole({
+                log(...args) { logs2.push(args); },
+                warn() {},
+                error() {},
+            });
+
+            reactor.console.log('broadcast');
+
+            assert.deepStrictEqual(logs1, [['broadcast']]);
+            assert.deepStrictEqual(logs2, [['broadcast']]);
+        });
+
+        it('uses default console before any attach', () => {
+            const defaultLogs = [];
+            const defaultConsole = {
+                log(...args) { defaultLogs.push(args); },
+                warn() {},
+                error() {},
+            };
+
+            const reactor = createReactor('test-attach-4', {
+                morphFunction: mockMorph,
+                console: defaultConsole,
+            });
+
+            reactor.console.log('before attach');
+            assert.deepStrictEqual(defaultLogs, [['before attach']]);
+        });
+    });
+
+    describe('detachConsole()', () => {
+        it('stops forwarding to detached console', () => {
+            const logs = [];
+            const attached = {
+                log(...args) { logs.push(args); },
+                warn() {},
+                error() {},
+            };
+
+            const reactor = createReactor('test-detach-1', {
+                morphFunction: mockMorph,
+                console: { log() {}, warn() {}, error() {} },
+            });
+            reactor.attachConsole(attached);
+            reactor.console.log('before');
+            reactor.detachConsole(attached);
+            reactor.console.log('after');
+
+            assert.deepStrictEqual(logs, [['before']]);
+        });
+
+        it('still calls default console after detach', () => {
+            const defaultLogs = [];
+            const defaultConsole = {
+                log(...args) { defaultLogs.push(args); },
+                warn() {},
+                error() {},
+            };
+            const attached = { log() {}, warn() {}, error() {} };
+
+            const reactor = createReactor('test-detach-2', {
+                morphFunction: mockMorph,
+                console: defaultConsole,
+            });
+            reactor.attachConsole(attached);
+            reactor.detachConsole(attached);
+            reactor.console.log('still works');
+
+            assert.deepStrictEqual(defaultLogs, [['still works']]);
+        });
+
+        it('is a no-op for unknown console', () => {
+            const reactor = createReactor('test-detach-3', {
+                morphFunction: mockMorph,
+                console: { log() {}, warn() {}, error() {} },
+            });
+            // Should not throw
+            reactor.detachConsole({ log() {}, warn() {}, error() {} });
+        });
+
+        it('only removes the specific console from multiple', () => {
+            const logs1 = [];
+            const logs2 = [];
+            const c1 = {
+                log(...args) { logs1.push(args); },
+                warn() {},
+                error() {},
+            };
+            const c2 = {
+                log(...args) { logs2.push(args); },
+                warn() {},
+                error() {},
+            };
+
+            const reactor = createReactor('test-detach-4', {
+                morphFunction: mockMorph,
+                console: { log() {}, warn() {}, error() {} },
+            });
+            reactor.attachConsole(c1);
+            reactor.attachConsole(c2);
+            reactor.detachConsole(c1);
+            reactor.console.log('only c2');
+
+            assert.deepStrictEqual(logs1, []);
+            assert.deepStrictEqual(logs2, [['only c2']]);
+        });
+    });
 });

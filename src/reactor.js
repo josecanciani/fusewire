@@ -7,6 +7,7 @@ import { Renderer } from './renderer.js';
 import { Idiomorph } from './lib/idiomorph/idiomorph.esm.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
+/** @typedef {{log: function(...*): void, warn: function(...*): void, error: function(...*): void}} ConsoleLike */
 /** @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: Function, instanceRegistry?: InstanceRegistry, basePath?: string}} ReactorConfig */
 
 /**
@@ -36,7 +37,10 @@ export class Reactor {
     this._appName = appName;
     this._basePath = config.basePath || './components';
     this._rootContainer = null;
-    this._console = config.console ?? globalThis.console;
+    this._defaultConsole = config.console ?? globalThis.console;
+    this._attachedConsoles = [];
+    /** @type {ConsoleLike} */
+    this._console = this._buildConsoleMultiplexer();
 
     // Auto-create dependencies if not provided
     this._templateStore = config.templateStore || new TemplateStore();
@@ -70,7 +74,7 @@ export class Reactor {
 
   /**
    * Get the console for this reactor
-   * @returns {Console} Console-like object
+   * @returns {ConsoleLike} Console-like object
    */
   get console() {
     return this._console;
@@ -82,6 +86,49 @@ export class Reactor {
    */
   get basePath() {
     return this._basePath;
+  }
+
+  /**
+   * Attach an additional console-like object to receive log messages.
+   * Messages are forwarded to both the default console and all attached consoles.
+   * @param {ConsoleLike} consoleObj - Object with log, warn, and error methods
+   */
+  attachConsole(consoleObj) {
+    this._attachedConsoles.push(consoleObj);
+  }
+
+  /**
+   * Detach a previously attached console-like object.
+   * @param {ConsoleLike} consoleObj - The same object passed to attachConsole
+   */
+  detachConsole(consoleObj) {
+    const index = this._attachedConsoles.indexOf(consoleObj);
+    if (index !== -1) this._attachedConsoles.splice(index, 1);
+  }
+
+  /**
+   * Build a console multiplexer that forwards calls to the default console
+   * and all currently attached consoles.
+   * @private
+   * @returns {ConsoleLike} Multiplexing console object
+   */
+  _buildConsoleMultiplexer() {
+    const defaultConsole = this._defaultConsole;
+    const attached = this._attachedConsoles;
+    return {
+      log(...args) {
+        defaultConsole.log(...args);
+        for (const c of attached) c.log(...args);
+      },
+      warn(...args) {
+        defaultConsole.warn(...args);
+        for (const c of attached) c.warn(...args);
+      },
+      error(...args) {
+        defaultConsole.error(...args);
+        for (const c of attached) c.error(...args);
+      },
+    };
   }
 
   /**

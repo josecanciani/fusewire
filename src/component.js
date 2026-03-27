@@ -109,7 +109,7 @@ export class Component {
    * Get the console for this component.
    * Returns the Reactor-level console (which may be a custom implementation
    * such as a Console component, or the built-in console by default).
-   * @returns {Console} Console-like object with log, warn, error methods
+   * @returns {import('./reactor.js').ConsoleLike} Console-like object with log, warn, error methods
    */
   get console() {
     return this._reactor._console;
