@@ -1,4 +1,5 @@
 import { ComponentId } from './component-id.js';
+import { ComponentReference } from './component-reference.js';
 import { FuseWire } from './fusewire.js';
 import { TemplateStore } from './template-store.js';
 import { InstanceRegistry } from './instance.js';
@@ -6,8 +7,7 @@ import { Renderer } from './renderer.js';
 import { Idiomorph } from './lib/idiomorph/idiomorph.esm.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
-/** @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: Function, instanceRegistry?: InstanceRegistry}} ReactorConfig */
-/** @typedef {{loadHtml?: boolean, loadCss?: boolean, loadJs?: boolean, version?: string}} RegisterComponentOptions */
+/** @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: Function, instanceRegistry?: InstanceRegistry, basePath?: string}} ReactorConfig */
 
 /**
  * Reactor - Orchestrator for CSR_ONLY mode
@@ -22,8 +22,21 @@ export class Reactor {
    * @param {ReactorConfig} config - Configuration options
    */
   constructor(appName = 'default', config = {}) {
+    // Validate appName is a valid CSS class name
+    if (!/^[a-zA-Z_-][a-zA-Z0-9_-]*$/.test(appName)) {
+      throw new Error(`Reactor: appName "${appName}" is not a valid CSS class name`);
+    }
+
+    // Check for duplicate app names
+    if (FuseWire.has(appName)) {
+      throw new Error(`Reactor: appName "${appName}" is already registered`);
+    }
+
     this._config = config;
     this._appName = appName;
+    this._basePath = config.basePath || './components';
+    this._rootContainer = null;
+    this._console = config.console ?? globalThis.console;
 
     // Auto-create dependencies if not provided
     this._templateStore = config.templateStore || new TemplateStore();
@@ -31,7 +44,7 @@ export class Reactor {
     // Renderer setup - use Idiomorph by default, allow override for tests
     if (!config.renderer) {
       const morphFunction = config.morphFunction || Idiomorph.morph;
-      this._renderer = new Renderer(morphFunction);
+      this._renderer = new Renderer(morphFunction, this._appName);
     } else {
       this._renderer = config.renderer;
     }
@@ -39,6 +52,9 @@ export class Reactor {
     this._instanceRegistry =
       config.instanceRegistry ||
       new InstanceRegistry(this._renderer, this._templateStore, this._appName);
+
+    // Give registry a reference to this reactor so auto-mounted children get _reactor
+    this._instanceRegistry._reactor = this;
 
     // Register this reactor with FuseWire global registry
     FuseWire.register(this._appName, this);
@@ -53,84 +69,42 @@ export class Reactor {
   }
 
   /**
-   * Register a component by loading its files
-   * @param {string} basePath - Base path for component files (e.g., '/components/Counter')
-   * @param {string} name - Component name (e.g., 'Counter')
-   * @param {RegisterComponentOptions} opts - Options
-   * @returns {Promise<{ComponentClass, htmlCode, cssCode}>} Loaded component data
+   * Get the console for this reactor
+   * @returns {Console} Console-like object
    */
-  async registerComponent(basePath, name, opts = {}) {
-    const { loadHtml = true, loadCss = true, loadJs = true, version = 'v1' } = opts;
-
-    const promises = [];
-    let htmlCode = '';
-    let cssCode = '';
-    let ComponentClass = null;
-
-    // Load HTML
-    if (loadHtml) {
-      promises.push(
-        fetch(`${basePath}.html`)
-          .then((res) => (res.ok ? res.text() : ''))
-          .then((text) => {
-            htmlCode = text;
-          }),
-      );
-    }
-
-    // Load CSS
-    if (loadCss) {
-      promises.push(
-        fetch(`${basePath}.css`)
-          .then((res) => (res.ok ? res.text() : ''))
-          .then((text) => {
-            cssCode = text;
-          }),
-      );
-    }
-
-    // Load JS module
-    if (loadJs) {
-      promises.push(
-        import(basePath + '.js').then((module) => {
-          // Find the component class (assume export { ClassName } or export default)
-          ComponentClass = module[name] || module.default;
-        }),
-      );
-    }
-
-    await Promise.all(promises);
-
-    // Register template
-    this._templateStore.set(name, {
-      version,
-      htmlCode,
-      cssCode,
-    });
-
-    return { ComponentClass, htmlCode, cssCode };
+  get console() {
+    return this._console;
   }
 
   /**
-   * Start a root component
+   * Get the base path for component files
+   * @returns {string} Base URL path for component file resolution
+   */
+  get basePath() {
+    return this._basePath;
+  }
+
+  /**
+   * Start a root component by name
    * @param {HTMLElement} container - Container to render into
-   * @param {typeof import('./component.js').Component} ComponentClass - Component class
+   * @param {string} componentName - Component name (e.g., 'Counter', 'Basics/Counter')
    * @param {string} id - Component instance ID
    * @param {ComponentVars} vars - Initial component variables
    * @returns {Promise<import('./component.js').Component>} Component instance
    */
-  async start(container, ComponentClass, id, vars) {
-    const componentId = new ComponentId(ComponentClass.componentName, id);
+  async start(container, componentName, id, vars = {}) {
+    // Add app namespace to root container (first call only)
+    if (!this._rootContainer) {
+      this._rootContainer = container;
+      container.classList.add('fusewire', this._appName);
+    }
 
-    // Create instance using registry (handles hydrate, render, afterRender)
-    const instance = await this._instanceRegistry.create(
-      componentId,
-      ComponentClass,
-      vars,
-      container,
-    );
+    const ref = new ComponentReference(componentName, id, vars);
 
-    // Attach reactor to component
+    // Create instance via registry (resolves class, hydrate, render, afterRender)
+    const instance = await this._instanceRegistry.createFromReference(ref, container);
+
+    // Ensure reactor is attached (also set by create() if registry has reactor ref)
     instance._reactor = this;
 
     return instance;

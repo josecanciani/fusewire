@@ -1,9 +1,12 @@
 import { ComponentId } from './component-id.js';
+import { ComponentReference } from './component-reference.js';
 
 /** @typedef {import('./component.js').Component} Component */
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
+/** @typedef {import('./component.js').VarValue} VarValue */
 /** @typedef {import('./component.js').ComponentConstructor} ComponentConstructor */
-/** @typedef {{render: function(ComponentVars, ComponentId): string, css: string}} CompiledTemplate */
+/** @typedef {{version?: string}} TemplateConstants */
+/** @typedef {{render: function(ComponentVars, ComponentId, TemplateConstants=): string, css: string}} CompiledTemplate */
 
 /**
  * Extract property value from an object using dot notation
@@ -19,25 +22,84 @@ function getPropertyValue(data, path) {
   const cleanPath = isNegated ? path.slice(1) : path;
 
   const parts = cleanPath.split('.');
+  /** @type {VarValue|Array<VarValue>|ComponentVars|undefined} */
   let value = data;
 
   for (const part of parts) {
     if (value === null || value === undefined) {
       return undefined;
     }
-    value = value[part];
+    value = /** @type {VarValue|Array<VarValue>|ComponentVars|undefined} */ (
+      /** @type {ComponentVars} */ (value)[part]
+    );
   }
 
-  return isNegated ? !value : value;
+  return isNegated ? !value : /** @type {VarValue|Array<VarValue>|undefined} */ (value);
 }
 
 /**
- * Check if a value is a Component instance
+ * Check if a value is a Component instance or ComponentReference
  * @param {VarValue|Array<VarValue>} value - Value to check
- * @returns {boolean} True if value is a Component instance
+ * @returns {boolean} True if value represents a component
  */
 function isComponent(value) {
-  return value && typeof value === 'object' && value.constructor && value.constructor.componentName;
+  if (value instanceof ComponentReference) return true;
+  return (
+    value &&
+    typeof value === 'object' &&
+    typeof (
+      /** @type {ComponentConstructor} */ (/** @type {Component} */ (value).constructor)
+        .componentName
+    ) === 'string'
+  );
+}
+
+/**
+ * Find the position of the matching closing tag, accounting for nesting.
+ * Handles same-tag nesting correctly (e.g., div inside div).
+ * @param {string} html - HTML string to search in
+ * @param {string} tagName - Tag name to match (e.g., "div")
+ * @param {number} startIndex - Position after the opening tag's closing bracket
+ * @returns {number} Position of the matching closing tag's `<`, or -1 if not found
+ */
+function findMatchingClose(html, tagName, startIndex) {
+  const lowerHtml = html.toLowerCase();
+  const lowerTag = tagName.toLowerCase();
+  const closeTag = `</${lowerTag}>`;
+  const openTag = `<${lowerTag}`;
+  let depth = 1;
+  let i = startIndex;
+
+  while (i < lowerHtml.length && depth > 0) {
+    const nextAngle = lowerHtml.indexOf('<', i);
+    if (nextAngle === -1) break;
+
+    // Check for closing tag: </tagName>
+    if (lowerHtml.startsWith(closeTag, nextAngle)) {
+      depth--;
+      if (depth === 0) return nextAngle;
+      i = nextAngle + closeTag.length;
+      continue;
+    }
+
+    // Check for opening tag: <tagName followed by whitespace, >, or /
+    if (lowerHtml.startsWith(openTag, nextAngle)) {
+      const charAfter = lowerHtml[nextAngle + openTag.length];
+      if (/[\s>/]/.test(charAfter || '')) {
+        // Skip self-closing tags (end with />)
+        const endBracket = lowerHtml.indexOf('>', nextAngle);
+        if (endBracket !== -1 && lowerHtml[endBracket - 1] !== '/') {
+          depth++;
+        }
+        i = endBracket !== -1 ? endBracket + 1 : nextAngle + 1;
+        continue;
+      }
+    }
+
+    i = nextAngle + 1;
+  }
+
+  return -1;
 }
 
 /**
@@ -61,16 +123,17 @@ function escapeHtml(str) {
 }
 
 /**
- * Render a component as an empty mount point
- * @param {Component} component - Component instance
+ * Render a component declaration as an empty mount point
+ * @param {Component|ComponentReference} decl - Component instance or ComponentReference
  * @param {ComponentId} parentId - Parent component ID
  * @returns {string} Mount point HTML
  */
-function renderMountPoint(component, parentId) {
-  const childId = new ComponentId(
-    /** @type {ComponentConstructor} */ (component.constructor).componentName,
-    component.id || '',
-  );
+function renderMountPoint(decl, parentId) {
+  const name =
+    decl instanceof ComponentReference
+      ? decl.componentName
+      : /** @type {ComponentConstructor} */ (decl.constructor).componentName;
+  const childId = new ComponentId(name, decl.id || '');
   return `<div data-fusewire-id="${childId.toCode()}" data-fusewire-parent-id="${parentId.toCode()}"></div>`;
 }
 
@@ -79,9 +142,10 @@ function renderMountPoint(component, parentId) {
  * @param {string} text - Text with ((...)) placeholders
  * @param {ComponentVars} vars - Variable data
  * @param {ComponentId} componentId - Component instance ID
+ * @param {TemplateConstants} constants - Template constants (version, etc.)
  * @returns {string} Interpolated text
  */
-function interpolateText(text, vars, componentId) {
+function interpolateText(text, vars, componentId, constants) {
   return text.replace(/\(\(([^)]+)\)\)/g, (match, path) => {
     path = path.trim();
 
@@ -92,6 +156,11 @@ function interpolateText(text, vars, componentId) {
       return `__FUSEWIRE_COMPONENT_${safeCode}__`;
     }
 
+    // Template constants (not part of mutable vars)
+    if (path === 'componentId') return escapeHtml(componentId.toCode());
+    if (path === 'componentName') return escapeHtml(componentId.name);
+    if (path === 'componentVersion') return escapeHtml(constants.version || '');
+
     const value = getPropertyValue(vars, path);
 
     // Handle undefined/null
@@ -101,12 +170,16 @@ function interpolateText(text, vars, componentId) {
 
     // Handle Component instances - render as empty mount point
     if (isComponent(value)) {
-      return renderMountPoint(value, componentId);
+      return renderMountPoint(/** @type {Component|ComponentReference} */ (value), componentId);
     }
 
     // Handle arrays of components
     if (Array.isArray(value) && value.length > 0 && isComponent(value[0])) {
-      return value.map((comp) => renderMountPoint(comp, componentId)).join('');
+      return value
+        .map((comp) =>
+          renderMountPoint(/** @type {Component|ComponentReference} */ (comp), componentId),
+        )
+        .join('');
     }
 
     // Handle regular values (escape HTML)
@@ -121,23 +194,36 @@ function interpolateText(text, vars, componentId) {
  * @returns {string} Processed HTML
  */
 function processConditionals(html, vars) {
-  // Match fw-if attributes and their elements
-  // Pattern: <tag fw-if="condition">content</tag>
-  const regex = /<(\w+)([^>]*)\s+fw-if=["']([^"']+)["']([^>]*)>([\s\S]*?)<\/\1>/gi;
+  const openRegex = /<(\w+)([^>]*)\s+fw-if=["']([^"']+)["']([^>]*)>/i;
+  let result = html;
+  let match;
 
-  return html.replace(regex, (match, tag, beforeAttrs, condition, afterAttrs, content) => {
+  while ((match = openRegex.exec(result)) !== null) {
+    const [fullMatch, tag, beforeAttrs, condition, afterAttrs] = match;
+    const contentStart = match.index + fullMatch.length;
+
+    const closeIndex = findMatchingClose(result, tag, contentStart);
+    if (closeIndex === -1) break;
+
+    const content = result.substring(contentStart, closeIndex);
+    const closeTag = `</${tag}>`;
+    const elementEnd = closeIndex + closeTag.length;
+
     const value = getPropertyValue(vars, condition.trim());
 
+    let replacement;
     if (!value) {
-      // Condition is false, remove the element
-      return '';
+      replacement = '';
+    } else {
+      const attrs = (beforeAttrs + ' ' + afterAttrs).trim();
+      const openTag = attrs ? `<${tag} ${attrs}>` : `<${tag}>`;
+      replacement = `${openTag}${content}${closeTag}`;
     }
 
-    // Condition is true, keep element but remove fw-if attribute
-    const attrs = (beforeAttrs + ' ' + afterAttrs).trim();
-    const openTag = attrs ? `<${tag} ${attrs}>` : `<${tag}>`;
-    return `${openTag}${content}</${tag}>`;
-  });
+    result = result.substring(0, match.index) + replacement + result.substring(elementEnd);
+  }
+
+  return result;
 }
 
 /**
@@ -145,26 +231,39 @@ function processConditionals(html, vars) {
  * @param {string} html - HTML template
  * @param {ComponentVars} vars - Variable data
  * @param {ComponentId} componentId - Component instance ID
+ * @param {TemplateConstants} constants - Template constants
  * @returns {string} Processed HTML
  */
-function processLoops(html, vars, componentId) {
-  // Match fw-each attributes and their elements
-  // Pattern: <tag fw-each="item in items">content</tag>
-  const regex = /<(\w+)([^>]*)\s+fw-each=["']([^"']+)["']([^>]*)>([\s\S]*?)<\/\1>/gi;
+function processLoops(html, vars, componentId, constants) {
+  const openRegex = /<(\w+)([^>]*)\s+fw-each=["']([^"']+)["']([^>]*)>/i;
+  let result = html;
+  let match;
 
-  return html.replace(regex, (match, tag, beforeAttrs, loopExpr, afterAttrs, content) => {
+  while ((match = openRegex.exec(result)) !== null) {
+    const [fullMatch, tag, beforeAttrs, loopExpr, afterAttrs] = match;
+    const contentStart = match.index + fullMatch.length;
+
+    const closeIndex = findMatchingClose(result, tag, contentStart);
+    if (closeIndex === -1) break;
+
+    const content = result.substring(contentStart, closeIndex);
+    const closeTag = `</${tag}>`;
+    const elementEnd = closeIndex + closeTag.length;
+
     // Parse "item in items" syntax
     const loopMatch = loopExpr.match(/^\s*(\w+)\s+in\s+([\w.]+)\s*$/);
     if (!loopMatch) {
       console.warn(`Invalid fw-each syntax: ${loopExpr}`);
-      return '';
+      result = result.substring(0, match.index) + result.substring(elementEnd);
+      continue;
     }
 
     const [, itemName, collectionPath] = loopMatch;
     const collection = getPropertyValue(vars, collectionPath);
 
     if (!Array.isArray(collection) || collection.length === 0) {
-      return '';
+      result = result.substring(0, match.index) + result.substring(elementEnd);
+      continue;
     }
 
     // Render the element for each item
@@ -178,78 +277,21 @@ function processLoops(html, vars, componentId) {
 
       // Recursively process nested conditionals and loops
       itemContent = processConditionals(itemContent, scopedVars);
-      itemContent = processLoops(itemContent, scopedVars, componentId);
+      itemContent = processLoops(itemContent, scopedVars, componentId, constants);
 
-      // Interpolate variables
-      itemContent = interpolateText(itemContent, scopedVars, componentId);
+      // Interpolate variables in content and element attributes
+      itemContent = interpolateText(itemContent, scopedVars, componentId, constants);
+      const itemAttrs = attrs ? interpolateText(attrs, scopedVars, componentId, constants) : '';
 
-      const openTag = attrs ? `<${tag} ${attrs}>` : `<${tag}>`;
-      return `${openTag}${itemContent}</${tag}>`;
+      const openTag = itemAttrs ? `<${tag} ${itemAttrs}>` : `<${tag}>`;
+      return `${openTag}${itemContent}${closeTag}`;
     });
 
-    return results.join('');
-  });
-}
-
-/**
- * Scope CSS by prefixing selectors with a component class
- * @param {string} css - Original CSS
- * @param {string} componentName - Component name for scoping
- * @returns {string} Scoped CSS
- */
-function scopeCSS(css, componentName) {
-  if (!css || !css.trim()) return '';
-
-  const scopeClass = `.fusewire-component-${componentName}`;
-
-  // Simple scoping: prefix each selector
-  // This is a basic implementation - a production version would use a proper CSS parser
-  return css.replace(/([^{}]+)\{/g, (match, selector) => {
-    const scoped = selector
-      .split(',')
-      .map((s) => `${scopeClass} ${s.trim()}`)
-      .join(', ');
-    return `${scoped} {`;
-  });
-}
-
-/**
- * Extract the root element's class name for CSS scoping
- * @param {string} html - HTML template
- * @returns {string} Class name or 'component'
- */
-function extractRootClassName(html) {
-  const match = html.match(/class=["']([^"']+)["']/);
-  return match ? match[1].split(' ')[0] : 'component';
-}
-
-/**
- * Add component scoping class to root element
- * @param {string} html - HTML template
- * @param {string} componentName - Component name
- * @returns {string} HTML with scoping class added
- */
-function addScopingClass(html, componentName) {
-  const scopeClass = `fusewire-component-${componentName}`;
-
-  // Find first opening tag
-  const match = html.match(/^(\s*)<(\w+)(\s+[^>]*)?(>)/);
-  if (!match) return html;
-
-  const [fullMatch, leadingSpace, tag, attrs, closingBracket] = match;
-
-  // Check if class attribute exists
-  const hasClass = attrs && /class=/.test(attrs);
-
-  if (hasClass) {
-    // Add to existing class attribute
-    const withClass = attrs.replace(/class=(["'])([^"']*)\1/, `class=$1$2 ${scopeClass}$1`);
-    return html.replace(fullMatch, `${leadingSpace}<${tag}${withClass}${closingBracket}`);
-  } else {
-    // Add new class attribute
-    const newAttrs = (attrs || '') + ` class="${scopeClass}"`;
-    return html.replace(fullMatch, `${leadingSpace}<${tag}${newAttrs}${closingBracket}`);
+    const replacement = results.join('');
+    result = result.substring(0, match.index) + replacement + result.substring(elementEnd);
   }
+
+  return result;
 }
 
 /**
@@ -260,17 +302,15 @@ function addScopingClass(html, componentName) {
  * @returns {CompiledTemplate} Compiled template with render function and raw CSS
  */
 export function compileTemplate(htmlCode, cssCode = '', appName = 'default') {
-  // Extract root class name for CSS scoping
-  const rootClassName = extractRootClassName(htmlCode);
-
   return {
     /**
      * Render the template with given variables
      * @param {ComponentVars} vars - Component variables
      * @param {ComponentId} componentId - Component instance ID
+     * @param {TemplateConstants} constants - Template constants (version, etc.)
      * @returns {string} Rendered HTML
      */
-    render(vars, componentId) {
+    render(vars, componentId, constants = {}) {
       if (!htmlCode || !htmlCode.trim()) {
         return '';
       }
@@ -282,10 +322,10 @@ export function compileTemplate(htmlCode, cssCode = '', appName = 'default') {
       html = processConditionals(html, vars);
 
       // 2. Process loops (expands repeated elements)
-      html = processLoops(html, vars, componentId);
+      html = processLoops(html, vars, componentId, constants);
 
       // 3. Interpolate variables (fills in values)
-      html = interpolateText(html, vars, componentId);
+      html = interpolateText(html, vars, componentId, constants);
 
       // 4. Replace ((this)) placeholders with FuseWire.get() calls
       html = html.replace(
@@ -297,9 +337,6 @@ export function compileTemplate(htmlCode, cssCode = '', appName = 'default') {
         },
       );
 
-      // 5. Add component scoping class
-      html = addScopingClass(html, componentId.name);
-
       return html;
     },
 
@@ -308,7 +345,7 @@ export function compileTemplate(htmlCode, cssCode = '', appName = 'default') {
      * @returns {string} Raw CSS string
      */
     get css() {
-      return scopeCSS(cssCode, rootClassName);
+      return cssCode || '';
     },
   };
 }

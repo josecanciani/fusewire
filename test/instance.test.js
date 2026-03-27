@@ -8,6 +8,7 @@ import { Component } from '../src/component.js';
 import { ComponentId } from '../src/component-id.js';
 import { ComponentNotFoundError } from '../src/errors/error-hierarchy.js';
 import { Idiomorph } from 'idiomorph';
+import { ComponentReference } from '../src/component-reference.js';
 
 describe('InstanceRegistry', () => {
     let dom;
@@ -78,7 +79,7 @@ describe('InstanceRegistry', () => {
             return Idiomorph.morph(container, html, options);
         });
         
-        registry = new InstanceRegistry(renderer, templateStore);
+        registry = new InstanceRegistry(renderer, templateStore, 'testApp');
 
         // Create a fresh container for each test
         container = document.createElement('div');
@@ -178,6 +179,24 @@ describe('InstanceRegistry', () => {
             );
         });
 
+        it('sets container on instance', async () => {
+            const componentId = new ComponentId('TestComponent', 'test1');
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>Test</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const instance = await registry.create(
+                componentId,
+                TestComponent,
+                {},
+                container
+            );
+
+            assert.strictEqual(instance.container, container);
+        });
+
         it('renders component to container', async () => {
             const componentId = new ComponentId('TestComponent', 'test1');
             templateStore.set('TestComponent', {
@@ -215,6 +234,28 @@ describe('InstanceRegistry', () => {
         it('returns null for non-existent instance', () => {
             const componentId = new ComponentId('TestComponent', 'test1');
             const retrieved = registry.get(componentId);
+
+            assert.strictEqual(retrieved, null);
+        });
+    });
+
+    describe('getByCode()', () => {
+        it('returns existing instance by code string', async () => {
+            const componentId = new ComponentId('TestComponent', 'test1');
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>Test</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const created = await registry.create(componentId, TestComponent, {}, container);
+            const retrieved = registry.getByCode('TestComponent#test1');
+
+            assert.strictEqual(retrieved, created);
+        });
+
+        it('returns null for non-existent code', () => {
+            const retrieved = registry.getByCode('TestComponent#nonexistent');
 
             assert.strictEqual(retrieved, null);
         });
@@ -539,4 +580,496 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(instance2.destroyCalled, true);
         });
     });
+
+    describe('Auto-mounting', () => {
+        class ChildComponent extends Component {
+            static componentName = 'ChildComponent';
+        }
+
+        it('auto-mounts child component from vars', async () => {
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>Parent: ((child))</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+            templateStore.set('ChildComponent', {
+                htmlCode: '<span>Child Content</span>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const componentId = new ComponentId('TestComponent', 'test1');
+            const childDecl = new ChildComponent('child1', {});
+
+            await registry.create(
+                componentId,
+                TestComponent,
+                { child: childDecl },
+                container
+            );
+
+            // Child should be auto-mounted in registry
+            const childId = new ComponentId('ChildComponent', 'child1');
+            assert.strictEqual(registry.has(childId), true);
+
+            // Child content should be rendered
+            assert.ok(container.innerHTML.includes('Child Content'));
+        });
+
+        it('auto-mounts array of child components', async () => {
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>((cards))</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+            templateStore.set('ChildComponent', {
+                htmlCode: '<span>Card</span>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const componentId = new ComponentId('TestComponent', 'test1');
+            const cards = [
+                new ChildComponent('c1', {}),
+                new ChildComponent('c2', {}),
+            ];
+
+            await registry.create(
+                componentId,
+                TestComponent,
+                { cards },
+                container
+            );
+
+            assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c1')), true);
+            assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c2')), true);
+        });
+
+        it('skips mount points without matching declarations', async () => {
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>((child))</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            class UnregisteredChild extends Component {
+                static componentName = 'UnregisteredChild';
+            }
+
+            const componentId = new ComponentId('TestComponent', 'test1');
+            const childDecl = new UnregisteredChild('u1', {});
+
+            // Should not throw even though child template is not registered
+            await registry.create(
+                componentId,
+                TestComponent,
+                { child: childDecl },
+                container
+            );
+
+            const childId = new ComponentId('UnregisteredChild', 'u1');
+            assert.strictEqual(registry.has(childId), false);
+        });
+
+        it('adds fusewire-component class to child container', async () => {
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>((child))</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+            templateStore.set('ChildComponent', {
+                htmlCode: '<span>Content</span>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const componentId = new ComponentId('TestComponent', 'test1');
+            const childDecl = new ChildComponent('child1', {});
+
+            await registry.create(
+                componentId,
+                TestComponent,
+                { child: childDecl },
+                container
+            );
+
+            const childId = new ComponentId('ChildComponent', 'child1');
+            const childContainer = registry.getContainer(childId);
+            assert.ok(childContainer.classList.contains('fusewire-component-ChildComponent'));
+        });
+
+        it('passes child vars to created instance', async () => {
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>((child))</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+            templateStore.set('ChildComponent', {
+                htmlCode: '<span>((label))</span>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const componentId = new ComponentId('TestComponent', 'test1');
+            const childDecl = new ChildComponent('child1', { label: 'Hello' });
+
+            await registry.create(
+                componentId,
+                TestComponent,
+                { child: childDecl },
+                container
+            );
+
+            const childId = new ComponentId('ChildComponent', 'child1');
+            const childInstance = registry.get(childId);
+            assert.strictEqual(childInstance.vars.label, 'Hello');
+            assert.ok(container.innerHTML.includes('Hello'));
+        });
+
+        // Note: Auto-cleanup tests trigger re-renders which use morphing
+        // Morphing tests are skipped in Node/JSDOM due to idiomorph compatibility issues
+        // These tests pass in real browsers - see test/browser/morphing.spec.js
+
+        it.skip('auto-removes child when var is set to null', async () => {
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>((child))</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+            templateStore.set('ChildComponent', {
+                htmlCode: '<span>Child</span>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const componentId = new ComponentId('TestComponent', 'test1');
+            const childDecl = new ChildComponent('child1', {});
+
+            const parent = await registry.create(
+                componentId,
+                TestComponent,
+                { child: childDecl },
+                container
+            );
+
+            const childId = new ComponentId('ChildComponent', 'child1');
+            assert.strictEqual(registry.has(childId), true);
+
+            // Set child var to null and re-render parent
+            parent.vars.child = null;
+            await registry.render(componentId);
+
+            // Child should be auto-removed
+            assert.strictEqual(registry.has(childId), false);
+        });
+
+        it.skip('auto-removes child when switching to different component type', async () => {
+            class AltChild extends Component {
+                static componentName = 'AltChild';
+            }
+
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>((child))</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+            templateStore.set('ChildComponent', {
+                htmlCode: '<span>Original</span>',
+                cssCode: '',
+                version: 'v1'
+            });
+            templateStore.set('AltChild', {
+                htmlCode: '<span>Replacement</span>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const componentId = new ComponentId('TestComponent', 'test1');
+            const parent = await registry.create(
+                componentId,
+                TestComponent,
+                { child: new ChildComponent('c1', {}) },
+                container
+            );
+
+            const oldChildId = new ComponentId('ChildComponent', 'c1');
+            assert.strictEqual(registry.has(oldChildId), true);
+
+            // Replace with different component type
+            parent.vars.child = new AltChild('c1', {});
+            await registry.render(componentId);
+
+            // Old child removed, new child created
+            assert.strictEqual(registry.has(oldChildId), false);
+            const newChildId = new ComponentId('AltChild', 'c1');
+            assert.strictEqual(registry.has(newChildId), true);
+            assert.ok(container.innerHTML.includes('Replacement'));
+        });
+
+        it.skip('calls destroy on auto-removed child', async () => {
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>((child))</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+            templateStore.set('ChildComponent', {
+                htmlCode: '<span>Child</span>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const componentId = new ComponentId('TestComponent', 'test1');
+            const childDecl = new ChildComponent('child1', {});
+
+            const parent = await registry.create(
+                componentId,
+                TestComponent,
+                { child: childDecl },
+                container
+            );
+
+            const childId = new ComponentId('ChildComponent', 'child1');
+            const childInstance = registry.get(childId);
+
+            // Set child var to null and re-render
+            parent.vars.child = null;
+            await registry.render(componentId);
+
+            assert.strictEqual(childInstance.destroyCalled, true);
+        });
+
+        it.skip('keeps child that remains in vars', async () => {
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>((child)) ((label))</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+            templateStore.set('ChildComponent', {
+                htmlCode: '<span>Child</span>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const componentId = new ComponentId('TestComponent', 'test1');
+            const childDecl = new ChildComponent('child1', {});
+
+            const parent = await registry.create(
+                componentId,
+                TestComponent,
+                { child: childDecl, label: 'v1' },
+                container
+            );
+
+            const childId = new ComponentId('ChildComponent', 'child1');
+            assert.strictEqual(registry.has(childId), true);
+
+            // Change a scalar var but keep the child
+            parent.vars.label = 'v2';
+            await registry.render(componentId);
+
+            // Child should still exist
+            assert.strictEqual(registry.has(childId), true);
+        });
+
+        it.skip('auto-removes children in arrays when array is cleared', async () => {
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>((cards))</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+            templateStore.set('ChildComponent', {
+                htmlCode: '<span>Card</span>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const componentId = new ComponentId('TestComponent', 'test1');
+            const cards = [
+                new ChildComponent('c1', {}),
+                new ChildComponent('c2', {}),
+            ];
+
+            const parent = await registry.create(
+                componentId,
+                TestComponent,
+                { cards },
+                container
+            );
+
+            assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c1')), true);
+            assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c2')), true);
+
+            // Clear the array
+            parent.vars.cards = [];
+            await registry.render(componentId);
+
+            assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c1')), false);
+            assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c2')), false);
+        });
+    });
+
+    describe('registerComponent()', () => {
+        it('pre-registers a component class for name resolution', async () => {
+            registry.registerComponent('TestComponent', TestComponent);
+
+            const componentId = new ComponentId('TestComponent', 'test1');
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>Test</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const ref = new ComponentReference('TestComponent', 'test1', {});
+            const instance = await registry.createFromReference(ref, container);
+
+            assert.ok(instance instanceof TestComponent);
+        });
+
+        it('overwrites previously registered class', () => {
+            class Alt extends Component {
+                static componentName = 'TestComponent';
+            }
+
+            registry.registerComponent('TestComponent', TestComponent);
+            registry.registerComponent('TestComponent', Alt);
+
+            // Internal map should have the latest class
+            assert.strictEqual(registry._componentClasses.get('TestComponent'), Alt);
+        });
+    });
+
+    describe('createFromReference()', () => {
+        it('creates instance from ComponentReference', async () => {
+            registry.registerComponent('TestComponent', TestComponent);
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>((message))</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const ref = new ComponentReference('TestComponent', 'test1', { message: 'Hello' });
+            const instance = await registry.createFromReference(ref, container);
+
+            assert.ok(instance instanceof TestComponent);
+            assert.strictEqual(instance.vars.message, 'Hello');
+            assert.strictEqual(instance.id, 'TestComponent#test1');
+        });
+
+        it('calls hydrate and afterRender hooks', async () => {
+            registry.registerComponent('TestComponent', TestComponent);
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>Test</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const ref = new ComponentReference('TestComponent', 'test1', {});
+            const instance = await registry.createFromReference(ref, container);
+
+            assert.strictEqual(instance.hydrateCalled, true);
+            assert.strictEqual(instance.afterRenderCalled, true);
+        });
+
+        it('throws if component class not registered and no reactor', async () => {
+            const ref = new ComponentReference('Unknown', 'test1', {});
+
+            await assert.rejects(
+                async () => await registry.createFromReference(ref, container),
+                /Cannot load component "Unknown"/
+            );
+        });
+    });
+
+    describe('Auto-mounting with ComponentReference', () => {
+        class ChildComponent extends Component {
+            static componentName = 'ChildComponent';
+        }
+
+        it('auto-mounts child from ComponentReference in vars', async () => {
+            registry.registerComponent('ChildComponent', ChildComponent);
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>((child))</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+            templateStore.set('ChildComponent', {
+                htmlCode: '<span>Child Content</span>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const componentId = new ComponentId('TestComponent', 'test1');
+            const childRef = new ComponentReference('ChildComponent', 'child1', {});
+
+            await registry.create(
+                componentId,
+                TestComponent,
+                { child: childRef },
+                container
+            );
+
+            const childId = new ComponentId('ChildComponent', 'child1');
+            assert.strictEqual(registry.has(childId), true);
+            assert.ok(container.innerHTML.includes('Child Content'));
+        });
+
+        it('auto-mounts array of ComponentReference children', async () => {
+            registry.registerComponent('ChildComponent', ChildComponent);
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>((cards))</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+            templateStore.set('ChildComponent', {
+                htmlCode: '<span>Card</span>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const componentId = new ComponentId('TestComponent', 'test1');
+            const cards = [
+                new ComponentReference('ChildComponent', 'c1', {}),
+                new ComponentReference('ChildComponent', 'c2', {}),
+            ];
+
+            await registry.create(
+                componentId,
+                TestComponent,
+                { cards },
+                container
+            );
+
+            assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c1')), true);
+            assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c2')), true);
+        });
+
+        it('passes vars from ComponentReference to child instance', async () => {
+            registry.registerComponent('ChildComponent', ChildComponent);
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>((child))</div>',
+                cssCode: '',
+                version: 'v1'
+            });
+            templateStore.set('ChildComponent', {
+                htmlCode: '<span>((label))</span>',
+                cssCode: '',
+                version: 'v1'
+            });
+
+            const componentId = new ComponentId('TestComponent', 'test1');
+            const childRef = new ComponentReference('ChildComponent', 'child1', { label: 'Hello' });
+
+            await registry.create(
+                componentId,
+                TestComponent,
+                { child: childRef },
+                container
+            );
+
+            const childId = new ComponentId('ChildComponent', 'child1');
+            const childInstance = registry.get(childId);
+            assert.strictEqual(childInstance.vars.label, 'Hello');
+        });
+    });
 });
+

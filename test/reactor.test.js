@@ -1,155 +1,443 @@
-import { describe, it } from 'node:test';
+import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { Reactor } from '../src/reactor.js';
 import { Component } from '../src/component.js';
+import { ComponentId } from '../src/component-id.js';
+import { InstanceRegistry } from '../src/instance.js';
+import { Renderer } from '../src/renderer.js';
+import { TemplateStore } from '../src/template-store.js';
+import { FuseWire } from '../src/fusewire.js';
+import { JSDOM } from 'jsdom';
+
+// Mock idiomorph for testing
+const mockMorph = () => {};
+
+// Track app names to unregister after each test
+let registeredApps = [];
+
+afterEach(() => {
+    for (const name of registeredApps) {
+        FuseWire.unregister(name);
+    }
+    registeredApps = [];
+});
+
+/**
+ * Create a Reactor and track it for cleanup
+ * @param {string} appName - Application name
+ * @param {object} config - Reactor config
+ * @returns {Reactor} The created reactor
+ */
+function createReactor(appName, config = {}) {
+    registeredApps.push(appName);
+    return new Reactor(appName, config);
+}
 
 describe('Reactor', () => {
-	describe('Constructor', () => {
-		it('creates reactor instance', () => {
-			const reactor = new Reactor();
-			assert.ok(reactor);
-			assert.ok(reactor._instances instanceof Map);
-			assert.ok(reactor._containers instanceof Map);
-		});
-	});
+    describe('Constructor', () => {
+        it('creates reactor instance with morphFunction', () => {
+            const reactor = createReactor('test-ctor-1', { morphFunction: mockMorph });
+            assert.ok(reactor);
+            assert.ok(reactor._instanceRegistry);
+            assert.ok(reactor._templateStore);
+            assert.ok(reactor._renderer);
+        });
 
-	describe('start()', () => {
-		it('creates and starts a root component', () => {
-			class Counter extends Component {
-				static componentName = 'Counter';
-			}
+        it('creates reactor instance with morphFunction override', () => {
+            const reactor = createReactor('test-ctor-2', { morphFunction: mockMorph });
+            assert.ok(reactor);
+            assert.ok(reactor._instanceRegistry);
+            assert.ok(reactor._templateStore);
+            assert.ok(reactor._renderer);
+        });
 
-			const reactor = new Reactor();
-			const container = {}; // Mock container
-			const instance = reactor.start(container, Counter, 'main', { count: 0 });
+        it('creates reactor instance with provided dependencies', () => {
+            const appName = 'test-ctor-3';
+            const templateStore = new TemplateStore();
+            const renderer = new Renderer(mockMorph, appName);
+            const registry = new InstanceRegistry(renderer, templateStore, appName);
+            
+            const reactor = createReactor(appName, {
+                instanceRegistry: registry,
+                templateStore: templateStore,
+                renderer: renderer
+            });
+            
+            assert.ok(reactor);
+            assert.strictEqual(reactor._instanceRegistry, registry);
+            assert.strictEqual(reactor._templateStore, templateStore);
+            assert.strictEqual(reactor._renderer, renderer);
+        });
 
-			assert.ok(instance);
-			assert.ok(instance instanceof Counter);
-			assert.strictEqual(instance.id, 'Counter#main');
-			assert.deepStrictEqual(instance.vars, { count: 0 });
-		});
+        it('accepts optional config', () => {
+            const config = { 
+                morphFunction: mockMorph,
+                logging: { enabled: false } 
+            };
+            const reactor = createReactor('test-ctor-4', config);
+            assert.deepStrictEqual(reactor._config, config);
+        });
 
-		it('attaches reactor to component', () => {
-			class Counter extends Component {
-				static componentName = 'Counter';
-			}
+        it('passes appName to auto-created renderer', () => {
+            const reactor = createReactor('test-ctor-5', { morphFunction: mockMorph });
+            assert.strictEqual(reactor._renderer._appName, 'test-ctor-5');
+        });
+    });
 
-			const reactor = new Reactor();
-			const container = {};
-			const instance = reactor.start(container, Counter, 'main', {});
+    describe('Validation', () => {
+        it('throws for invalid CSS class name (starts with number)', () => {
+            assert.throws(
+                () => createReactor('123invalid', { morphFunction: mockMorph }),
+                /not a valid CSS class name/,
+            );
+        });
 
-			assert.strictEqual(instance._reactor, reactor);
-		});
+        it('throws for invalid CSS class name (contains spaces)', () => {
+            assert.throws(
+                () => createReactor('has space', { morphFunction: mockMorph }),
+                /not a valid CSS class name/,
+            );
+        });
 
-		it('stores instance and container', () => {
-			class Counter extends Component {
-				static componentName = 'Counter';
-			}
+        it('throws for invalid CSS class name (contains dots)', () => {
+            assert.throws(
+                () => createReactor('has.dot', { morphFunction: mockMorph }),
+                /not a valid CSS class name/,
+            );
+        });
 
-			const reactor = new Reactor();
-			const container = {};
-			const instance = reactor.start(container, Counter, 'main', {});
+        it('accepts valid CSS class names', () => {
+            const reactor1 = createReactor('valid-name', { morphFunction: mockMorph });
+            assert.ok(reactor1);
+            const reactor2 = createReactor('_underscore', { morphFunction: mockMorph });
+            assert.ok(reactor2);
+            const reactor3 = createReactor('camelCase', { morphFunction: mockMorph });
+            assert.ok(reactor3);
+            const reactor4 = createReactor('with-123', { morphFunction: mockMorph });
+            assert.ok(reactor4);
+        });
 
-			assert.strictEqual(reactor._instances.get('Counter#main'), instance);
-			assert.strictEqual(reactor._containers.get('Counter#main'), container);
-		});
+        it('throws for duplicate app name', () => {
+            createReactor('unique-app', { morphFunction: mockMorph });
+            assert.throws(
+                () => createReactor('unique-app', { morphFunction: mockMorph }),
+                /already registered/,
+            );
+        });
+    });
 
-		it('calls hydrate hook', () => {
-			class Counter extends Component {
-				static componentName = 'Counter';
+    describe('start()', () => {
+        it('creates and starts a root component', async () => {
+            const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
+            global.document = dom.window.document;
 
-				hydrate() {
-					this.hydrateCalled = true;
-				}
-			}
+            class Counter extends Component {
+                static componentName = 'Counter';
+            }
 
-			const reactor = new Reactor();
-			const container = {};
-			const instance = reactor.start(container, Counter, 'main', {});
+            const appName = 'test-start-1';
+            const templateStore = new TemplateStore();
+            templateStore.set('Counter', {
+                version: 'test',
+                htmlCode: '<div>Count: ((count))</div>',
+                cssCode: '',
+            });
 
-			assert.strictEqual(instance.hydrateCalled, true);
-		});
-	});
+            const renderer = new Renderer(mockMorph, appName);
+            const registry = new InstanceRegistry(renderer, templateStore, appName);
+            registry.registerComponent('Counter', Counter);
+            const reactor = createReactor(appName, {
+                instanceRegistry: registry,
+                templateStore: templateStore,
+                renderer: renderer
+            });
+            const container = dom.window.document.getElementById('app');
+            
+            const instance = await reactor.start(container, 'Counter', 'main', { count: 0 });
 
-	describe('react()', () => {
-		it('calls update hook on component', () => {
-			class Counter extends Component {
-				static componentName = 'Counter';
+            assert.ok(instance);
+            assert.ok(instance instanceof Counter);
+            assert.strictEqual(instance.id, 'Counter#main');
+            assert.deepStrictEqual(instance.vars, { count: 0 });
+        });
 
-				update() {
-					this.updateCalled = true;
-				}
-			}
+        it('attaches reactor to component', async () => {
+            const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
+            global.document = dom.window.document;
 
-			const reactor = new Reactor();
-			const container = {};
-			const instance = reactor.start(container, Counter, 'main', {});
+            class Counter extends Component {
+                static componentName = 'Counter';
+            }
 
-			instance.updateCalled = false;
-			reactor.react(instance, 'CSR');
+            const appName = 'test-start-2';
+            const templateStore = new TemplateStore();
+            templateStore.set('Counter', {
+                version: 'test',
+                htmlCode: '<div>Count: ((count))</div>',
+                cssCode: '',
+            });
 
-			assert.strictEqual(instance.updateCalled, true);
-		});
+            const renderer = new Renderer(mockMorph, appName);
+            const registry = new InstanceRegistry(renderer, templateStore, appName);
+            registry.registerComponent('Counter', Counter);
+            const reactor = createReactor(appName, {
+                instanceRegistry: registry,
+                templateStore: templateStore,
+                renderer: renderer
+            });
+            const container = dom.window.document.getElementById('app');
+            
+            const instance = await reactor.start(container, 'Counter', 'main', {});
 
-		it('defaults to CSR mode', () => {
-			class Counter extends Component {
-				static componentName = 'Counter';
+            assert.strictEqual(instance._reactor, reactor);
+        });
 
-				update() {
-					this.updateCalled = true;
-				}
-			}
+        it('delegates to instanceRegistry.createFromReference()', async () => {
+            class Counter extends Component {
+                static componentName = 'Counter';
+            }
 
-			const reactor = new Reactor();
-			const container = {};
-			const instance = reactor.start(container, Counter, 'main', {});
+            let createCalled = false;
+            let receivedRef = null;
+            const mockRegistry = {
+                _reactor: null,
+                async createFromReference(ref, container) {
+                    createCalled = true;
+                    receivedRef = ref;
+                    const instance = new Counter('', {});
+                    return instance;
+                },
+            };
 
-			instance.updateCalled = false;
-			reactor.react(instance); // No mode specified
+            const reactor = createReactor('test-start-3', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph
+            });
+            const container = { classList: { add() {} } };
+            
+            await reactor.start(container, 'Counter', 'main', {});
 
-			assert.strictEqual(instance.updateCalled, true);
-		});
+            assert.strictEqual(createCalled, true);
+            assert.strictEqual(receivedRef.componentName, 'Counter');
+            assert.strictEqual(receivedRef.id, 'main');
+        });
 
-		it('throws for unsupported render mode', () => {
-			class Counter extends Component {
-				static componentName = 'Counter';
-			}
+        it('adds fusewire and appName classes to root container', async () => {
+            const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
+            global.document = dom.window.document;
 
-			const reactor = new Reactor();
-			const container = {};
-			const instance = reactor.start(container, Counter, 'main', {});
+            class Counter extends Component {
+                static componentName = 'Counter';
+            }
 
-			assert.throws(
-				() => reactor.react(instance, 'SSR'),
-				/Unsupported render mode "SSR"/,
-			);
-		});
-	});
+            const appName = 'test-start-4';
+            const templateStore = new TemplateStore();
+            templateStore.set('Counter', {
+                version: 'test',
+                htmlCode: '<div>Test</div>',
+                cssCode: '',
+            });
 
-	describe('Component integration', () => {
-		it('allows component to call react() method', () => {
-			class Counter extends Component {
-				static componentName = 'Counter';
+            const renderer = new Renderer(mockMorph, appName);
+            const registry = new InstanceRegistry(renderer, templateStore, appName);
+            registry.registerComponent('Counter', Counter);
+            const reactor = createReactor(appName, {
+                instanceRegistry: registry,
+                templateStore: templateStore,
+                renderer: renderer
+            });
+            const container = dom.window.document.getElementById('app');
 
-				increment() {
-					this.vars.count++;
-					this.react(); // Should trigger reactor.react()
-				}
+            await reactor.start(container, 'Counter', 'main', {});
 
-				update() {
-					this.updateCalled = true;
-				}
-			}
+            assert.ok(container.classList.contains('fusewire'));
+            assert.ok(container.classList.contains(appName));
+            assert.ok(container.classList.contains('fusewire-component-Counter'));
+        });
 
-			const reactor = new Reactor();
-			const container = {};
-			const instance = reactor.start(container, Counter, 'main', { count: 0 });
+        it('adds app classes only to first container', async () => {
+            const dom = new JSDOM('<!DOCTYPE html><div id="app"></div><div id="child"></div>');
+            global.document = dom.window.document;
 
-			instance.updateCalled = false;
-			instance.increment();
+            class Parent extends Component {
+                static componentName = 'Parent';
+            }
+            class Child extends Component {
+                static componentName = 'Child';
+            }
 
-			assert.strictEqual(instance.vars.count, 1);
-			assert.strictEqual(instance.updateCalled, true);
-		});
-	});
+            const appName = 'test-start-5';
+            const templateStore = new TemplateStore();
+            templateStore.set('Parent', { version: 'v1', htmlCode: '<div>Parent</div>', cssCode: '' });
+            templateStore.set('Child', { version: 'v1', htmlCode: '<div>Child</div>', cssCode: '' });
+
+            const renderer = new Renderer(mockMorph, appName);
+            const registry = new InstanceRegistry(renderer, templateStore, appName);
+            registry.registerComponent('Parent', Parent);
+            registry.registerComponent('Child', Child);
+            const reactor = createReactor(appName, {
+                instanceRegistry: registry,
+                templateStore: templateStore,
+                renderer: renderer
+            });
+
+            const rootContainer = dom.window.document.getElementById('app');
+            const childContainer = dom.window.document.getElementById('child');
+
+            await reactor.start(rootContainer, 'Parent', 'main', {});
+            await reactor.start(childContainer, 'Child', 'child', {});
+
+            // Root container gets fusewire + appName
+            assert.ok(rootContainer.classList.contains('fusewire'));
+            assert.ok(rootContainer.classList.contains(appName));
+
+            // Child container gets component class but NOT fusewire/appName
+            assert.ok(childContainer.classList.contains('fusewire-component-Child'));
+            assert.ok(!childContainer.classList.contains('fusewire'));
+        });
+
+        it('sets container on component instance', async () => {
+            const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
+            global.document = dom.window.document;
+
+            class Counter extends Component {
+                static componentName = 'Counter';
+            }
+
+            const appName = 'test-start-6';
+            const templateStore = new TemplateStore();
+            templateStore.set('Counter', {
+                version: 'test',
+                htmlCode: '<div>Test</div>',
+                cssCode: '',
+            });
+
+            const renderer = new Renderer(mockMorph, appName);
+            const registry = new InstanceRegistry(renderer, templateStore, appName);
+            registry.registerComponent('Counter', Counter);
+            const reactor = createReactor(appName, {
+                instanceRegistry: registry,
+                templateStore: templateStore,
+                renderer: renderer
+            });
+            const container = dom.window.document.getElementById('app');
+
+            const instance = await reactor.start(container, 'Counter', 'main', {});
+
+            assert.strictEqual(instance.container, container);
+        });
+    });
+
+    describe('react()', () => {
+        it('accepts ComponentId', async () => {
+            let renderCalled = false;
+            const mockRegistry = {
+                async render(componentId) {
+                    renderCalled = true;
+                    assert.ok(componentId instanceof ComponentId);
+                },
+            };
+
+            const reactor = createReactor('test-react-1', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph
+            });
+            const componentId = new ComponentId('Counter', 'main');
+            
+            await reactor.react(componentId, 'CSR');
+
+            assert.strictEqual(renderCalled, true);
+        });
+
+        it('accepts string componentId', async () => {
+            let renderCalled = false;
+            const mockRegistry = {
+                async render(componentId) {
+                    renderCalled = true;
+                    assert.ok(componentId instanceof ComponentId);
+                    assert.strictEqual(componentId.name, 'Counter');
+                    assert.strictEqual(componentId.id, 'main');
+                },
+            };
+
+            const reactor = createReactor('test-react-2', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph
+            });
+            
+            await reactor.react('Counter#main', 'CSR');
+
+            assert.strictEqual(renderCalled, true);
+        });
+
+        it('defaults to CSR mode', async () => {
+            const mockRegistry = {
+                async render() {},
+            };
+
+            const reactor = createReactor('test-react-3', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph
+            });
+            
+            // Should not throw
+            await reactor.react('Counter#main');
+        });
+
+        it('throws for unsupported render mode', async () => {
+            const mockRegistry = {
+                async render() {},
+            };
+
+            const reactor = createReactor('test-react-4', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph
+            });
+
+            await assert.rejects(
+                async () => await reactor.react('Counter#main', 'SSR'),
+                /Unsupported render mode "SSR"/,
+            );
+        });
+
+        it('delegates to instanceRegistry.render()', async () => {
+            let renderCalled = false;
+            const mockRegistry = {
+                async render(componentId) {
+                    renderCalled = true;
+                },
+            };
+
+            const reactor = createReactor('test-react-5', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph
+            });
+            
+            await reactor.react('Counter#main');
+
+            assert.strictEqual(renderCalled, true);
+        });
+    });
+
+    describe('registerComponent() removal', () => {
+        it('does not have registerComponent method', () => {
+            const reactor = createReactor('test-no-register-1', { morphFunction: mockMorph });
+            assert.strictEqual(reactor.registerComponent, undefined);
+        });
+    });
+
+    describe('basePath', () => {
+        it('defaults to ./components', () => {
+            const reactor = createReactor('test-basepath-1', { morphFunction: mockMorph });
+            assert.strictEqual(reactor.basePath, './components');
+        });
+
+        it('accepts custom basePath', () => {
+            const reactor = createReactor('test-basepath-2', {
+                morphFunction: mockMorph,
+                basePath: '/custom/path'
+            });
+            assert.strictEqual(reactor.basePath, '/custom/path');
+        });
+    });
 });

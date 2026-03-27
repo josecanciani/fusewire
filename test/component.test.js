@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { Component } from '../src/component.js';
+import { ComponentReference } from '../src/component-reference.js';
 
 describe('Component', () => {
 	describe('Constructor', () => {
@@ -92,28 +93,28 @@ describe('Component', () => {
 
 	describe('react()', () => {
 		it('calls reactor.react when attached', () => {
-			const comp = new Component('test', {});
+			const comp = new Component('Component#test', {});
 			const reactCalls = [];
 
 			comp._reactor = {
-				react(component, mode) {
-					reactCalls.push({ component, mode });
+				react(componentCode, mode) {
+					reactCalls.push({ componentCode, mode });
 				},
 			};
 
 			comp.react('CSR');
 
 			assert.strictEqual(reactCalls.length, 1);
-			assert.strictEqual(reactCalls[0].component, comp);
+			assert.strictEqual(reactCalls[0].componentCode, 'Component#test');
 			assert.strictEqual(reactCalls[0].mode, 'CSR');
 		});
 
 		it('defaults to CSR mode', () => {
-			const comp = new Component('test', {});
+			const comp = new Component('Component#test', {});
 			const reactCalls = [];
 
 			comp._reactor = {
-				react(component, mode) {
+				react(componentCode, mode) {
 					reactCalls.push({ mode });
 				},
 			};
@@ -246,6 +247,42 @@ describe('Component', () => {
 			assert.strictEqual(migrated.newField, 'default');
 			assert.strictEqual(migrated.renamedField, 'value');
 			assert.strictEqual(migrated.oldField, undefined);
+		});
+	});
+
+	describe('createChild()', () => {
+		it('returns a ComponentReference with correct componentName, id, and vars', () => {
+			const comp = new Component();
+			const ref = comp.createChild('Sidebar', 'main', { collapsed: false });
+
+			assert.strictEqual(ref.componentName, 'Sidebar');
+			assert.strictEqual(ref.id, 'main');
+			assert.deepStrictEqual(ref.vars, { collapsed: false });
+		});
+
+		it('returns a ComponentReference with empty id when id is omitted', () => {
+			const comp = new Component();
+			const ref = comp.createChild('Sidebar', { collapsed: true });
+
+			assert.strictEqual(ref.componentName, 'Sidebar');
+			assert.strictEqual(ref.id, '');
+			assert.deepStrictEqual(ref.vars, { collapsed: true });
+		});
+
+		it('returns a ComponentReference with empty id and empty vars when only name is given', () => {
+			const comp = new Component();
+			const ref = comp.createChild('Sidebar');
+
+			assert.strictEqual(ref.componentName, 'Sidebar');
+			assert.strictEqual(ref.id, '');
+			assert.deepStrictEqual(ref.vars, {});
+		});
+
+		it('returns an instance of ComponentReference', () => {
+			const comp = new Component();
+			const ref = comp.createChild('Sidebar', 'main', { collapsed: false });
+
+			assert.ok(ref instanceof ComponentReference);
 		});
 	});
 });

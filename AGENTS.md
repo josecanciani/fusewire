@@ -167,10 +167,10 @@ To include a child component, put its instance in vars. The template renders it 
 
 ### Introspection over re-fetching
 
-When you need a component's source code (HTML, CSS), read it from the template store after registration instead of fetching files again:
+After a component has been rendered (template lazy-loaded), read its source from the template store instead of fetching files again:
 
 ```javascript
-await this._reactor.registerComponent(path, name);
+// Template is auto-loaded on first render; read it from the store afterward
 const template = this._reactor._templateStore.get(name);
 // template.htmlCode, template.cssCode are available
 ```

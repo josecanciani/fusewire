@@ -32,10 +32,10 @@ class Counter extends Component {
   }
 }
 
-const reactor = new Reactor();
+const reactor = new Reactor('myApp');
 reactor.start(
   document.getElementById('app'),
-  Counter,
+  'Counter',
   'main',
   { count: 0 }
 );
@@ -66,6 +66,19 @@ npm run lint
 # Format code
 npm run format
 ```
+
+## Examples
+
+Interactive examples are available in the `examples/` directory. To run them:
+
+```bash
+npm run examples
+```
+
+This will start a local web server at http://localhost:8000 and open the examples page in your browser.
+
+Available examples:
+- **Counter (Client-Only)**: Demonstrates component lifecycle, reactive rendering, templates, and CSS scoping
 
 ## License
 

@@ -6,221 +6,258 @@ import { ComponentId } from '../src/component-id.js';
 import { Idiomorph } from 'idiomorph';
 
 describe('Renderer', () => {
-	let dom;
-	let document;
-	let container;
+    let dom;
+    let document;
+    let container;
+    const appName = 'testApp';
 
-	beforeEach(() => {
-		dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-			url: 'http://localhost', // Needed for localStorage
-		});
-		document = dom.window.document;
-		const { window } = dom;
+    beforeEach(() => {
+        dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
+            url: 'http://localhost', // Needed for localStorage
+        });
+        document = dom.window.document;
+        const { window } = dom;
 
-		// Set up global DOM objects for idiomorph
-		// Copy all relevant constructors from JSDOM window to global
-		Object.keys(window).forEach((key) => {
-			const value = window[key];
-			if (typeof value === 'function' && (
-				key.startsWith('HTML') ||
-				key.startsWith('DOM') ||
-				key === 'Node' ||
-				key === 'Element' ||
-				key === 'Document'
-			)) {
-				global[key] = value;
-			}
-		});
-		global.document = document;
-		global.localStorage = window.localStorage;
+        // Set up global DOM objects for idiomorph
+        // Copy all relevant constructors from JSDOM window to global
+        Object.keys(window).forEach((key) => {
+            const value = window[key];
+            if (typeof value === 'function' && (
+                key.startsWith('HTML') ||
+                key.startsWith('DOM') ||
+                key === 'Node' ||
+                key === 'Element' ||
+                key === 'Document'
+            )) {
+                global[key] = value;
+            }
+        });
+        global.document = document;
+        global.localStorage = window.localStorage;
 
-		container = document.createElement('div');
-		document.body.appendChild(container);
-	});
+        container = document.createElement('div');
+        document.body.appendChild(container);
+    });
 
-	describe('Constructor', () => {
-		it('creates renderer with morph function', () => {
-			const renderer = new Renderer(Idiomorph.morph);
-			assert.ok(renderer);
-			assert.strictEqual(typeof renderer.morphFunction, 'function');
-		});
-	});
+    describe('Constructor', () => {
+        it('creates renderer with morph function and appName', () => {
+            const renderer = new Renderer(Idiomorph.morph, appName);
+            assert.ok(renderer);
+            assert.strictEqual(typeof renderer.morphFunction, 'function');
+            assert.strictEqual(renderer._appName, appName);
+        });
 
-	describe('render()', () => {
-		it('renders template on first render (innerHTML)', () => {
-			const renderer = new Renderer(Idiomorph.morph);
-			const compiledTemplate = {
-				render: (vars) => `<div class="counter">${vars.count}</div>`,
-				css: '.counter { color: red; }',
-			};
-			const componentId = new ComponentId('Counter', '1');
+        it('defaults appName to "default"', () => {
+            const renderer = new Renderer(Idiomorph.morph);
+            assert.strictEqual(renderer._appName, 'default');
+        });
+    });
 
-			const mountPoints = renderer.render(
-				container,
-				compiledTemplate,
-				{ count: 5 },
-				componentId,
-			);
+    describe('render()', () => {
+        it('renders template on first render (innerHTML)', () => {
+            const renderer = new Renderer(Idiomorph.morph, appName);
+            const compiledTemplate = {
+                render: (vars) => `<div class="counter">${vars.count}</div>`,
+                css: '.counter { color: red; }',
+            };
+            const componentId = new ComponentId('Counter', '1');
 
-			assert.strictEqual(container.innerHTML, '<div class="counter">5</div>');
-			assert.strictEqual(mountPoints.length, 0);
-		});
+            const mountPoints = renderer.render(
+                container,
+                compiledTemplate,
+                { count: 5 },
+                componentId,
+            );
 
-		// Note: Morphing tests are skipped in Node/JSDOM due to idiomorph compatibility issues
-		// These tests pass in real browsers - see test/browser/morphing.spec.js
-		it.skip('morphs DOM on re-render', () => {
-			const renderer = new Renderer(Idiomorph.morph);
-			const compiledTemplate = {
-				render: (vars) => `<div class="counter">${vars.count}</div>`,
-				css: '',
-			};
-			const componentId = new ComponentId('Counter', '1');
+            assert.strictEqual(container.innerHTML, '<div class="counter">5</div>');
+            assert.strictEqual(mountPoints.length, 0);
+        });
 
-			// First render
-			renderer.render(container, compiledTemplate, { count: 5 }, componentId);
-			const firstDiv = container.querySelector('.counter');
+        // Note: Morphing tests are skipped in Node/JSDOM due to idiomorph compatibility issues
+        // These tests pass in real browsers - see test/browser/morphing.spec.js
+        it.skip('morphs DOM on re-render', () => {
+            const renderer = new Renderer(Idiomorph.morph, appName);
+            const compiledTemplate = {
+                render: (vars) => `<div class="counter">${vars.count}</div>`,
+                css: '',
+            };
+            const componentId = new ComponentId('Counter', '1');
 
-			// Second render with updated count
-			renderer.render(container, compiledTemplate, { count: 10 }, componentId);
-			const secondDiv = container.querySelector('.counter');
+            // First render
+            renderer.render(container, compiledTemplate, { count: 5 }, componentId);
+            const firstDiv = container.querySelector('.counter');
 
-			// Same element reference (morphed, not replaced)
-			assert.strictEqual(firstDiv, secondDiv);
-			assert.strictEqual(secondDiv.textContent, '10');
-		});
+            // Second render with updated count
+            renderer.render(container, compiledTemplate, { count: 10 }, componentId);
+            const secondDiv = container.querySelector('.counter');
 
-		it('injects CSS on first render', () => {
-			const renderer = new Renderer(Idiomorph.morph);
-			const compiledTemplate = {
-				render: () => '<div>Test</div>',
-				css: '.test { color: blue; }',
-			};
-			const componentId = new ComponentId('TestComponent', '1');
+            // Same element reference (morphed, not replaced)
+            assert.strictEqual(firstDiv, secondDiv);
+            assert.strictEqual(secondDiv.textContent, '10');
+        });
 
-			renderer.render(container, compiledTemplate, {}, componentId);
+        it('injects scoped CSS on first render', () => {
+            const renderer = new Renderer(Idiomorph.morph, appName);
+            const compiledTemplate = {
+                render: () => '<div>Test</div>',
+                css: '.test { color: blue; }',
+            };
+            const componentId = new ComponentId('TestComponent', '1');
 
-			const styleEl = document.getElementById(
-				'fusewire-style-TestComponent',
-			);
-			assert.ok(styleEl);
-			assert.strictEqual(styleEl.textContent, '.test { color: blue; }');
-		});
+            renderer.render(container, compiledTemplate, {}, componentId);
 
-		it('injects CSS only once per component name', () => {
-			const renderer = new Renderer(Idiomorph.morph);
-			const compiledTemplate = {
-				render: () => '<div>Test</div>',
-				css: '.test { color: blue; }',
-			};
+            const styleEl = document.getElementById(
+                `fusewire-style-${appName}-TestComponent`,
+            );
+            assert.ok(styleEl);
+            // CSS should be scoped with appName + component class
+            assert.ok(styleEl.textContent.includes(`.${appName}`));
+            assert.ok(styleEl.textContent.includes('.fusewire-component-TestComponent'));
+            assert.ok(styleEl.textContent.includes('.test'));
+        });
 
-			// Render first instance
-			renderer.render(
-				container,
-				compiledTemplate,
-				{},
-				new ComponentId('TestComponent', '1'),
-			);
+        it('injects CSS only once per component name', () => {
+            const renderer = new Renderer(Idiomorph.morph, appName);
+            const compiledTemplate = {
+                render: () => '<div>Test</div>',
+                css: '.test { color: blue; }',
+            };
 
-			// Render second instance
-			const container2 = document.createElement('div');
-			renderer.render(
-				container2,
-				compiledTemplate,
-				{},
-				new ComponentId('TestComponent', '2'),
-			);
+            // Render first instance
+            renderer.render(
+                container,
+                compiledTemplate,
+                {},
+                new ComponentId('TestComponent', '1'),
+            );
 
-			// Only one style tag should exist
-			const styleTags = document.querySelectorAll(
-				'[id^="fusewire-style-TestComponent"]',
-			);
-			assert.strictEqual(styleTags.length, 1);
-		});
+            // Render second instance
+            const container2 = document.createElement('div');
+            renderer.render(
+                container2,
+                compiledTemplate,
+                {},
+                new ComponentId('TestComponent', '2'),
+            );
 
-		it('does not inject CSS if cssCode is empty', () => {
-			const renderer = new Renderer(Idiomorph.morph);
-			const compiledTemplate = {
-				render: () => '<div>Test</div>',
-				css: '',
-			};
-			const componentId = new ComponentId('NoCSS', '1');
+            // Only one style tag should exist
+            const styleTags = document.querySelectorAll(
+                `[id^="fusewire-style-${appName}-TestComponent"]`,
+            );
+            assert.strictEqual(styleTags.length, 1);
+        });
 
-			renderer.render(container, compiledTemplate, {}, componentId);
+        it('does not inject CSS if cssCode is empty', () => {
+            const renderer = new Renderer(Idiomorph.morph, appName);
+            const compiledTemplate = {
+                render: () => '<div>Test</div>',
+                css: '',
+            };
+            const componentId = new ComponentId('NoCSS', '1');
 
-			const styleEl = document.getElementById('fusewire-style-NoCSS');
-			assert.strictEqual(styleEl, null);
-		});
+            renderer.render(container, compiledTemplate, {}, componentId);
 
-		it('finds child mount points', () => {
-			const renderer = new Renderer(Idiomorph.morph);
-			const compiledTemplate = {
-				render: (vars, parentId) =>
-					`<div>
-						<div data-fusewire-id="Child#1" data-fusewire-parent-id="${parentId}"></div>
-						<div data-fusewire-id="Child#2" data-fusewire-parent-id="${parentId}"></div>
-					</div>`,
-				css: '',
-			};
-			const componentId = new ComponentId('Parent', '1');
+            const styleEl = document.getElementById(`fusewire-style-${appName}-NoCSS`);
+            assert.strictEqual(styleEl, null);
+        });
 
-			const mountPoints = renderer.render(
-				container,
-				compiledTemplate,
-				{},
-				componentId,
-			);
+        it('finds child mount points', () => {
+            const renderer = new Renderer(Idiomorph.morph, appName);
+            const compiledTemplate = {
+                render: (vars, parentId) =>
+                    `<div>
+                        <div data-fusewire-id="Child#1" data-fusewire-parent-id="${parentId}"></div>
+                        <div data-fusewire-id="Child#2" data-fusewire-parent-id="${parentId}"></div>
+                    </div>`,
+                css: '',
+            };
+            const componentId = new ComponentId('Parent', '1');
 
-			assert.strictEqual(mountPoints.length, 2);
-			assert.strictEqual(
-				mountPoints[0].getAttribute('data-fusewire-id'),
-				'Child#1',
-			);
-			assert.strictEqual(
-				mountPoints[1].getAttribute('data-fusewire-id'),
-				'Child#2',
-			);
-		});
+            const mountPoints = renderer.render(
+                container,
+                compiledTemplate,
+                {},
+                componentId,
+            );
 
-		it.skip('updates text nodes via morphing', () => {
-			const renderer = new Renderer(Idiomorph.morph);
-			const compiledTemplate = {
-				render: (vars) => `<div><span>${vars.text}</span></div>`,
-				css: '',
-			};
-			const componentId = new ComponentId('Text', '1');
+            assert.strictEqual(mountPoints.length, 2);
+            assert.strictEqual(
+                mountPoints[0].getAttribute('data-fusewire-id'),
+                'Child#1',
+            );
+            assert.strictEqual(
+                mountPoints[1].getAttribute('data-fusewire-id'),
+                'Child#2',
+            );
+        });
 
-			renderer.render(container, compiledTemplate, { text: 'Hello' }, componentId);
-			const span = container.querySelector('span');
-			assert.strictEqual(span.textContent, 'Hello');
+        it.skip('updates text nodes via morphing', () => {
+            const renderer = new Renderer(Idiomorph.morph, appName);
+            const compiledTemplate = {
+                render: (vars) => `<div><span>${vars.text}</span></div>`,
+                css: '',
+            };
+            const componentId = new ComponentId('Text', '1');
 
-			renderer.render(container, compiledTemplate, { text: 'World' }, componentId);
-			assert.strictEqual(span.textContent, 'World');
-		});
+            renderer.render(container, compiledTemplate, { text: 'Hello' }, componentId);
+            const span = container.querySelector('span');
+            assert.strictEqual(span.textContent, 'Hello');
 
-		it.skip('updates attributes via morphing', () => {
-			const renderer = new Renderer(Idiomorph.morph);
-			const compiledTemplate = {
-				render: (vars) => `<div><button class="${vars.btnClass}">Click</button></div>`,
-				css: '',
-			};
-			const componentId = new ComponentId('Button', '1');
+            renderer.render(container, compiledTemplate, { text: 'World' }, componentId);
+            assert.strictEqual(span.textContent, 'World');
+        });
 
-			renderer.render(
-				container,
-				compiledTemplate,
-				{ btnClass: 'primary' },
-				componentId,
-			);
-			const button = container.querySelector('button');
-			assert.strictEqual(button.className, 'primary');
+        it.skip('updates attributes via morphing', () => {
+            const renderer = new Renderer(Idiomorph.morph, appName);
+            const compiledTemplate = {
+                render: (vars) => `<div><button class="${vars.btnClass}">Click</button></div>`,
+                css: '',
+            };
+            const componentId = new ComponentId('Button', '1');
 
-			renderer.render(
-				container,
-				compiledTemplate,
-				{ btnClass: 'secondary' },
-				componentId,
-			);
-			assert.strictEqual(button.className, 'secondary');
-		});
-	});
+            renderer.render(
+                container,
+                compiledTemplate,
+                { btnClass: 'primary' },
+                componentId,
+            );
+            const button = container.querySelector('button');
+            assert.strictEqual(button.className, 'primary');
+
+            renderer.render(
+                container,
+                compiledTemplate,
+                { btnClass: 'secondary' },
+                componentId,
+            );
+            assert.strictEqual(button.className, 'secondary');
+        });
+    });
+
+    describe('_scopeCSS()', () => {
+        it('wraps CSS in nested appName and component class rules', () => {
+            const renderer = new Renderer(Idiomorph.morph, appName);
+            const scoped = renderer._scopeCSS('.test { color: red; }', 'Counter');
+
+            assert.ok(scoped.startsWith(`.${appName} {`));
+            assert.ok(scoped.includes('.fusewire-component-Counter {'));
+            assert.ok(scoped.includes('.test { color: red; }'));
+        });
+
+        it('preserves raw CSS inside the nesting', () => {
+            const renderer = new Renderer(Idiomorph.morph, appName);
+            const css = `.a, .b { color: blue; }
+.c { font-size: 1rem; }`;
+            const scoped = renderer._scopeCSS(css, 'Counter');
+
+            assert.ok(scoped.includes('.a, .b { color: blue; }'));
+            assert.ok(scoped.includes('.c { font-size: 1rem; }'));
+        });
+
+        it('returns empty string for empty CSS', () => {
+            const renderer = new Renderer(Idiomorph.morph, appName);
+            assert.strictEqual(renderer._scopeCSS('', 'Counter'), '');
+            assert.strictEqual(renderer._scopeCSS('   ', 'Counter'), '');
+        });
+    });
 });
