@@ -7,20 +7,28 @@ describe('Component', () => {
 	describe('Constructor', () => {
 		it('creates instance with default values', () => {
 			const comp = new Component();
-			assert.strictEqual(comp.id, '');
+			assert.deepStrictEqual(comp.componentVars, {});
 			assert.deepStrictEqual(comp.vars, {});
-			assert.strictEqual(comp.container, null);
+			assert.strictEqual(comp.componentContainer, null);
+			assert.strictEqual(comp.componentParent, null);
+			assert.strictEqual(comp.componentName, '');
+			assert.strictEqual(comp.componentId, '');
+			assert.strictEqual(comp.componentVersion, '');
 		});
 
-		it('creates instance with id and vars', () => {
-			const comp = new Component('main', { count: 0 });
-			assert.strictEqual(comp.id, 'main');
+		it('creates instance with vars', () => {
+			const comp = new Component({ count: 0 });
+			assert.deepStrictEqual(comp.componentVars, { count: 0 });
 			assert.deepStrictEqual(comp.vars, { count: 0 });
 		});
 
-		it('sets static componentName', () => {
-			assert.strictEqual(Component.componentName, 'Component');
+		it('vars getter returns componentVars', () => {
+			const comp = new Component({ count: 0 });
+			assert.strictEqual(comp.vars, comp.componentVars);
+			comp.componentVars.count = 5;
+			assert.strictEqual(comp.vars.count, 5);
 		});
+
 	});
 
 	describe('Lifecycle Hooks', () => {
@@ -46,10 +54,8 @@ describe('Component', () => {
 
 		it('allows overriding hooks', async () => {
 			class TestComponent extends Component {
-				static componentName = 'TestComponent';
-				
-				constructor(id, vars) {
-					super(id, vars);
+				constructor(vars) {
+					super(vars);
 					this.hydrateCalled = false;
 					this.updateCalled = false;
 					this.destroyCalled = false;
@@ -74,7 +80,7 @@ describe('Component', () => {
 				}
 			}
 
-			const comp = new TestComponent('test', { count: 0 });
+			const comp = new TestComponent({ count: 0 });
 
 			await comp.hydrate();
 			assert.strictEqual(comp.hydrateCalled, true);
@@ -93,7 +99,9 @@ describe('Component', () => {
 
 	describe('react()', () => {
 		it('calls reactor.react when attached', () => {
-			const comp = new Component('Component#test', {});
+			const comp = new Component();
+			comp.componentName = 'Component';
+			comp.componentId = 'test';
 			const reactCalls = [];
 
 			comp._reactor = {
@@ -110,7 +118,9 @@ describe('Component', () => {
 		});
 
 		it('defaults to CSR mode', () => {
-			const comp = new Component('Component#test', {});
+			const comp = new Component();
+			comp.componentName = 'Component';
+			comp.componentId = 'test';
 			const reactCalls = [];
 
 			comp._reactor = {
@@ -126,27 +136,16 @@ describe('Component', () => {
 	});
 
 	describe('Subclassing', () => {
-		it('allows subclassing with custom componentName', () => {
-			class Counter extends Component {
-				static componentName = 'Counter';
-			}
-
-			assert.strictEqual(Counter.componentName, 'Counter');
-		});
-
 		it('inherits from Component', () => {
-			class Counter extends Component {
-				static componentName = 'Counter';
-			}
+			class Counter extends Component {}
 
-			const counter = new Counter('main', { count: 0 });
+			const counter = new Counter({ count: 0 });
 			assert.ok(counter instanceof Component);
 			assert.ok(counter instanceof Counter);
 		});
 
 		it('allows adding custom methods', () => {
 			class Counter extends Component {
-				static componentName = 'Counter';
 
 				increment() {
 					this.vars.count++;
@@ -157,7 +156,7 @@ describe('Component', () => {
 				}
 			}
 
-			const counter = new Counter('main', { count: 5 });
+			const counter = new Counter({ count: 5 });
 			counter.increment();
 			assert.strictEqual(counter.vars.count, 6);
 			counter.decrement();
@@ -167,13 +166,13 @@ describe('Component', () => {
 
 	describe('Vars Management', () => {
 		it('allows direct vars mutation', () => {
-			const comp = new Component('test', { count: 0 });
+			const comp = new Component({ count: 0 });
 			comp.vars.count = 10;
 			assert.strictEqual(comp.vars.count, 10);
 		});
 
 		it('allows nested object vars', () => {
-			const comp = new Component('test', {
+			const comp = new Component({
 				user: {
 					name: 'Alice',
 					profile: {
@@ -196,7 +195,6 @@ describe('Component', () => {
 
 		it('can be overridden in subclass', () => {
 			class Counter extends Component {
-				static componentName = 'Counter';
 				static CURRENT_VERSION = 2;
 
 				static migrateVars(vars) {
@@ -217,7 +215,6 @@ describe('Component', () => {
 
 		it('allows developer-maintained version tracking', () => {
 			class MyComponent extends Component {
-				static componentName = 'MyComponent';
 				static CURRENT_VERSION = 3;
 
 				static migrateVars(vars) {

@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import { JSDOM } from 'jsdom';
 import { ComponentId } from '../src/component-id.js';
 import { compileTemplate } from '../src/template-compiler.js';
+import { ComponentReference } from '../src/component-reference.js';
 
 // Set up JSDOM global document
 const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
@@ -318,17 +319,9 @@ describe('Template Compiler', () => {
 
     describe('Component Mount Points', () => {
         it('renders component as mount point', () => {
-            // Mock component class
-            class ChildComponent {
-                static componentName = 'ChildComponent';
-                constructor(id) {
-                    this.id = id;
-                }
-            }
-
             const template = compileTemplate('<div>((child))</div>');
             const componentId = new ComponentId('Parent', 'main');
-            const child = new ChildComponent('child1');
+            const child = new ComponentReference('ChildComponent', 'child1');
             const result = template.render({ child }, componentId);
 
             assert.ok(result.includes('data-fusewire-id="ChildComponent#child1"'));
@@ -336,16 +329,12 @@ describe('Template Compiler', () => {
         });
 
         it('renders array of components as mount points', () => {
-            class Card {
-                static componentName = 'Card';
-                constructor(id) {
-                    this.id = id;
-                }
-            }
-
             const template = compileTemplate('<div>((cards))</div>');
             const componentId = new ComponentId('CardList', 'main');
-            const cards = [new Card('card1'), new Card('card2')];
+            const cards = [
+                new ComponentReference('Card', 'card1'),
+                new ComponentReference('Card', 'card2'),
+            ];
             const result = template.render({ cards }, componentId);
 
             assert.ok(result.includes('data-fusewire-id="Card#card1"'));

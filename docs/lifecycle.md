@@ -6,24 +6,24 @@ Components in FuseWire follow a well-defined lifecycle with hooks at key points.
 
 ## Lifecycle Hooks
 
-### `constructor(id, vars)`
+### `constructor(vars)`
 
 **When:** Component instance is created  
 **Type:** Synchronous  
 **Purpose:** Initialize component instance
 
 ```js
-constructor(id = '', vars = {}) {
-  super(id, vars);
+constructor(vars = {}) {
+  super(vars);
   this.myInternalState = {};
 }
 ```
 
 **Guidelines:**
-- Call `super(id, vars)` first
+- Call `super(vars)` first
 - Set up internal state
 - Don't perform async operations here
-- Don't access DOM (container not set yet)
+- Don't access DOM (componentContainer not set yet)
 
 ---
 
@@ -91,19 +91,19 @@ update(oldVars) {
 ```js
 afterRender() {
   // Set up event listeners
-  const button = this.container.querySelector('.submit-btn');
+  const button = this.componentContainer.querySelector('.submit-btn');
   button.addEventListener('click', () => this.submit());
   
   // Initialize DOM-dependent libraries
-  this.tooltip = new Tooltip(this.container.querySelector('.help-icon'));
+  this.tooltip = new Tooltip(this.componentContainer.querySelector('.help-icon'));
   
   // Trigger animations
-  this.container.classList.add('fade-in');
+  this.componentContainer.classList.add('fade-in');
 }
 ```
 
 **Guidelines:**
-- Safe to access `this.container` and child elements
+- Safe to access `this.componentContainer` and child elements
 - Called after every render (not just first)
 - Keep lightweight to avoid blocking
 - Remember to clean up in `destroy()`
@@ -147,7 +147,7 @@ destroy() {
 ### First Render
 
 ```
-1. new Component(id, vars)
+1. new Component(vars)
 2. hydrate()                    # Async, can modify vars
 3. [render DOM]
 4. afterRender()
@@ -221,7 +221,7 @@ class Chart extends Component {
     }
     
     // Initialize new chart
-    const canvas = this.container.querySelector('canvas');
+    const canvas = this.componentContainer.querySelector('canvas');
     this.chart = new ChartLibrary(canvas, {
       data: this.vars.data
     });
@@ -280,9 +280,9 @@ Add logging to understand the lifecycle:
 
 ```js
 class DebugComponent extends Component {
-  constructor(id, vars) {
-    super(id, vars);
-    console.log('[constructor]', id, vars);
+  constructor(vars) {
+    super(vars);
+    console.log('[constructor]', this.componentName, this.componentId, vars);
   }
   
   async hydrate() {
@@ -296,11 +296,11 @@ class DebugComponent extends Component {
   }
   
   afterRender() {
-    console.log('[afterRender]', this.container);
+    console.log('[afterRender]', this.componentContainer);
   }
   
   destroy() {
-    console.log('[destroy]', this.id);
+    console.log('[destroy]', `${this.componentName}#${this.componentId}`);
   }
 }
 ```

@@ -1,9 +1,9 @@
 import { ComponentNotFoundError } from './errors/error-hierarchy.js';
 import { ComponentId, toCssName } from './component-id.js';
 import { ComponentReference } from './component-reference.js';
+import { Component } from './component.js';
 import { compileTemplate } from './template-compiler.js';
 
-/** @typedef {import('./component.js').Component} Component */
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
 /** @typedef {import('./component.js').VarValue} VarValue */
 /** @typedef {import('./component.js').ComponentConstructor} ComponentConstructor */
@@ -35,6 +35,7 @@ export class InstanceRegistry {
    * @param {ComponentConstructor} ComponentClass - The component class constructor
    */
   registerComponent(name, ComponentClass) {
+    Object.defineProperty(ComponentClass, 'componentName', { value: name, configurable: true });
     this._componentClasses.set(name, ComponentClass);
   }
 
@@ -65,10 +66,12 @@ export class InstanceRegistry {
     }
 
     // Add component scope class to container
-    container.classList.add(`fusewire-component-${toCssName(ComponentClass.componentName)}`);
+    container.classList.add(`fusewire-component-${toCssName(componentId.name)}`);
 
-    const instance = new ComponentClass(code, vars);
-    instance.container = container;
+    const instance = new ComponentClass(vars);
+    instance.componentName = componentId.name;
+    instance.componentId = componentId.id;
+    instance.componentContainer = container;
 
     // Attach reactor if available (enables this.react() on the instance)
     if (this._reactor) {
@@ -125,10 +128,10 @@ export class InstanceRegistry {
     }
 
     const { instance } = entry;
-    const oldVars = { ...instance.vars };
+    const oldVars = { ...instance.componentVars };
 
     // Update vars
-    Object.assign(instance.vars, newVars);
+    Object.assign(instance.componentVars, newVars);
 
     // Call update hook
     await instance.update(oldVars);
@@ -186,7 +189,7 @@ export class InstanceRegistry {
     }
 
     const { instance, container } = entry;
-    const componentName = instance.constructor.componentName;
+    const componentName = instance.componentName;
 
     // Lazy-load template from basePath if not already in store
     if (!this._templateStore.has(componentName) && this._reactor) {
@@ -199,6 +202,9 @@ export class InstanceRegistry {
       throw new Error(`Template not found for component ${componentName}`);
     }
 
+    // Update version on instance
+    instance.componentVersion = template.version || '';
+
     // Get or compile template
     let compiled = this._templateStore.getCompiled(componentName);
     if (!compiled) {
@@ -207,7 +213,7 @@ export class InstanceRegistry {
     }
 
     // Snapshot current child declarations from vars before rendering
-    const currentChildren = this._collectChildComponents(instance.vars);
+    const currentChildren = this._collectChildComponents(instance.componentVars);
 
     // Build template constants
     const constants = { version: template.version || '' };
@@ -216,7 +222,7 @@ export class InstanceRegistry {
     const mountPoints = this._renderer.render(
       container,
       compiled,
-      instance.vars,
+      instance.componentVars,
       componentId,
       constants,
     );
@@ -259,33 +265,36 @@ export class InstanceRegistry {
       // Child already exists — update container reference (morphing may replace elements)
       const entry = this._instances.get(childId.toCode());
       entry.container = mountPoint;
-      entry.instance.container = mountPoint;
+      entry.instance.componentContainer = mountPoint;
       mountPoint.classList.add(`fusewire-component-${toCssName(childId.name)}`);
       await this.render(childId);
       return;
     }
 
     // Find matching child declaration in parent's vars
-    const decl = this._findChildDeclaration(parentInstance.vars, childId);
+    const decl = this._findChildDeclaration(parentInstance.componentVars, childId);
     if (!decl) return;
 
     // Create and render the child (template will be lazy-loaded during render).
     // Catch errors so a missing child template doesn't crash the parent.
     try {
+      let childInstance;
       if (decl instanceof ComponentReference) {
-        await this.createFromReference(decl, mountPoint);
+        childInstance = await this.createFromReference(decl, mountPoint);
       } else {
         // Legacy: Component instance used as declaration
-        await this.create(
+        childInstance = await this.create(
           childId,
           /** @type {ComponentConstructor} */ (decl.constructor),
-          { ...decl.vars },
+          { ...decl.componentVars },
           mountPoint,
         );
         // Link declaration to reactor so it can trigger re-renders via react()
         decl._reactor = this._reactor;
-        decl.id = childId.toCode();
+        decl.componentName = childId.name;
+        decl.componentId = childId.id;
       }
+      childInstance.componentParent = parentInstance;
     } catch {
       // Clean up partially-created instance if render failed
       this._instances.delete(childId.toCode());
@@ -332,7 +341,7 @@ export class InstanceRegistry {
       decl &&
       typeof decl === 'object' &&
       /** @type {ComponentConstructor} */ (decl.constructor).componentName === childId.name &&
-      (decl.id || '') === childId.id
+      (decl.componentId || '') === childId.id
     );
   }
 
@@ -397,6 +406,12 @@ export class InstanceRegistry {
       );
     }
 
+    // Set the canonical component name on the class
+    Object.defineProperty(ComponentClass, 'componentName', {
+      value: componentName,
+      configurable: true,
+    });
+
     // Cache for future use
     this._componentClasses.set(componentName, ComponentClass);
     return ComponentClass;
@@ -441,7 +456,7 @@ export class InstanceRegistry {
     } else {
       const decl = /** @type {Component} */ (value);
       name = /** @type {ComponentConstructor} */ (decl.constructor).componentName;
-      id = decl.id || '';
+      id = decl.componentId || '';
     }
     const componentId = new ComponentId(name, id);
     children.set(componentId.toCode(), componentId);
@@ -454,14 +469,6 @@ export class InstanceRegistry {
    * @returns {boolean} True if value is a component declaration
    */
   _isComponentDecl(value) {
-    if (value instanceof ComponentReference) return true;
-    return (
-      value !== null &&
-      typeof value === 'object' &&
-      typeof (
-        /** @type {ComponentConstructor} */ (/** @type {Component} */ (value).constructor)
-          .componentName
-      ) === 'string'
-    );
+    return value instanceof ComponentReference || value instanceof Component;
   }
 }

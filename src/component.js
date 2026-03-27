@@ -4,19 +4,19 @@ import { ComponentReference } from './component-reference.js';
 /** @typedef {{[key: string]: Scalar}} ScalarObject */
 /** @typedef {Scalar|ScalarObject|Component|ComponentReference} VarValue */
 /** @typedef {{[key: string]: (VarValue|Array<VarValue>)}} ComponentVars */
-/** @typedef {{new(code: string, vars: ComponentVars): Component, componentName: string}} ComponentConstructor */
+/** @typedef {{new(vars: ComponentVars): Component, componentName: string}} ComponentConstructor */
 
 /**
  * Base class for all FuseWire components
+ * @property {ComponentVars} componentVars - Component variables/data
+ * @property {ComponentVars} vars - Alias for componentVars
+ * @property {HTMLElement|null} componentContainer - DOM container element — set by engine when mounted
+ * @property {Component|null} componentParent - Parent component instance — set by engine, null for root
+ * @property {string} componentName - Component name (e.g. 'Counter') — set by engine
+ * @property {string} componentId - Instance identifier (e.g. 'main') — set by engine
+ * @property {string} componentVersion - Template version hash — set by engine after first render
  */
 export class Component {
-  /**
-   * Component name for template resolution
-   * @type {string}
-   * @static
-   */
-  static componentName = 'Component';
-
   /**
    * Migrate vars when template version changes
    * Override in subclasses to handle version migrations
@@ -31,14 +31,24 @@ export class Component {
 
   /**
    * Create a new Component instance
-   * @param {string} id - Instance identifier (optional)
    * @param {ComponentVars} vars - Component variables/data
    */
-  constructor(id = '', vars = {}) {
-    this.id = id;
-    this.vars = vars;
-    this.container = null; // Set by framework when mounted
+  constructor(vars = {}) {
+    this.componentVars = vars;
+    this.componentContainer = null; // Set by framework when mounted
+    this.componentParent = null; // Set by framework
     this._reactor = null; // Set by framework
+    this.componentName = '';
+    this.componentId = '';
+    this.componentVersion = '';
+  }
+
+  /**
+   * Alias for componentVars
+   * @returns {ComponentVars} Component variables/data
+   */
+  get vars() {
+    return this.componentVars;
   }
 
   /**
@@ -113,6 +123,9 @@ export class Component {
     if (!this._reactor) {
       throw new Error('Component: Cannot react - reactor not attached');
     }
-    this._reactor.react(this.id, mode);
+    const code = this.componentId
+      ? `${this.componentName}#${this.componentId}`
+      : this.componentName;
+    this._reactor.react(code, mode);
   }
 }

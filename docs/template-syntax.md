@@ -171,7 +171,7 @@ When a variable value is a Component instance, it renders as a mount point:
 ```js
 class Dashboard extends Component {
   async hydrate() {
-    this.vars.sidebar = new Sidebar('main', { collapsed: false });
+    this.vars.sidebar = this.createChild('Sidebar', 'main', { collapsed: false });
   }
 }
 ```
@@ -206,8 +206,8 @@ If a variable is an array of Components, each renders as a mount point:
 class UserList extends Component {
   async hydrate() {
     this.vars.users = [
-      new UserCard('user1', { name: 'Alice' }),
-      new UserCard('user2', { name: 'Bob' })
+      this.createChild('UserCard', 'user1', { name: 'Alice' }),
+      this.createChild('UserCard', 'user2', { name: 'Bob' })
     ];
   }
 }
@@ -332,8 +332,6 @@ The container element automatically gets the scoping class applied.
 **Counter.js:**
 ```js
 export class Counter extends Component {
-  static componentName = 'Counter';
-  
   async hydrate() {
     if (!this.vars.history) {
       this.vars.history = [];

@@ -24,8 +24,6 @@ import { Component } from '@fusewire/client/component.js';
 import { Reactor } from '@fusewire/client/reactor.js';
 
 class Counter extends Component {
-  static componentName = 'Counter';
-  
   increment() {
     this.vars.count++;
     this.react();

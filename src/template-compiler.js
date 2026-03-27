@@ -1,7 +1,7 @@
 import { ComponentId } from './component-id.js';
 import { ComponentReference } from './component-reference.js';
+import { Component } from './component.js';
 
-/** @typedef {import('./component.js').Component} Component */
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
 /** @typedef {import('./component.js').VarValue} VarValue */
 /** @typedef {import('./component.js').ComponentConstructor} ComponentConstructor */
@@ -43,15 +43,7 @@ function getPropertyValue(data, path) {
  * @returns {boolean} True if value represents a component
  */
 function isComponent(value) {
-  if (value instanceof ComponentReference) return true;
-  return (
-    value &&
-    typeof value === 'object' &&
-    typeof (
-      /** @type {ComponentConstructor} */ (/** @type {Component} */ (value).constructor)
-        .componentName
-    ) === 'string'
-  );
+  return value instanceof ComponentReference || value instanceof Component;
 }
 
 /**
@@ -129,11 +121,16 @@ function escapeHtml(str) {
  * @returns {string} Mount point HTML
  */
 function renderMountPoint(decl, parentId) {
-  const name =
-    decl instanceof ComponentReference
-      ? decl.componentName
-      : /** @type {ComponentConstructor} */ (decl.constructor).componentName;
-  const childId = new ComponentId(name, decl.id || '');
+  let name;
+  let id;
+  if (decl instanceof ComponentReference) {
+    name = decl.componentName;
+    id = decl.id || '';
+  } else {
+    name = /** @type {ComponentConstructor} */ (decl.constructor).componentName;
+    id = decl.componentId || '';
+  }
+  const childId = new ComponentId(name, id);
   return `<div data-fusewire-id="${childId.toCode()}" data-fusewire-parent-id="${parentId.toCode()}"></div>`;
 }
 

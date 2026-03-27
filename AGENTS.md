@@ -150,7 +150,7 @@ The core principle of FuseWire is: **you manage data, the template manages the U
 
 ```javascript
 // WRONG: manually toggling UI
-this.container.querySelector('.details').style.display = 'block';
+this.componentContainer.querySelector('.details').style.display = 'block';
 
 // RIGHT: set a var, let the template handle it
 this.vars.showDetails = true;

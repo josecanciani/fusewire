@@ -131,9 +131,7 @@ describe('Reactor', () => {
             const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
             global.document = dom.window.document;
 
-            class Counter extends Component {
-                static componentName = 'Counter';
-            }
+            class Counter extends Component {}
 
             const appName = 'test-start-1';
             const templateStore = new TemplateStore();
@@ -157,7 +155,8 @@ describe('Reactor', () => {
 
             assert.ok(instance);
             assert.ok(instance instanceof Counter);
-            assert.strictEqual(instance.id, 'Counter#main');
+            assert.strictEqual(instance.componentName, 'Counter');
+            assert.strictEqual(instance.componentId, 'main');
             assert.deepStrictEqual(instance.vars, { count: 0 });
         });
 
@@ -165,9 +164,7 @@ describe('Reactor', () => {
             const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
             global.document = dom.window.document;
 
-            class Counter extends Component {
-                static componentName = 'Counter';
-            }
+            class Counter extends Component {}
 
             const appName = 'test-start-2';
             const templateStore = new TemplateStore();
@@ -193,9 +190,7 @@ describe('Reactor', () => {
         });
 
         it('delegates to instanceRegistry.createFromReference()', async () => {
-            class Counter extends Component {
-                static componentName = 'Counter';
-            }
+            class Counter extends Component {}
 
             let createCalled = false;
             let receivedRef = null;
@@ -226,9 +221,7 @@ describe('Reactor', () => {
             const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
             global.document = dom.window.document;
 
-            class Counter extends Component {
-                static componentName = 'Counter';
-            }
+            class Counter extends Component {}
 
             const appName = 'test-start-4';
             const templateStore = new TemplateStore();
@@ -259,12 +252,8 @@ describe('Reactor', () => {
             const dom = new JSDOM('<!DOCTYPE html><div id="app"></div><div id="child"></div>');
             global.document = dom.window.document;
 
-            class Parent extends Component {
-                static componentName = 'Parent';
-            }
-            class Child extends Component {
-                static componentName = 'Child';
-            }
+            class Parent extends Component {}
+            class Child extends Component {}
 
             const appName = 'test-start-5';
             const templateStore = new TemplateStore();
@@ -300,9 +289,7 @@ describe('Reactor', () => {
             const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
             global.document = dom.window.document;
 
-            class Counter extends Component {
-                static componentName = 'Counter';
-            }
+            class Counter extends Component {}
 
             const appName = 'test-start-6';
             const templateStore = new TemplateStore();
@@ -324,7 +311,7 @@ describe('Reactor', () => {
 
             const instance = await reactor.start(container, 'Counter', 'main', {});
 
-            assert.strictEqual(instance.container, container);
+            assert.strictEqual(instance.componentContainer, container);
         });
     });
 

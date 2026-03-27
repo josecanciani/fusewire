@@ -20,10 +20,8 @@ describe('InstanceRegistry', () => {
 
     // Test component class
     class TestComponent extends Component {
-        static componentName = 'TestComponent';
-
-        constructor(id, vars) {
-            super(id, vars);
+        constructor(vars) {
+            super(vars);
             this.hydrateCalled = false;
             this.updateCalled = false;
             this.destroyCalled = false;
@@ -194,7 +192,7 @@ describe('InstanceRegistry', () => {
                 container
             );
 
-            assert.strictEqual(instance.container, container);
+            assert.strictEqual(instance.componentContainer, container);
         });
 
         it('renders component to container', async () => {
@@ -582,11 +580,10 @@ describe('InstanceRegistry', () => {
     });
 
     describe('Auto-mounting', () => {
-        class ChildComponent extends Component {
-            static componentName = 'ChildComponent';
-        }
+        class ChildComponent extends Component {}
 
         it('auto-mounts child component from vars', async () => {
+            registry.registerComponent('ChildComponent', ChildComponent);
             templateStore.set('TestComponent', {
                 htmlCode: '<div>Parent: ((child))</div>',
                 cssCode: '',
@@ -599,7 +596,8 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new ChildComponent('child1', {});
+            const childDecl = new ChildComponent({});
+            childDecl.componentId = 'child1';
 
             await registry.create(
                 componentId,
@@ -617,6 +615,7 @@ describe('InstanceRegistry', () => {
         });
 
         it('auto-mounts array of child components', async () => {
+            registry.registerComponent('ChildComponent', ChildComponent);
             templateStore.set('TestComponent', {
                 htmlCode: '<div>((cards))</div>',
                 cssCode: '',
@@ -629,10 +628,11 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const cards = [
-                new ChildComponent('c1', {}),
-                new ChildComponent('c2', {}),
-            ];
+            const card1 = new ChildComponent({});
+            card1.componentId = 'c1';
+            const card2 = new ChildComponent({});
+            card2.componentId = 'c2';
+            const cards = [card1, card2];
 
             await registry.create(
                 componentId,
@@ -652,12 +652,12 @@ describe('InstanceRegistry', () => {
                 version: 'v1'
             });
 
-            class UnregisteredChild extends Component {
-                static componentName = 'UnregisteredChild';
-            }
+            class UnregisteredChild extends Component {}
+            registry.registerComponent('UnregisteredChild', UnregisteredChild);
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new UnregisteredChild('u1', {});
+            const childDecl = new UnregisteredChild({});
+            childDecl.componentId = 'u1';
 
             // Should not throw even though child template is not registered
             await registry.create(
@@ -672,6 +672,7 @@ describe('InstanceRegistry', () => {
         });
 
         it('adds fusewire-component class to child container', async () => {
+            registry.registerComponent('ChildComponent', ChildComponent);
             templateStore.set('TestComponent', {
                 htmlCode: '<div>((child))</div>',
                 cssCode: '',
@@ -684,7 +685,8 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new ChildComponent('child1', {});
+            const childDecl = new ChildComponent({});
+            childDecl.componentId = 'child1';
 
             await registry.create(
                 componentId,
@@ -699,6 +701,7 @@ describe('InstanceRegistry', () => {
         });
 
         it('passes child vars to created instance', async () => {
+            registry.registerComponent('ChildComponent', ChildComponent);
             templateStore.set('TestComponent', {
                 htmlCode: '<div>((child))</div>',
                 cssCode: '',
@@ -711,7 +714,8 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new ChildComponent('child1', { label: 'Hello' });
+            const childDecl = new ChildComponent({ label: 'Hello' });
+            childDecl.componentId = 'child1';
 
             await registry.create(
                 componentId,
@@ -743,7 +747,8 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new ChildComponent('child1', {});
+            const childDecl = new ChildComponent({});
+            childDecl.componentId = 'child1';
 
             const parent = await registry.create(
                 componentId,
@@ -764,9 +769,7 @@ describe('InstanceRegistry', () => {
         });
 
         it.skip('auto-removes child when switching to different component type', async () => {
-            class AltChild extends Component {
-                static componentName = 'AltChild';
-            }
+            class AltChild extends Component {}
 
             templateStore.set('TestComponent', {
                 htmlCode: '<div>((child))</div>',
@@ -785,10 +788,12 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
+            const childDecl = new ChildComponent({});
+            childDecl.componentId = 'c1';
             const parent = await registry.create(
                 componentId,
                 TestComponent,
-                { child: new ChildComponent('c1', {}) },
+                { child: childDecl },
                 container
             );
 
@@ -796,7 +801,9 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(registry.has(oldChildId), true);
 
             // Replace with different component type
-            parent.vars.child = new AltChild('c1', {});
+            const altDecl = new AltChild({});
+            altDecl.componentId = 'c1';
+            parent.vars.child = altDecl;
             await registry.render(componentId);
 
             // Old child removed, new child created
@@ -819,7 +826,8 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new ChildComponent('child1', {});
+            const childDecl = new ChildComponent({});
+            childDecl.componentId = 'child1';
 
             const parent = await registry.create(
                 componentId,
@@ -851,7 +859,8 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new ChildComponent('child1', {});
+            const childDecl = new ChildComponent({});
+            childDecl.componentId = 'child1';
 
             const parent = await registry.create(
                 componentId,
@@ -884,10 +893,11 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const cards = [
-                new ChildComponent('c1', {}),
-                new ChildComponent('c2', {}),
-            ];
+            const card1 = new ChildComponent({});
+            card1.componentId = 'c1';
+            const card2 = new ChildComponent({});
+            card2.componentId = 'c2';
+            const cards = [card1, card2];
 
             const parent = await registry.create(
                 componentId,
@@ -926,9 +936,7 @@ describe('InstanceRegistry', () => {
         });
 
         it('overwrites previously registered class', () => {
-            class Alt extends Component {
-                static componentName = 'TestComponent';
-            }
+            class Alt extends Component {}
 
             registry.registerComponent('TestComponent', TestComponent);
             registry.registerComponent('TestComponent', Alt);
@@ -952,7 +960,8 @@ describe('InstanceRegistry', () => {
 
             assert.ok(instance instanceof TestComponent);
             assert.strictEqual(instance.vars.message, 'Hello');
-            assert.strictEqual(instance.id, 'TestComponent#test1');
+            assert.strictEqual(instance.componentName, 'TestComponent');
+            assert.strictEqual(instance.componentId, 'test1');
         });
 
         it('calls hydrate and afterRender hooks', async () => {
@@ -981,9 +990,7 @@ describe('InstanceRegistry', () => {
     });
 
     describe('Auto-mounting with ComponentReference', () => {
-        class ChildComponent extends Component {
-            static componentName = 'ChildComponent';
-        }
+        class ChildComponent extends Component {}
 
         it('auto-mounts child from ComponentReference in vars', async () => {
             registry.registerComponent('ChildComponent', ChildComponent);
