@@ -1,5 +1,5 @@
 /** @typedef {import('./template-compiler.js').CompiledTemplate} CompiledTemplate */
-/** @typedef {{version: string, htmlCode: string, cssCode?: string, jsUrl?: string}} TemplateData */
+/** @typedef {{version: string, htmlCode: string, cssCode?: string}} TemplateData */
 
 /**
  * In-memory template storage with content-hash versioning
@@ -16,12 +16,11 @@ export class TemplateStore {
    * @param {string} componentName - Component name
    * @param {TemplateData} template - Template data
    */
-  set(componentName, { version, htmlCode, cssCode = '', jsUrl = '' }) {
+  set(componentName, { version, htmlCode, cssCode = '' }) {
     this._templates.set(componentName, {
       version,
       htmlCode,
       cssCode,
-      jsUrl,
     });
     // Clear compiled cache when template changes
     this._compiled.delete(componentName);
@@ -91,39 +90,33 @@ export class TemplateStore {
   }
 
   /**
-   * Fetch template files and compute version hash
-   * @param {string} componentName - Component name
-   * @param {string} basePath - Base path for component files (e.g., '/components')
+   * Fetch template files (HTML and CSS) and compute version hash
+   * @param {string} componentName - Component name (e.g., 'Counter', 'Basics/Counter')
+   * @param {string} basePath - Base URL path for component files (e.g., './components')
    * @returns {Promise<TemplateData>} Template data with version
    */
-  async fetch(componentName, basePath = '/components') {
-    // Fetch HTML, CSS, and JS files
+  async fetch(componentName, basePath = './components') {
     const htmlUrl = `${basePath}/${componentName}.html`;
     const cssUrl = `${basePath}/${componentName}.css`;
-    const jsUrl = `${basePath}/${componentName}.js`;
 
-    const [htmlCode, cssCode, jsCode] = await Promise.all([
+    const [htmlCode, cssCode] = await Promise.all([
       fetch(htmlUrl).then((r) => r.text()),
       fetch(cssUrl)
-        .then((r) => r.text())
+        .then((r) => (r.ok ? r.text() : ''))
         .catch(() => ''), // CSS is optional
-      fetch(jsUrl)
-        .then((r) => r.text())
-        .catch(() => ''), // JS might be pre-loaded as module
     ]);
 
-    // Compute version hash from all content
-    const version = await this._computeHash(htmlCode + cssCode + jsCode);
+    // Compute version hash from content
+    const version = await this._computeHash(htmlCode + cssCode);
 
     // Store template
     this.set(componentName, {
       version,
       htmlCode,
       cssCode,
-      jsUrl,
     });
 
-    return { version, htmlCode, cssCode, jsUrl };
+    return { version, htmlCode, cssCode };
   }
 
   /**

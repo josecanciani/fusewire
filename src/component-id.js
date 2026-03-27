@@ -10,7 +10,7 @@
 export class ComponentId {
   /**
    * Create a new ComponentId
-   * @param {string} name - Component name (e.g., "UserList", "Dashlet_ServerTime")
+   * @param {string} name - Component name (e.g., "Counter", "Basics/Counter")
    * @param {string} id - Optional instance identifier (e.g., "main", "sidebar", "")
    */
   constructor(name, id = '') {
@@ -79,4 +79,14 @@ export class ComponentId {
   toString() {
     return this.toCode();
   }
+}
+
+/**
+ * Convert a component name to a CSS-safe identifier.
+ * Replaces '/' (used in directory-based names like 'Basics/Counter') with '_'.
+ * @param {string} name - Component name
+ * @returns {string} CSS-safe name
+ */
+export function toCssName(name) {
+  return name.replaceAll('/', '_');
 }

@@ -50,6 +50,15 @@ class FuseWireRegistry {
   }
 
   /**
+   * Check if an app name is already registered
+   * @param {string} appName - Application name
+   * @returns {boolean} True if app name is registered
+   */
+  has(appName) {
+    return this._reactors.has(appName);
+  }
+
+  /**
    * Get all registered app names
    * @returns {string[]} Array of registered app names
    */

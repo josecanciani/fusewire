@@ -17,7 +17,6 @@ describe('TemplateStore', () => {
 				version: 'a1b2c3d4e5f6',
 				htmlCode: '<div>Hello</div>',
 				cssCode: '.container { color: red; }',
-				jsUrl: '/components/Test.js',
 			};
 
 			store.set('Test', template);
@@ -37,7 +36,6 @@ describe('TemplateStore', () => {
 			assert.strictEqual(retrieved.version, 'abc123');
 			assert.strictEqual(retrieved.htmlCode, '<div>Hello</div>');
 			assert.strictEqual(retrieved.cssCode, '');
-			assert.strictEqual(retrieved.jsUrl, '');
 		});
 
 		it('returns null for non-existent template', () => {
