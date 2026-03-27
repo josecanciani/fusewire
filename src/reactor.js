@@ -170,7 +170,9 @@ export class Reactor {
     // Convert string to ComponentId if needed
     const id = typeof componentId === 'string' ? ComponentId.fromCode(componentId) : componentId;
 
-    // Re-render using registry (calls update hook and re-renders)
+    // Re-render and call afterRender hook
     await this._instanceRegistry.render(id);
+    const instance = this._instanceRegistry.get(id);
+    if (instance) instance.afterRender();
   }
 }

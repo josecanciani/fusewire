@@ -323,6 +323,7 @@ describe('Reactor', () => {
                     renderCalled = true;
                     assert.ok(componentId instanceof ComponentId);
                 },
+                get() { return null; },
             };
 
             const reactor = createReactor('test-react-1', {
@@ -345,6 +346,7 @@ describe('Reactor', () => {
                     assert.strictEqual(componentId.name, 'Counter');
                     assert.strictEqual(componentId.id, 'main');
                 },
+                get() { return null; },
             };
 
             const reactor = createReactor('test-react-2', {
@@ -360,6 +362,7 @@ describe('Reactor', () => {
         it('defaults to CSR mode', async () => {
             const mockRegistry = {
                 async render() {},
+                get() { return null; },
             };
 
             const reactor = createReactor('test-react-3', {
@@ -374,6 +377,7 @@ describe('Reactor', () => {
         it('throws for unsupported render mode', async () => {
             const mockRegistry = {
                 async render() {},
+                get() { return null; },
             };
 
             const reactor = createReactor('test-react-4', {
@@ -393,6 +397,7 @@ describe('Reactor', () => {
                 async render(componentId) {
                     renderCalled = true;
                 },
+                get() { return null; },
             };
 
             const reactor = createReactor('test-react-5', {
@@ -403,6 +408,41 @@ describe('Reactor', () => {
             await reactor.react('Counter#main');
 
             assert.strictEqual(renderCalled, true);
+        });
+
+        it('calls afterRender() on the instance after render()', async () => {
+            let afterRenderCalled = false;
+            const fakeInstance = {
+                afterRender() { afterRenderCalled = true; },
+            };
+            const mockRegistry = {
+                async render() {},
+                get() { return fakeInstance; },
+            };
+
+            const reactor = createReactor('test-react-6', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph
+            });
+
+            await reactor.react('Counter#main');
+
+            assert.strictEqual(afterRenderCalled, true);
+        });
+
+        it('does not throw if instance is not found after render()', async () => {
+            const mockRegistry = {
+                async render() {},
+                get() { return null; },
+            };
+
+            const reactor = createReactor('test-react-7', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph
+            });
+
+            // Should not throw
+            await reactor.react('Counter#main');
         });
     });
 
