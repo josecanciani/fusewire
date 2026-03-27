@@ -1,16 +1,14 @@
 {
     "compilerOptions": {
-        "checkJs": true,
+        "checkJs": false,
         "noEmit": true,
-        "strict": false,
         "target": "ESNext",
         "module": "ESNext",
         "moduleResolution": "bundler",
         "lib": ["ESNext", "DOM"],
         "paths": {
-            "/js/*": ["./src/*"]
+            "/js/*": ["../src/*"]
         }
     },
-    "include": ["src/**/*.js"],
-    "exclude": ["src/lib/**"]
+    "include": ["**/*.js"]
 }
