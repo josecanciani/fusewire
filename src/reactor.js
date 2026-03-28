@@ -140,16 +140,23 @@ export class Reactor {
    * @returns {Promise<import('./component.js').Component>} Component instance
    */
   async start(container, componentName, id, vars = {}) {
-    // Add app namespace to root container (first call only)
+    let renderContainer = container;
+
+    // Add app namespace to root container (first call only).
+    // Create a child element so app-level classes (fusewire, appName) and
+    // component-level class (fusewire-component-X) live on separate DOM
+    // elements. CSS scoping uses descendant selectors that require nesting.
     if (!this._rootContainer) {
       this._rootContainer = container;
       container.classList.add('fusewire', this._appName);
+      renderContainer = container.ownerDocument.createElement('div');
+      container.appendChild(renderContainer);
     }
 
     const ref = new ComponentReference(componentName, id, vars);
 
     // Create instance via registry (resolves class, hydrate, render, afterRender)
-    const instance = await this._instanceRegistry.createFromReference(ref, container);
+    const instance = await this._instanceRegistry.createFromReference(ref, renderContainer);
 
     // Ensure reactor is attached (also set by create() if registry has reactor ref)
     instance._reactor = this;

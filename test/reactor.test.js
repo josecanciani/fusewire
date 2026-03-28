@@ -190,6 +190,9 @@ describe('Reactor', () => {
         });
 
         it('delegates to instanceRegistry.createFromReference()', async () => {
+            const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
+            global.document = dom.window.document;
+
             class Counter extends Component {}
 
             let createCalled = false;
@@ -208,7 +211,7 @@ describe('Reactor', () => {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph
             });
-            const container = { classList: { add() {} } };
+            const container = dom.window.document.getElementById('app');
             
             await reactor.start(container, 'Counter', 'main', {});
 
@@ -245,7 +248,9 @@ describe('Reactor', () => {
 
             assert.ok(container.classList.contains('fusewire'));
             assert.ok(container.classList.contains(appName));
-            assert.ok(container.classList.contains('fusewire-component-Counter'));
+            // Root component class is on a child element (CSS scoping needs nesting)
+            assert.ok(!container.classList.contains('fusewire-component-Counter'));
+            assert.ok(container.firstChild.classList.contains('fusewire-component-Counter'));
         });
 
         it('adds app classes only to first container', async () => {
@@ -311,7 +316,9 @@ describe('Reactor', () => {
 
             const instance = await reactor.start(container, 'Counter', 'main', {});
 
-            assert.strictEqual(instance.componentContainer, container);
+            // Root component container is the child element created for CSS scoping
+            assert.strictEqual(instance.componentContainer, container.firstChild);
+            assert.strictEqual(instance.componentContainer.parentElement, container);
         });
     });
 
