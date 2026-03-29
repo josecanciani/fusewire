@@ -1,9 +1,20 @@
 /** @typedef {import('./template-compiler.js').CompiledTemplate} CompiledTemplate */
-/** @typedef {{version: string, htmlCode: string, cssCode?: string}} TemplateData */
 
 /**
- * In-memory template storage with content-hash versioning
- * Stores HTML, CSS, and compiled templates for components
+ * @typedef {{
+ *   version: string,
+ *   htmlCode: string,
+ *   cssCode: string,
+ *   jsCode: string,
+ *   fetchedAt: number,
+ *   etags: { html: string, css: string, js: string }
+ * }} TemplateData
+ */
+
+/**
+ * In-memory template storage with content-hash versioning.
+ * Stores HTML, CSS, JS source, and compiled templates for components.
+ * Supports conditional fetching via ETags and staleness checks.
  */
 export class TemplateStore {
   constructor() {
@@ -16,11 +27,24 @@ export class TemplateStore {
    * @param {string} componentName - Component name
    * @param {TemplateData} template - Template data
    */
-  set(componentName, { version, htmlCode, cssCode = '' }) {
+  set(
+    componentName,
+    {
+      version,
+      htmlCode,
+      cssCode = '',
+      jsCode = '',
+      fetchedAt = 0,
+      etags = { html: '', css: '', js: '' },
+    },
+  ) {
     this._templates.set(componentName, {
       version,
       htmlCode,
       cssCode,
+      jsCode,
+      fetchedAt: fetchedAt || Date.now(),
+      etags,
     });
     // Clear compiled cache when template changes
     this._compiled.delete(componentName);
@@ -52,6 +76,19 @@ export class TemplateStore {
    */
   has(componentName) {
     return this._templates.has(componentName);
+  }
+
+  /**
+   * Check if a stored template is stale (older than the given TTL)
+   * @param {string} componentName - Component name
+   * @param {number} ttlMs - Maximum age in milliseconds (0 = never stale)
+   * @returns {boolean} True if template is stale or not found
+   */
+  isStale(componentName, ttlMs) {
+    if (ttlMs === 0) return false;
+    const template = this._templates.get(componentName);
+    if (!template) return true;
+    return Date.now() - template.fetchedAt > ttlMs;
   }
 
   /**
@@ -90,42 +127,79 @@ export class TemplateStore {
   }
 
   /**
-   * Fetch template files (HTML and CSS) and compute version hash
+   * Fetch template files (HTML, CSS, JS) and compute version hash.
+   * All three requests are made in parallel, each with its own ETag for
+   * conditional requests. If every file returns 304 Not Modified, fetchedAt
+   * is refreshed and the existing template is returned unchanged. When any
+   * file has new content, the version hash is recomputed from all three.
    * @param {string} componentName - Component name (e.g., 'Counter', 'Basics/Counter')
    * @param {string} basePath - Base URL path for component files (e.g., './components')
    * @returns {Promise<TemplateData>} Template data with version
    */
   async fetch(componentName, basePath = './components') {
+    const existing = this._templates.get(componentName);
+    const etags = existing ? existing.etags : { html: '', css: '', js: '' };
+
     const htmlUrl = `${basePath}/${componentName}.html`;
     const cssUrl = `${basePath}/${componentName}.css`;
+    const jsUrl = `${basePath}/${componentName}.js`;
 
-    const [htmlCode, cssCode] = await Promise.all([
-      fetch(htmlUrl).then((r) => r.text()),
-      fetch(cssUrl)
-        .then((r) => (r.ok ? r.text() : ''))
-        .catch(() => ''), // CSS is optional
+    const conditionalHeaders = (fileEtag) =>
+      fileEtag ? { headers: { 'If-None-Match': fileEtag } } : {};
+
+    // Fetch all three files in parallel
+    const [htmlResponse, cssResponse, jsResponse] = await Promise.all([
+      fetch(htmlUrl, conditionalHeaders(etags.html)),
+      fetch(cssUrl, conditionalHeaders(etags.css)).catch(() => null),
+      fetch(jsUrl, conditionalHeaders(etags.js)).catch(() => null),
     ]);
 
-    // Compute version hash from content
-    const version = await this._computeHash(htmlCode + cssCode);
+    const htmlNotModified = htmlResponse.status === 304;
+    const cssNotModified = cssResponse !== null && cssResponse.status === 304;
+    const jsNotModified = jsResponse !== null && jsResponse.status === 304;
 
-    // Store template
-    this.set(componentName, {
-      version,
-      htmlCode,
-      cssCode,
-    });
+    // All 304 — nothing changed, just refresh fetchedAt
+    if (htmlNotModified && cssNotModified && jsNotModified && existing) {
+      existing.fetchedAt = Date.now();
+      return existing;
+    }
 
-    return { version, htmlCode, cssCode };
+    // Resolve content: 304 → keep existing, 200 → new content, missing/error → ''
+    const htmlCode = htmlNotModified && existing ? existing.htmlCode : await htmlResponse.text();
+    const cssCode =
+      cssNotModified && existing
+        ? existing.cssCode
+        : cssResponse !== null && cssResponse.ok
+          ? await cssResponse.text()
+          : '';
+    const jsCode =
+      jsNotModified && existing
+        ? existing.jsCode
+        : jsResponse !== null && jsResponse.ok
+          ? await jsResponse.text()
+          : '';
+
+    // Preserve ETags: use new ETag from response, or keep existing
+    const newEtags = {
+      html: htmlResponse.headers.get('etag') || etags.html,
+      css: cssResponse !== null ? cssResponse.headers.get('etag') || etags.css : etags.css,
+      js: jsResponse !== null ? jsResponse.headers.get('etag') || etags.js : etags.js,
+    };
+
+    const version = await this.computeHash(htmlCode + cssCode + jsCode);
+    const fetchedAt = Date.now();
+
+    this.set(componentName, { version, htmlCode, cssCode, jsCode, fetchedAt, etags: newEtags });
+
+    return { version, htmlCode, cssCode, jsCode, fetchedAt, etags: newEtags };
   }
 
   /**
-   * Compute SHA-256 hash of content (first 12 chars)
-   * @private
+   * Compute SHA-256 hash of content (first 12 hex chars)
    * @param {string} content - Content to hash
    * @returns {Promise<string>} Hash string (12 hex chars)
    */
-  async _computeHash(content) {
+  async computeHash(content) {
     // Use Web Crypto API (available in browser and Node 18+)
     if (typeof crypto === 'undefined' || !crypto.subtle) {
       throw new Error('Web Crypto API not available. Requires modern browser or Node.js 18+');
