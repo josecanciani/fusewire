@@ -8,16 +8,16 @@ import { ComponentId } from '../component-id.js';
  * @returns {HTMLElement[]} Array of mount point elements
  */
 export function findChildMountPoints(container, parentComponentId) {
-  const parentCode =
-    typeof parentComponentId === 'string' ? parentComponentId : parentComponentId.code;
+    const parentCode =
+        typeof parentComponentId === 'string' ? parentComponentId : parentComponentId.code;
 
-  // In attribute selectors with quoted values, special characters don't need escaping
-  // Only escape the quote character itself and backslash
-  const escapedParentId = parentCode.replace(/["\\]/g, '\\$&');
-  const selector = `[data-fusewire-parent-id="${escapedParentId}"]`;
-  const elements = container.querySelectorAll(selector);
+    // In attribute selectors with quoted values, special characters don't need escaping
+    // Only escape the quote character itself and backslash
+    const escapedParentId = parentCode.replace(/["\\]/g, '\\$&');
+    const selector = `[data-fusewire-parent-id="${escapedParentId}"]`;
+    const elements = container.querySelectorAll(selector);
 
-  return /** @type {HTMLElement[]} */ (Array.from(elements));
+    return /** @type {HTMLElement[]} */ (Array.from(elements));
 }
 
 /**
@@ -27,21 +27,21 @@ export function findChildMountPoints(container, parentComponentId) {
  * @returns {HTMLDivElement} The mount point div element
  */
 export function createMountPoint(componentId, parentComponentId) {
-  const div = document.createElement('div');
+    const div = document.createElement('div');
 
-  // Accept either ComponentId instance or string
-  const code = typeof componentId === 'string' ? componentId : componentId.code;
+    // Accept either ComponentId instance or string
+    const code = typeof componentId === 'string' ? componentId : componentId.code;
 
-  div.setAttribute('data-fusewire-id', code);
+    div.setAttribute('data-fusewire-id', code);
 
-  // Set parent ID if provided
-  if (parentComponentId) {
-    const parentCode =
-      typeof parentComponentId === 'string' ? parentComponentId : parentComponentId.code;
-    div.setAttribute('data-fusewire-parent-id', parentCode);
-  }
+    // Set parent ID if provided
+    if (parentComponentId) {
+        const parentCode =
+            typeof parentComponentId === 'string' ? parentComponentId : parentComponentId.code;
+        div.setAttribute('data-fusewire-parent-id', parentCode);
+    }
 
-  return div;
+    return div;
 }
 
 /**
@@ -50,7 +50,7 @@ export function createMountPoint(componentId, parentComponentId) {
  * @returns {boolean} True if element is a mount point
  */
 export function isMountPoint(element) {
-  return element.hasAttribute('data-fusewire-id');
+    return element.hasAttribute('data-fusewire-id');
 }
 
 /**
@@ -59,15 +59,15 @@ export function isMountPoint(element) {
  * @returns {ComponentId|null} The component ID or null if invalid
  */
 export function getComponentIdFromElement(element) {
-  if (!isMountPoint(element)) {
-    return null;
-  }
+    if (!isMountPoint(element)) {
+        return null;
+    }
 
-  const code = element.getAttribute('data-fusewire-id');
-  try {
-    return ComponentId.fromCode(code);
-  } catch (error) {
-    console.warn(`Invalid data-fusewire-id on element: ${code}`, error);
-    return null;
-  }
+    const code = element.getAttribute('data-fusewire-id');
+    try {
+        return ComponentId.fromCode(code);
+    } catch (error) {
+        console.warn(`Invalid data-fusewire-id on element: ${code}`, error);
+        return null;
+    }
 }
