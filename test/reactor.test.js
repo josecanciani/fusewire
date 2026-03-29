@@ -325,12 +325,13 @@ describe('Reactor', () => {
     describe('react()', () => {
         it('accepts ComponentId', async () => {
             let renderCalled = false;
+            const fakeInstance = { afterRender() {} };
             const mockRegistry = {
                 async render(componentId) {
                     renderCalled = true;
                     assert.ok(componentId instanceof ComponentId);
                 },
-                get() { return null; },
+                get() { return fakeInstance; },
             };
 
             const reactor = createReactor('test-react-1', {
@@ -346,6 +347,7 @@ describe('Reactor', () => {
 
         it('accepts string componentId', async () => {
             let renderCalled = false;
+            const fakeInstance = { afterRender() {} };
             const mockRegistry = {
                 async render(componentId) {
                     renderCalled = true;
@@ -353,7 +355,7 @@ describe('Reactor', () => {
                     assert.strictEqual(componentId.name, 'Counter');
                     assert.strictEqual(componentId.id, 'main');
                 },
-                get() { return null; },
+                get() { return fakeInstance; },
             };
 
             const reactor = createReactor('test-react-2', {
@@ -367,9 +369,10 @@ describe('Reactor', () => {
         });
 
         it('defaults to CSR mode', async () => {
+            const fakeInstance = { afterRender() {} };
             const mockRegistry = {
                 async render() {},
-                get() { return null; },
+                get() { return fakeInstance; },
             };
 
             const reactor = createReactor('test-react-3', {
@@ -400,11 +403,12 @@ describe('Reactor', () => {
 
         it('delegates to instanceRegistry.render()', async () => {
             let renderCalled = false;
+            const fakeInstance = { afterRender() {} };
             const mockRegistry = {
                 async render(componentId) {
                     renderCalled = true;
                 },
-                get() { return null; },
+                get() { return fakeInstance; },
             };
 
             const reactor = createReactor('test-react-5', {
@@ -437,7 +441,7 @@ describe('Reactor', () => {
             assert.strictEqual(afterRenderCalled, true);
         });
 
-        it('does not throw if instance is not found after render()', async () => {
+        it('throws if instance is not found after render()', async () => {
             const mockRegistry = {
                 async render() {},
                 get() { return null; },
@@ -448,8 +452,10 @@ describe('Reactor', () => {
                 morphFunction: mockMorph
             });
 
-            // Should not throw
-            await reactor.react('Counter#main');
+            await assert.rejects(
+                () => reactor.react('Counter#main'),
+                TypeError,
+            );
         });
     });
 
@@ -637,6 +643,107 @@ describe('Reactor', () => {
 
             assert.deepStrictEqual(logs1, []);
             assert.deepStrictEqual(logs2, [['only c2']]);
+        });
+    });
+
+    describe('render queue', () => {
+        it('deduplicates queued react() calls for the same component', async () => {
+            let renderCount = 0;
+            const fakeInstance = { afterRender() {} };
+            const mockRegistry = {
+                async render() { renderCount++; },
+                get() { return fakeInstance; },
+            };
+
+            const reactor = createReactor('test-queue-1', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+            });
+
+            // Fire two reacts for the same component in the same synchronous block.
+            // The first starts the drain (shifts the entry and begins render).
+            // The second sees the queue empty (entry was shifted) and adds again.
+            // Result: 2 renders (current + queued), NOT 1, because the first was
+            // already shifted before the second call.
+            const p1 = reactor.react('Counter#main');
+            const p2 = reactor.react('Counter#main');
+
+            // Both return the same drain promise
+            assert.strictEqual(p1, p2);
+            await p1;
+            assert.strictEqual(renderCount, 2);
+        });
+
+        it('processes different components sequentially', async () => {
+            const order = [];
+            const fakeA = { afterRender() { order.push('afterA'); } };
+            const fakeB = { afterRender() { order.push('afterB'); } };
+            const mockRegistry = {
+                async render(id) { order.push(`render:${id.code}`); },
+                get(id) { return id.code === 'A#1' ? fakeA : fakeB; },
+            };
+
+            const reactor = createReactor('test-queue-2', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+            });
+
+            reactor.react('A#1');
+            reactor.react('B#1');
+            await reactor._drainPromise;
+
+            assert.deepStrictEqual(order, [
+                'render:A#1', 'afterA',
+                'render:B#1', 'afterB',
+            ]);
+        });
+
+        it('processes entries enqueued during afterRender', async () => {
+            const order = [];
+            let reactor;
+            const fakeA = {
+                afterRender() {
+                    order.push('afterA');
+                    // This simulates Counter.afterRender → console.log → Panel.react()
+                    reactor.react('B#1');
+                },
+            };
+            const fakeB = { afterRender() { order.push('afterB'); } };
+            const mockRegistry = {
+                async render(id) { order.push(`render:${id.code}`); },
+                get(id) { return id.code === 'A#1' ? fakeA : fakeB; },
+            };
+
+            reactor = createReactor('test-queue-3', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+            });
+
+            await reactor.react('A#1');
+
+            // B was enqueued during A's afterRender and processed in the same drain
+            assert.deepStrictEqual(order, [
+                'render:A#1', 'afterA',
+                'render:B#1', 'afterB',
+            ]);
+        });
+
+        it('is not draining after queue is empty', async () => {
+            const fakeInstance = { afterRender() {} };
+            const mockRegistry = {
+                async render() {},
+                get() { return fakeInstance; },
+            };
+
+            const reactor = createReactor('test-queue-4', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+            });
+
+            await reactor.react('Counter#main');
+
+            assert.strictEqual(reactor._draining, false);
+            assert.strictEqual(reactor._queue.size, 0);
         });
     });
 });

@@ -42,6 +42,14 @@ export class Reactor {
     /** @type {ConsoleLike} */
     this._console = this._buildConsoleMultiplexer();
 
+    // Render queue — serializes all react() calls so only one render chain
+    // runs at a time. Keyed by component code for O(1) dedup.
+    /** @type {Map<string, {id: ComponentId, mode: string}>} */
+    this._queue = new Map();
+    this._draining = false;
+    /** @type {Promise<void>} */
+    this._drainPromise = Promise.resolve();
+
     // Auto-create dependencies if not provided
     this._templateStore = config.templateStore || new TemplateStore();
 
@@ -165,21 +173,56 @@ export class Reactor {
   }
 
   /**
-   * Trigger re-render of a component
+   * Enqueue a component re-render.
+   * The render executes asynchronously via the internal render queue, which
+   * serializes all renders so only one render chain runs at a time.
+   * Multiple react() calls for the same component are deduplicated — if the
+   * component is already queued, subsequent calls are dropped (the queued
+   * render will use the latest vars when it runs).
    * @param {ComponentId|string} componentId - Component to re-render (ComponentId or code string)
    * @param {string} mode - Render mode (currently only 'CSR' supported)
+   * @returns {Promise<void>} Resolves when the current queue drain completes
    */
-  async react(componentId, mode = 'CSR') {
+  react(componentId, mode = 'CSR') {
     if (mode !== 'CSR') {
       throw new Error(`Reactor: Unsupported render mode "${mode}"`);
     }
 
-    // Convert string to ComponentId if needed
+    // Accept both ComponentId and code string (from legacy callers)
     const id = typeof componentId === 'string' ? ComponentId.fromCode(componentId) : componentId;
 
-    // Re-render and call afterRender hook
-    await this._instanceRegistry.render(id);
-    const instance = this._instanceRegistry.get(id);
-    if (instance) instance.afterRender();
+    // Deduplicate: skip if this component is already waiting in the queue
+    const code = id.code;
+    if (!this._queue.has(code)) {
+      this._queue.set(code, { id, mode });
+    }
+
+    // Start draining if not already running
+    if (!this._draining) {
+      this._drainPromise = this._drain();
+    }
+    return this._drainPromise;
+  }
+
+  /**
+   * Process the render queue sequentially until empty.
+   * For each entry: render the component, then call afterRender().
+   * If afterRender() (or any code during the render) enqueues more entries,
+   * they are processed in order before the drain completes.
+   * @private
+   * @returns {Promise<void>} Resolves when the queue is empty
+   */
+  async _drain() {
+    this._draining = true;
+    try {
+      while (this._queue.size > 0) {
+        const [code, { id }] = this._queue.entries().next().value;
+        this._queue.delete(code);
+        await this._instanceRegistry.render(id);
+        this._instanceRegistry.get(id).afterRender();
+      }
+    } finally {
+      this._draining = false;
+    }
   }
 }
