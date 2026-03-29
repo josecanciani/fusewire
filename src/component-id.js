@@ -1,35 +1,78 @@
 /**
- * ComponentId - Represents a component's identity (name + optional instance id)
+ * ComponentId - Represents a component's identity (name + optional instance id + version).
  *
- * Format: "ComponentName#instanceId" or "ComponentName" (if no instance id)
+ * Immutable after construction. When a component's template version changes,
+ * the framework creates a new ComponentId (and a new Component instance)
+ * rather than mutating the existing one.
  *
- * Example:
- *   new ComponentId('UserList', 'main')  // UserList#main
- *   new ComponentId('Counter')           // Counter
+ * Terminology:
+ *   - **name**    The class/template name (e.g. "Table/Person")
+ *   - **id**      A unique instance identifier within that name (e.g. "1234")
+ *   - **code**    The full unique reference: "Table/Person#1234"
+ *   - **version** Content hash of the component's HTML + CSS + JS files
+ *
+ * @example
+ *   new ComponentId('UserList', 'main')           // code → "UserList#main", version → ''
+ *   new ComponentId('Counter', '', 'a1b2c3d4e5f6') // code → "Counter", version → 'a1b2c3d4e5f6'
  */
 export class ComponentId {
   /**
    * Create a new ComponentId
    * @param {string} name - Component name (e.g., "Counter", "Basics/Counter")
    * @param {string} id - Optional instance identifier (e.g., "main", "sidebar", "")
+   * @param {string} version - Content hash of the component's files (default empty)
    */
-  constructor(name, id = '') {
+  constructor(name, id = '', version = '') {
     if (!name || typeof name !== 'string') {
       throw new Error('ComponentId: name must be a non-empty string');
     }
 
-    this.name = name;
-    this.id = id || '';
+    this._name = name;
+    this._id = id || '';
+    this._version = version || '';
+  }
+
+  /**
+   * Component name (class/template name, e.g. "Counter", "Table/Person")
+   * @returns {string} The component name
+   */
+  get name() {
+    return this._name;
+  }
+
+  /**
+   * Instance identifier within the component name (e.g. "main", "1234")
+   * @returns {string} The instance identifier
+   */
+  get id() {
+    return this._id;
+  }
+
+  /**
+   * Content hash of the component's HTML + CSS + JS files
+   * @returns {string} The version hash or empty string if not yet known
+   */
+  get version() {
+    return this._version;
+  }
+
+  /**
+   * Full component code — unique reference within the application.
+   * Format: "Name#id" when id is present, "Name" otherwise.
+   * @returns {string} The component code string
+   */
+  get code() {
+    return this._id ? `${this._name}#${this._id}` : this._name;
   }
 
   /**
    * Parse a component code string into a ComponentId
    * @param {string} code - Format: "Name#id" or "Name"
-   * @returns {ComponentId}
+   * @returns {ComponentId} Parsed ComponentId instance
    *
-   * Examples:
-   *   ComponentId.fromCode('UserList#main') → { name: 'UserList', id: 'main' }
-   *   ComponentId.fromCode('Counter') → { name: 'Counter', id: '' }
+   * @example
+   *   ComponentId.fromCode('UserList#main') // → { name: 'UserList', id: 'main' }
+   *   ComponentId.fromCode('Counter')       // → { name: 'Counter', id: '' }
    */
   static fromCode(code) {
     if (!code || typeof code !== 'string') {
@@ -38,7 +81,6 @@ export class ComponentId {
 
     const hashIndex = code.indexOf('#');
     if (hashIndex === -1) {
-      // No # found, entire string is the name
       return new ComponentId(code, '');
     }
 
@@ -49,19 +91,7 @@ export class ComponentId {
   }
 
   /**
-   * Serialize this ComponentId to a code string
-   * @returns {string} Format: "Name#id" or "Name"
-   *
-   * Examples:
-   *   new ComponentId('UserList', 'main').toCode() → "UserList#main"
-   *   new ComponentId('Counter').toCode() → "Counter"
-   */
-  toCode() {
-    return this.id ? `${this.name}#${this.id}` : this.name;
-  }
-
-  /**
-   * Check equality with another ComponentId
+   * Check equality with another ComponentId (compares name and id, not version)
    * @param {ComponentId} other - ComponentId to compare with
    * @returns {boolean} True if name and id match
    */
@@ -69,15 +99,15 @@ export class ComponentId {
     if (!other || !(other instanceof ComponentId)) {
       return false;
     }
-    return this.name === other.name && this.id === other.id;
+    return this._name === other._name && this._id === other._id;
   }
 
   /**
-   * String representation (for debugging)
+   * String representation (returns the component code)
    * @returns {string} Component code string
    */
   toString() {
-    return this.toCode();
+    return this.code;
   }
 }
 

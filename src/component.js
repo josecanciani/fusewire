@@ -7,14 +7,13 @@ import { ComponentReference } from './component-reference.js';
 /** @typedef {{new(vars: ComponentVars): Component, componentName: string}} ComponentConstructor */
 
 /**
- * Base class for all FuseWire components
- * @property {ComponentVars} componentVars - Component variables/data
- * @property {ComponentVars} vars - Alias for componentVars
- * @property {HTMLElement|null} componentContainer - DOM container element — set by engine when mounted
- * @property {Component|null} componentParent - Parent component instance — set by engine, null for root
- * @property {string} componentName - Component name (e.g. 'Counter') — set by engine
- * @property {string} componentId - Instance identifier (e.g. 'main') — set by engine
- * @property {string} componentVersion - Template version hash — set by engine after first render
+ * Base class for all FuseWire components.
+ *
+ * Framework-managed properties (set by the engine, read-only for developers):
+ *   - _componentId   ComponentId object (name, id, version, code)
+ *   - _registryEntry  Shared entry object with container/parent (managed by InstanceRegistry)
+ *   - _console        Pre-built console wrapper (creates LogMessage with component context)
+ *   - _reactor        Reactor reference (enables react(), console, etc.)
  */
 export class Component {
   /**
@@ -35,12 +34,62 @@ export class Component {
    */
   constructor(vars = {}) {
     this.componentVars = vars;
-    this.componentContainer = null; // Set by framework when mounted
-    this.componentParent = null; // Set by framework
-    this._reactor = null; // Set by framework
-    this.componentName = '';
-    this.componentId = '';
-    this.componentVersion = '';
+    this._componentId = null; // Set by framework (ComponentId)
+    this._registryEntry = null; // Set by framework ({ container, parent })
+    this._console = null; // Set by framework (pre-built console wrapper)
+    this._reactor = null; // Set by framework (Reactor)
+  }
+
+  /**
+   * Component name — the class/template name (e.g. "Counter", "Table/Person").
+   * @returns {string} The component name
+   */
+  get componentName() {
+    return this._componentId.name;
+  }
+
+  /**
+   * Component instance id — unique within the component name (e.g. "main", "1234").
+   * @returns {string} The instance identifier
+   */
+  get componentId() {
+    return this._componentId.id;
+  }
+
+  /**
+   * Template version hash — set by the framework after each render.
+   * @returns {string} The template version
+   */
+  get componentVersion() {
+    return this._componentId.version;
+  }
+
+  /**
+   * Component code — full unique reference (e.g. "Counter#main").
+   * @returns {string} The component code
+   */
+  get componentCode() {
+    return this._componentId.code;
+  }
+
+  /**
+   * DOM container element where this component renders.
+   * Managed by the InstanceRegistry — may change when DOM morphing
+   * replaces elements or when the component moves.
+   * @returns {HTMLElement} The container element
+   */
+  get componentContainer() {
+    return this._registryEntry.container;
+  }
+
+  /**
+   * Parent component instance.
+   * Managed by the InstanceRegistry — may change if the component
+   * is moved to a different parent.
+   * @returns {Component|null} The parent component or null if root
+   */
+  get componentParent() {
+    return this._registryEntry.parent;
   }
 
   /**
@@ -126,12 +175,13 @@ export class Component {
 
   /**
    * Get the console for this component.
-   * Returns the Reactor-level console (which may be a custom implementation
-   * such as a Console component, or the built-in console by default).
+   * Returns a pre-built wrapper that creates LogMessage objects with
+   * component context, then forwards to the Reactor-level console
+   * multiplexer. Supports rest parameters: this.console.log(msg, ...args).
    * @returns {import('./reactor.js').ConsoleLike} Console-like object with log, warn, error methods
    */
   get console() {
-    return this._reactor._console;
+    return this._console;
   }
 
   /**
@@ -142,9 +192,6 @@ export class Component {
     if (!this._reactor) {
       throw new Error('Component: Cannot react - reactor not attached');
     }
-    const code = this.componentId
-      ? `${this.componentName}#${this.componentId}`
-      : this.componentName;
-    this._reactor.react(code, mode);
+    this._reactor.react(this._componentId, mode);
   }
 }

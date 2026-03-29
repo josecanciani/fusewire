@@ -100,6 +100,7 @@ npm run lint && npm run format:check && npm run jsdoc-check && npm run typecheck
 - **Indentation:** 4 spaces (not tabs)
 - **Quotes:** Single quotes for strings
 - **No hardcoded duplicates:** Never repeat a value that is already stored in a variable or derived from code. If a path, name, or label appears in log messages, error messages, or comments, reference the variable — don't hardcode the string a second time.
+- **No defensive fallbacks:** Do not use optional chaining (`?.`), ternary fallbacks (`x ? x.prop : ''`), `|| defaultValue`, or silent early returns to mask values that should always be present. If state is required, access it directly and let the error surface. Defensive fallbacks hide bugs. Legitimate uses: public lookup methods returning null for missing keys, optional function parameters with defaults, and API boundaries where input is untrusted.
 - Enforced via oxfmt configuration and automated tests
 
 ## JSDoc Documentation

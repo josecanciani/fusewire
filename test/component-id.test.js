@@ -8,12 +8,28 @@ describe('ComponentId', () => {
 			const cid = new ComponentId('UserList');
 			assert.strictEqual(cid.name, 'UserList');
 			assert.strictEqual(cid.id, '');
+			assert.strictEqual(cid.version, '');
 		});
 
 		it('creates ComponentId with name and id', () => {
 			const cid = new ComponentId('UserList', 'main');
 			assert.strictEqual(cid.name, 'UserList');
 			assert.strictEqual(cid.id, 'main');
+			assert.strictEqual(cid.version, '');
+		});
+
+		it('creates ComponentId with name, id and version', () => {
+			const cid = new ComponentId('UserList', 'main', 'a1b2c3');
+			assert.strictEqual(cid.name, 'UserList');
+			assert.strictEqual(cid.id, 'main');
+			assert.strictEqual(cid.version, 'a1b2c3');
+		});
+
+		it('creates ComponentId with version but no id', () => {
+			const cid = new ComponentId('Counter', '', 'abc123');
+			assert.strictEqual(cid.name, 'Counter');
+			assert.strictEqual(cid.id, '');
+			assert.strictEqual(cid.version, 'abc123');
 		});
 
 		it('treats empty string id as no id', () => {
@@ -89,27 +105,27 @@ describe('ComponentId', () => {
 		});
 	});
 
-	describe('toCode', () => {
+	describe('code', () => {
 		it('serializes with id', () => {
 			const cid = new ComponentId('UserList', 'main');
-			assert.strictEqual(cid.toCode(), 'UserList#main');
+			assert.strictEqual(cid.code, 'UserList#main');
 		});
 
 		it('serializes without id', () => {
 			const cid = new ComponentId('Counter');
-			assert.strictEqual(cid.toCode(), 'Counter');
+			assert.strictEqual(cid.code, 'Counter');
 		});
 
 		it('round-trip with id', () => {
 			const original = 'Dashlet_ServerTime#sidebar';
 			const cid = ComponentId.fromCode(original);
-			assert.strictEqual(cid.toCode(), original);
+			assert.strictEqual(cid.code, original);
 		});
 
 		it('round-trip without id', () => {
 			const original = 'Index';
 			const cid = ComponentId.fromCode(original);
-			assert.strictEqual(cid.toCode(), original);
+			assert.strictEqual(cid.code, original);
 		});
 	});
 
@@ -123,6 +139,12 @@ describe('ComponentId', () => {
 		it('returns true for ComponentIds with no id', () => {
 			const cid1 = new ComponentId('Counter');
 			const cid2 = new ComponentId('Counter', '');
+			assert.strictEqual(cid1.equals(cid2), true);
+		});
+
+		it('returns true when only version differs', () => {
+			const cid1 = new ComponentId('Counter', 'main', 'v1');
+			const cid2 = new ComponentId('Counter', 'main', 'v2');
 			assert.strictEqual(cid1.equals(cid2), true);
 		});
 

@@ -74,12 +74,18 @@ describe('DOM Helpers', () => {
 			assert.strictEqual(isMountPoint(div), false);
 		});
 
-		it('returns false for null', () => {
-			assert.strictEqual(isMountPoint(null), false);
+		it('throws for null', () => {
+			assert.throws(
+				() => isMountPoint(null),
+				TypeError,
+			);
 		});
 
-		it('returns false for non-element', () => {
-			assert.strictEqual(isMountPoint({}), false);
+		it('throws for non-element', () => {
+			assert.throws(
+				() => isMountPoint({}),
+				TypeError,
+			);
 		});
 	});
 
@@ -117,9 +123,11 @@ describe('DOM Helpers', () => {
 			assert.strictEqual(componentId, null);
 		});
 
-		it('returns null for null element', () => {
-			const componentId = getComponentIdFromElement(null);
-			assert.strictEqual(componentId, null);
+		it('throws for null element', () => {
+			assert.throws(
+				() => getComponentIdFromElement(null),
+				TypeError,
+			);
 		});
 	});
 
@@ -203,9 +211,11 @@ describe('DOM Helpers', () => {
 			assert.deepStrictEqual(mountPoints, []);
 		});
 
-		it('returns empty array for null container', () => {
-			const mountPoints = findChildMountPoints(null, 'Dashboard#10');
-			assert.deepStrictEqual(mountPoints, []);
+		it('throws for null container', () => {
+			assert.throws(
+				() => findChildMountPoints(null, 'Dashboard#10'),
+				TypeError,
+			);
 		});
 
 		it('skips mount points with wrong parent id', () => {

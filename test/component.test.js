@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { Component } from '../src/component.js';
+import { ComponentId } from '../src/component-id.js';
 import { ComponentReference } from '../src/component-reference.js';
 
 describe('Component', () => {
@@ -9,11 +10,6 @@ describe('Component', () => {
 			const comp = new Component();
 			assert.deepStrictEqual(comp.componentVars, {});
 			assert.deepStrictEqual(comp.vars, {});
-			assert.strictEqual(comp.componentContainer, null);
-			assert.strictEqual(comp.componentParent, null);
-			assert.strictEqual(comp.componentName, '');
-			assert.strictEqual(comp.componentId, '');
-			assert.strictEqual(comp.componentVersion, '');
 		});
 
 		it('creates instance with vars', () => {
@@ -108,12 +104,11 @@ describe('Component', () => {
 
 		it('triggers react() by default', () => {
 			const comp = new Component({ x: 0 });
-			comp.componentName = 'Test';
-			comp.componentId = 'u1';
+			comp._componentId = new ComponentId('Test', 'u1');
 			const reactCalls = [];
 			comp._reactor = {
-				react(code, mode) {
-					reactCalls.push({ code, mode });
+				react(componentId, mode) {
+					reactCalls.push({ code: componentId.code, mode });
 				},
 			};
 
@@ -125,12 +120,11 @@ describe('Component', () => {
 
 		it('does not react when react=false', () => {
 			const comp = new Component({ x: 0 });
-			comp.componentName = 'Test';
-			comp.componentId = 'u1';
+			comp._componentId = new ComponentId('Test', 'u1');
 			const reactCalls = [];
 			comp._reactor = {
-				react(code, mode) {
-					reactCalls.push({ code, mode });
+				react(componentId, mode) {
+					reactCalls.push({ code: componentId.code, mode });
 				},
 			};
 
@@ -143,31 +137,29 @@ describe('Component', () => {
 	describe('react()', () => {
 		it('calls reactor.react when attached', () => {
 			const comp = new Component();
-			comp.componentName = 'Component';
-			comp.componentId = 'test';
+			comp._componentId = new ComponentId('Component', 'test');
 			const reactCalls = [];
 
 			comp._reactor = {
-				react(componentCode, mode) {
-					reactCalls.push({ componentCode, mode });
+				react(componentId, mode) {
+					reactCalls.push({ code: componentId.code, mode });
 				},
 			};
 
 			comp.react('CSR');
 
 			assert.strictEqual(reactCalls.length, 1);
-			assert.strictEqual(reactCalls[0].componentCode, 'Component#test');
+			assert.strictEqual(reactCalls[0].code, 'Component#test');
 			assert.strictEqual(reactCalls[0].mode, 'CSR');
 		});
 
 		it('defaults to CSR mode', () => {
 			const comp = new Component();
-			comp.componentName = 'Component';
-			comp.componentId = 'test';
+			comp._componentId = new ComponentId('Component', 'test');
 			const reactCalls = [];
 
 			comp._reactor = {
-				react(componentCode, mode) {
+				react(componentId, mode) {
 					reactCalls.push({ mode });
 				},
 			};

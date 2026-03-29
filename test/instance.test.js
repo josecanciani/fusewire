@@ -80,6 +80,12 @@ describe('InstanceRegistry', () => {
         
         registry = new InstanceRegistry(renderer, templateStore, 'testApp');
 
+        // Wire a mock reactor (normally done by Reactor constructor)
+        registry._reactor = {
+            _console: console,
+            _basePath: './components',
+        };
+
         // Create a fresh container for each test
         container = document.createElement('div');
         document.body.appendChild(container);
@@ -598,7 +604,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new ChildComponent({});
-            childDecl.componentId = 'child1';
+            childDecl._componentId = new ComponentId('ChildComponent', 'child1');
 
             await registry.create(
                 componentId,
@@ -630,9 +636,9 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const card1 = new ChildComponent({});
-            card1.componentId = 'c1';
+            card1._componentId = new ComponentId('ChildComponent', 'c1');
             const card2 = new ChildComponent({});
-            card2.componentId = 'c2';
+            card2._componentId = new ComponentId('ChildComponent', 'c2');
             const cards = [card1, card2];
 
             await registry.create(
@@ -646,7 +652,7 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c2')), true);
         });
 
-        it('skips mount points without matching declarations', async () => {
+        it('throws when child template is missing', async () => {
             templateStore.set('TestComponent', {
                 htmlCode: '<div>((child))</div>',
                 cssCode: '',
@@ -658,18 +664,17 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new UnregisteredChild({});
-            childDecl.componentId = 'u1';
+            childDecl._componentId = new ComponentId('UnregisteredChild', 'u1');
 
-            // Should not throw even though child template is not registered
-            await registry.create(
-                componentId,
-                TestComponent,
-                { child: childDecl },
-                container
+            await assert.rejects(
+                () => registry.create(
+                    componentId,
+                    TestComponent,
+                    { child: childDecl },
+                    container
+                ),
+                /UnregisteredChild/
             );
-
-            const childId = new ComponentId('UnregisteredChild', 'u1');
-            assert.strictEqual(registry.has(childId), false);
         });
 
         it('adds fusewire-component class to child container', async () => {
@@ -687,7 +692,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new ChildComponent({});
-            childDecl.componentId = 'child1';
+            childDecl._componentId = new ComponentId('ChildComponent', 'child1');
 
             await registry.create(
                 componentId,
@@ -716,7 +721,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new ChildComponent({ label: 'Hello' });
-            childDecl.componentId = 'child1';
+            childDecl._componentId = new ComponentId('ChildComponent', 'child1');
 
             await registry.create(
                 componentId,
@@ -749,7 +754,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new ChildComponent({});
-            childDecl.componentId = 'child1';
+            childDecl._componentId = new ComponentId('ChildComponent', 'child1');
 
             const parent = await registry.create(
                 componentId,
@@ -790,7 +795,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new ChildComponent({});
-            childDecl.componentId = 'c1';
+            childDecl._componentId = new ComponentId('ChildComponent', 'c1');
             const parent = await registry.create(
                 componentId,
                 TestComponent,
@@ -803,7 +808,7 @@ describe('InstanceRegistry', () => {
 
             // Replace with different component type
             const altDecl = new AltChild({});
-            altDecl.componentId = 'c1';
+            altDecl._componentId = new ComponentId('AltChild', 'c1');
             parent.vars.child = altDecl;
             await registry.render(componentId);
 
@@ -828,7 +833,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new ChildComponent({});
-            childDecl.componentId = 'child1';
+            childDecl._componentId = new ComponentId('ChildComponent', 'child1');
 
             const parent = await registry.create(
                 componentId,
@@ -861,7 +866,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new ChildComponent({});
-            childDecl.componentId = 'child1';
+            childDecl._componentId = new ComponentId('ChildComponent', 'child1');
 
             const parent = await registry.create(
                 componentId,
@@ -895,9 +900,9 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const card1 = new ChildComponent({});
-            card1.componentId = 'c1';
+            card1._componentId = new ComponentId('ChildComponent', 'c1');
             const card2 = new ChildComponent({});
-            card2.componentId = 'c2';
+            card2._componentId = new ComponentId('ChildComponent', 'c2');
             const cards = [card1, card2];
 
             const parent = await registry.create(
@@ -980,12 +985,12 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(instance.afterRenderCalled, true);
         });
 
-        it('throws if component class not registered and no reactor', async () => {
+        it('throws if component class not found', async () => {
             const ref = new ComponentReference('Unknown', 'test1', {});
 
             await assert.rejects(
                 async () => await registry.createFromReference(ref, container),
-                /Cannot load component "Unknown"/
+                /Unknown/
             );
         });
     });

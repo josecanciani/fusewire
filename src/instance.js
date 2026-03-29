@@ -2,6 +2,7 @@ import { ComponentNotFoundError } from './errors/error-hierarchy.js';
 import { ComponentId, toCssName } from './component-id.js';
 import { ComponentReference } from './component-reference.js';
 import { Component } from './component.js';
+import { LogMessage } from './log-message.js';
 import { compileTemplate } from './template-compiler.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
@@ -17,6 +18,7 @@ import { compileTemplate } from './template-compiler.js';
  * - Coordinate rendering with Renderer
  * - Manage component tree (parent/child relationships)
  * - Resolve ComponentReference declarations to real Component instances
+ * - Wire framework properties: _componentId, _registryEntry, _console, _reactor
  */
 export class InstanceRegistry {
   constructor(renderer, templateStore, appName = 'default') {
@@ -24,7 +26,7 @@ export class InstanceRegistry {
     this._templateStore = templateStore;
     this._appName = appName;
     this._reactor = null; // Set by Reactor after construction
-    this._instances = new Map(); // componentId.toCode() -> { instance, container, children }
+    this._instances = new Map(); // componentId.code -> { instance, container, parent, children }
     this._componentClasses = new Map(); // componentName -> ComponentConstructor (pre-registered)
   }
 
@@ -35,7 +37,10 @@ export class InstanceRegistry {
    * @param {ComponentConstructor} ComponentClass - The component class constructor
    */
   registerComponent(name, ComponentClass) {
-    Object.defineProperty(ComponentClass, 'componentName', { value: name, configurable: true });
+    Object.defineProperty(ComponentClass, 'componentName', {
+      value: name,
+      configurable: true,
+    });
     this._componentClasses.set(name, ComponentClass);
   }
 
@@ -47,12 +52,23 @@ export class InstanceRegistry {
    */
   async createFromReference(ref, container) {
     const ComponentClass = await this._loadComponentClass(ref.componentName);
-    const componentId = ref.toComponentId();
+
+    // Ensure template is loaded so we can read its version
+    const version = await this._ensureTemplate(ref.componentName);
+    const componentId = new ComponentId(ref.componentName, ref.id, version);
+
     return await this.create(componentId, ComponentClass, { ...ref.vars }, container);
   }
 
   /**
-   * Create a new component instance
+   * Create a new component instance.
+   *
+   * Wires all framework-managed properties on the instance:
+   *   - _componentId    → ComponentId object (name, id, version, code)
+   *   - _registryEntry  → shared entry object (container, parent) — same object stored in the registry
+   *   - _console        → pre-built console wrapper with component context
+   *   - _reactor        → Reactor reference
+   *
    * @param {ComponentId} componentId - Component identifier
    * @param {ComponentConstructor} ComponentClass - Component class constructor
    * @param {ComponentVars} vars - Initial vars
@@ -60,7 +76,7 @@ export class InstanceRegistry {
    * @returns {Promise<Component>} The created instance
    */
   async create(componentId, ComponentClass, vars, container) {
-    const code = componentId.toCode();
+    const code = componentId.code;
     if (this._instances.has(code)) {
       throw new Error(`Component ${code} already exists in registry`);
     }
@@ -69,20 +85,21 @@ export class InstanceRegistry {
     container.classList.add(`fusewire-component-${toCssName(componentId.name)}`);
 
     const instance = new ComponentClass(vars);
-    instance.componentName = componentId.name;
-    instance.componentId = componentId.id;
-    instance.componentContainer = container;
 
-    // Attach reactor if available (enables this.react() on the instance)
-    if (this._reactor) {
-      instance._reactor = this._reactor;
-    }
+    // Build registry entry — the single source of truth for container/parent.
+    // The component holds a reference to this same object via _registryEntry,
+    // so updates here are immediately visible through the getters.
+    const entry = { instance, container, parent: null, children: null };
+    this._instances.set(code, entry);
+
+    // Wire framework properties
+    instance._componentId = componentId;
+    instance._registryEntry = entry;
+    instance._reactor = this._reactor;
+    instance._console = this._buildConsoleFor(componentId);
 
     // Call hydrate hook
     await instance.hydrate();
-
-    // Store instance and container
-    this._instances.set(code, { instance, container });
 
     // Initial render
     await this.render(componentId);
@@ -95,11 +112,11 @@ export class InstanceRegistry {
 
   /**
    * Get an existing instance
-   * @param {ComponentId|string} componentId - Component identifier or code string (e.g., "Counter#main" or "Counter")
+   * @param {ComponentId|string} componentId - Component identifier or code string (e.g., "Counter#main")
    * @returns {Component|null} The component instance or null if not found
    */
   get(componentId) {
-    const code = typeof componentId === 'string' ? componentId : componentId.toCode();
+    const code = typeof componentId === 'string' ? componentId : componentId.code;
     const entry = this._instances.get(code);
     return entry ? entry.instance : null;
   }
@@ -112,7 +129,7 @@ export class InstanceRegistry {
    * @param {ComponentVars} newVars - New variable values to merge
    */
   async update(componentId, newVars) {
-    const code = componentId.toCode();
+    const code = componentId.code;
     const entry = this._instances.get(code);
 
     if (!entry) {
@@ -136,7 +153,7 @@ export class InstanceRegistry {
    * @param {ComponentId} componentId - Component identifier
    */
   async remove(componentId) {
-    const code = componentId.toCode();
+    const code = componentId.code;
     const entry = this._instances.get(code);
 
     if (!entry) {
@@ -156,7 +173,7 @@ export class InstanceRegistry {
     await instance.destroy();
 
     // Remove from DOM
-    if (container && container.parentNode) {
+    if (container.parentNode) {
       container.parentNode.removeChild(container);
     }
 
@@ -165,11 +182,32 @@ export class InstanceRegistry {
   }
 
   /**
-   * Render a component instance to its container
+   * Ensure a component's template is loaded into the store.
+   * Lazy-fetches from basePath if not already present.
+   * @private
+   * @param {string} componentName - Component name
+   * @returns {Promise<string>} Template version hash
+   */
+  async _ensureTemplate(componentName) {
+    if (!this._templateStore.has(componentName) && this._reactor) {
+      await this._templateStore.fetch(componentName, this._reactor._basePath);
+    }
+    const template = this._templateStore.get(componentName);
+    if (!template) {
+      throw new Error(`Template not found for component ${componentName}`);
+    }
+    return template.version;
+  }
+
+  /**
+   * Render a component instance to its container.
+   * Callers must ensure renders are serialized (the Reactor's render queue
+   * handles this for react() calls; internal callers like _mountChild and
+   * create() are already within a parent's render and thus serialized).
    * @param {ComponentId} componentId - Component identifier
    */
   async render(componentId) {
-    const code = componentId.toCode();
+    const code = componentId.code;
     const entry = this._instances.get(code);
 
     if (!entry) {
@@ -179,24 +217,22 @@ export class InstanceRegistry {
     const { instance, container } = entry;
     const componentName = instance.componentName;
 
-    // Lazy-load template from basePath if not already in store
-    if (!this._templateStore.has(componentName) && this._reactor) {
-      await this._templateStore.fetch(componentName, this._reactor._basePath);
+    // Lazy-load template from basePath if not already in store.
+    // IMPORTANT: the `if` guard keeps render() synchronous when the template
+    // is already cached. An unconditional `await` would yield to the microtask
+    // queue and break callers that expect fire-and-forget react() to update
+    // the DOM before the next synchronous statement runs (e.g. Playground).
+    if (!this._templateStore.has(componentName)) {
+      await this._ensureTemplate(componentName);
     }
 
     // Get template from store
     const template = this._templateStore.get(componentName);
-    if (!template) {
-      throw new Error(`Template not found for component ${componentName}`);
-    }
-
-    // Update version on instance
-    instance.componentVersion = template.version || '';
 
     // Get or compile template
     let compiled = this._templateStore.getCompiled(componentName);
     if (!compiled) {
-      compiled = compileTemplate(template.htmlCode || '', template.cssCode || '', this._appName);
+      compiled = compileTemplate(template.htmlCode, template.cssCode, this._appName);
       this._templateStore.setCompiled(componentName, compiled);
     }
 
@@ -204,7 +240,7 @@ export class InstanceRegistry {
     const currentChildren = this._collectChildComponents(instance.componentVars);
 
     // Build template constants
-    const constants = { version: template.version || '' };
+    const constants = { version: componentId.version };
 
     // Render to DOM and find child mount points
     const mountPoints = this._renderer.render(
@@ -240,20 +276,12 @@ export class InstanceRegistry {
    */
   async _mountChild(mountPoint, parentInstance) {
     const childCode = mountPoint.getAttribute('data-fusewire-id');
-    if (!childCode) return;
-
-    let childId;
-    try {
-      childId = ComponentId.fromCode(childCode);
-    } catch {
-      return;
-    }
+    const childId = ComponentId.fromCode(childCode);
 
     if (this.has(childId)) {
       // Child already exists — update container reference (morphing may replace elements)
-      const entry = this._instances.get(childId.toCode());
+      const entry = this._instances.get(childId.code);
       entry.container = mountPoint;
-      entry.instance.componentContainer = mountPoint;
       mountPoint.classList.add(`fusewire-component-${toCssName(childId.name)}`);
       await this.render(childId);
       return;
@@ -261,39 +289,36 @@ export class InstanceRegistry {
 
     // Find matching child declaration in parent's vars
     const decl = this._findChildDeclaration(parentInstance.componentVars, childId);
-    if (!decl) return;
-
-    // Create and render the child (template will be lazy-loaded during render).
-    // Catch errors so a missing child template doesn't crash the parent.
-    try {
-      let childInstance;
-      if (decl instanceof ComponentReference) {
-        childInstance = await this.createFromReference(decl, mountPoint);
-        // Replace the transient ComponentReference with the real Component in the
-        // parent's vars. From this point on, parent code that accesses the var
-        // (e.g. this.vars.logs.at(-1)) gets the Component directly and can call
-        // update() on it. The old reference is marked as replaced so that any
-        // stale usage throws.
-        this._replaceRefInVars(parentInstance.componentVars, decl, childInstance);
-        decl._replaced = true;
-      } else {
-        // Legacy: Component instance used as declaration
-        childInstance = await this.create(
-          childId,
-          /** @type {ComponentConstructor} */ (decl.constructor),
-          { ...decl.componentVars },
-          mountPoint,
-        );
-        // Link declaration to reactor so it can trigger re-renders via react()
-        decl._reactor = this._reactor;
-        decl.componentName = childId.name;
-        decl.componentId = childId.id;
-      }
-      childInstance.componentParent = parentInstance;
-    } catch {
-      // Clean up partially-created instance if render failed
-      this._instances.delete(childId.toCode());
+    if (!decl) {
+      throw new Error(
+        `Mount point for "${childId.code}" found in DOM but no matching declaration in parent vars`,
+      );
     }
+
+    let childInstance;
+    if (decl instanceof ComponentReference) {
+      childInstance = await this.createFromReference(decl, mountPoint);
+      // Replace the transient ComponentReference with the real Component in the
+      // parent's vars. From this point on, parent code that accesses the var
+      // (e.g. this.vars.logs.at(-1)) gets the Component directly and can call
+      // update() on it. The old reference is marked as replaced so that any
+      // stale usage throws.
+      this._replaceRefInVars(parentInstance.componentVars, decl, childInstance);
+      decl._replaced = true;
+    } else {
+      // Legacy: Component instance used as declaration
+      childInstance = await this.create(
+        childId,
+        /** @type {ComponentConstructor} */ (decl.constructor),
+        { ...decl.componentVars },
+        mountPoint,
+      );
+      // Link declaration to reactor so it can trigger re-renders via react()
+      decl._reactor = this._reactor;
+      decl._componentId = childId;
+    }
+    // Set parent on the child's registry entry
+    this._instances.get(childInstance._componentId.code).parent = parentInstance;
   }
 
   /**
@@ -346,7 +371,7 @@ export class InstanceRegistry {
    * @returns {boolean} True if instance exists in registry
    */
   has(componentId) {
-    return this._instances.has(componentId.toCode());
+    return this._instances.has(componentId.code);
   }
 
   /**
@@ -355,7 +380,7 @@ export class InstanceRegistry {
    * @returns {HTMLElement|null} Container element or null if not found
    */
   getContainer(componentId) {
-    const entry = this._instances.get(componentId.toCode());
+    const entry = this._instances.get(componentId.code);
     return entry ? entry.container : null;
   }
 
@@ -368,6 +393,27 @@ export class InstanceRegistry {
       const componentId = ComponentId.fromCode(code);
       await this.remove(componentId);
     }
+  }
+
+  /**
+   * Build a pre-bound console wrapper for a component.
+   * The wrapper creates LogMessage objects with the component's identity
+   * and forwards them (plus any extra args) to the reactor's console
+   * multiplexer. Extra args are passed through for the native console
+   * but are NOT stored in the LogMessage (avoids object references).
+   * @private
+   * @param {ComponentId} componentId - Component identity
+   * @returns {import('./reactor.js').ConsoleLike} Console-like object
+   */
+  _buildConsoleFor(componentId) {
+    const reactorConsole = this._reactor._console;
+    return {
+      log: (message, ...args) => reactorConsole.log(new LogMessage(componentId, message), ...args),
+      warn: (message, ...args) =>
+        reactorConsole.warn(new LogMessage(componentId, message), ...args),
+      error: (message, ...args) =>
+        reactorConsole.error(new LogMessage(componentId, message), ...args),
+    };
   }
 
   /**
@@ -415,9 +461,6 @@ export class InstanceRegistry {
   /**
    * Collect component declarations from vars (top-level values and array items).
    * Recognises both ComponentReference and legacy Component instances.
-   * Vars follow a flat structure: scalar, plain object, Component/ComponentReference,
-   * or Array of those. Plain objects cannot contain components, so only top-level
-   * and array scanning is needed.
    * @private
    * @param {ComponentVars} vars - Component variables
    * @returns {Map<string, ComponentId>} Map of component code to ComponentId
@@ -454,7 +497,7 @@ export class InstanceRegistry {
       id = decl.componentId || '';
     }
     const componentId = new ComponentId(name, id);
-    children.set(componentId.toCode(), componentId);
+    children.set(componentId.code, componentId);
   }
 
   /**

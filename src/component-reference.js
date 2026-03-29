@@ -68,7 +68,7 @@ export class ComponentReference {
   update(newVars) {
     if (this._replaced) {
       throw new Error(
-        `ComponentReference: update() called on replaced reference "${this.componentName}#${this.id}". ` +
+        `ComponentReference: update() called on replaced reference "${this.toComponentId().code}". ` +
           'Use the Component instance from vars instead.',
       );
     }

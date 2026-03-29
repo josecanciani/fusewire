@@ -8,12 +8,8 @@ import { ComponentId } from '../component-id.js';
  * @returns {HTMLElement[]} Array of mount point elements
  */
 export function findChildMountPoints(container, parentComponentId) {
-  if (!container) {
-    return [];
-  }
-
   const parentCode =
-    typeof parentComponentId === 'string' ? parentComponentId : parentComponentId.toCode();
+    typeof parentComponentId === 'string' ? parentComponentId : parentComponentId.code;
 
   // In attribute selectors with quoted values, special characters don't need escaping
   // Only escape the quote character itself and backslash
@@ -34,14 +30,14 @@ export function createMountPoint(componentId, parentComponentId) {
   const div = document.createElement('div');
 
   // Accept either ComponentId instance or string
-  const code = typeof componentId === 'string' ? componentId : componentId.toCode();
+  const code = typeof componentId === 'string' ? componentId : componentId.code;
 
   div.setAttribute('data-fusewire-id', code);
 
   // Set parent ID if provided
   if (parentComponentId) {
     const parentCode =
-      typeof parentComponentId === 'string' ? parentComponentId : parentComponentId.toCode();
+      typeof parentComponentId === 'string' ? parentComponentId : parentComponentId.code;
     div.setAttribute('data-fusewire-parent-id', parentCode);
   }
 
@@ -54,9 +50,6 @@ export function createMountPoint(componentId, parentComponentId) {
  * @returns {boolean} True if element is a mount point
  */
 export function isMountPoint(element) {
-  if (!element || !element.hasAttribute) {
-    return false;
-  }
   return element.hasAttribute('data-fusewire-id');
 }
 

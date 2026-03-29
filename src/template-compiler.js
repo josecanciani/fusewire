@@ -131,7 +131,7 @@ function renderMountPoint(decl, parentId) {
     id = decl.componentId || '';
   }
   const childId = new ComponentId(name, id);
-  return `<div data-fusewire-id="${childId.toCode()}" data-fusewire-parent-id="${parentId.toCode()}"></div>`;
+  return `<div data-fusewire-id="${childId.code}" data-fusewire-parent-id="${parentId.code}"></div>`;
 }
 
 /**
@@ -149,12 +149,12 @@ function interpolateText(text, vars, componentId, constants) {
     // Special case: ((this)) - placeholder for component instance reference
     if (path === 'this') {
       // Replace # with _ to make it a valid JS identifier
-      const safeCode = componentId.toCode().replace(/#/g, '_');
+      const safeCode = componentId.code.replace(/#/g, '_');
       return `__FUSEWIRE_COMPONENT_${safeCode}__`;
     }
 
     // Template constants (not part of mutable vars)
-    if (path === 'componentId') return escapeHtml(componentId.toCode());
+    if (path === 'componentId') return escapeHtml(componentId.code);
     if (path === 'componentName') return escapeHtml(componentId.name);
     if (path === 'componentVersion') return escapeHtml(constants.version || '');
 
