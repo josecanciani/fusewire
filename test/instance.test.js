@@ -9,6 +9,7 @@ import { ComponentId } from '../src/component-id.js';
 import { ComponentNotFoundError } from '../src/errors/error-hierarchy.js';
 import { Idiomorph } from 'idiomorph';
 import { ComponentReference } from '../src/component-reference.js';
+import { COMPONENT_ID, LIFECYCLE_ACTIVE } from '../src/symbols.js';
 
 describe('InstanceRegistry', () => {
     let dom;
@@ -299,7 +300,7 @@ describe('InstanceRegistry', () => {
             );
         });
 
-        it('clears _lifecycleActive after create() completes', async () => {
+        it('clears LIFECYCLE_ACTIVE after create() completes', async () => {
             const componentId = new ComponentId('TestComponent', 'test1');
             templateStore.set('TestComponent', {
                 htmlCode: '<div>Test</div>',
@@ -314,10 +315,10 @@ describe('InstanceRegistry', () => {
                 container,
             );
 
-            assert.strictEqual(instance._lifecycleActive, null);
+            assert.strictEqual(instance[LIFECYCLE_ACTIVE], null);
         });
 
-        it('clears _lifecycleActive even when hydrate() throws', async () => {
+        it('clears LIFECYCLE_ACTIVE even when hydrate() throws', async () => {
             class ThrowingHydrate extends Component {
                 async hydrate() {
                     throw new Error('hydrate failed');
@@ -338,7 +339,7 @@ describe('InstanceRegistry', () => {
             );
 
             const instance = registry.get(componentId);
-            assert.strictEqual(instance._lifecycleActive, null);
+            assert.strictEqual(instance[LIFECYCLE_ACTIVE], null);
         });
 
         // Note: update() triggers re-render which uses morphing.
@@ -773,7 +774,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new ChildComponent();
-            childDecl._componentId = new ComponentId('ChildComponent', 'child1');
+            childDecl[COMPONENT_ID] = new ComponentId('ChildComponent', 'child1');
 
             await registry.create(
                 componentId,
@@ -805,9 +806,9 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const card1 = new ChildComponent();
-            card1._componentId = new ComponentId('ChildComponent', 'c1');
+            card1[COMPONENT_ID] = new ComponentId('ChildComponent', 'c1');
             const card2 = new ChildComponent();
-            card2._componentId = new ComponentId('ChildComponent', 'c2');
+            card2[COMPONENT_ID] = new ComponentId('ChildComponent', 'c2');
             const cards = [card1, card2];
 
             await registry.create(
@@ -833,7 +834,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new UnregisteredChild();
-            childDecl._componentId = new ComponentId('UnregisteredChild', 'u1');
+            childDecl[COMPONENT_ID] = new ComponentId('UnregisteredChild', 'u1');
 
             await assert.rejects(
                 () => registry.create(
@@ -861,7 +862,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new ChildComponent();
-            childDecl._componentId = new ComponentId('ChildComponent', 'child1');
+            childDecl[COMPONENT_ID] = new ComponentId('ChildComponent', 'child1');
 
             await registry.create(
                 componentId,
@@ -890,7 +891,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = Object.assign(new ChildComponent(), { label: 'Hello' });
-            childDecl._componentId = new ComponentId('ChildComponent', 'child1');
+            childDecl[COMPONENT_ID] = new ComponentId('ChildComponent', 'child1');
 
             await registry.create(
                 componentId,
@@ -923,7 +924,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new ChildComponent();
-            childDecl._componentId = new ComponentId('ChildComponent', 'child1');
+            childDecl[COMPONENT_ID] = new ComponentId('ChildComponent', 'child1');
 
             const parent = await registry.create(
                 componentId,
@@ -964,7 +965,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new ChildComponent();
-            childDecl._componentId = new ComponentId('ChildComponent', 'c1');
+            childDecl[COMPONENT_ID] = new ComponentId('ChildComponent', 'c1');
             const parent = await registry.create(
                 componentId,
                 TestComponent,
@@ -977,7 +978,7 @@ describe('InstanceRegistry', () => {
 
             // Replace with different component type
             const altDecl = new AltChild();
-            altDecl._componentId = new ComponentId('AltChild', 'c1');
+            altDecl[COMPONENT_ID] = new ComponentId('AltChild', 'c1');
             parent.child = altDecl;
             await registry.render(componentId);
 
@@ -1002,7 +1003,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new ChildComponent();
-            childDecl._componentId = new ComponentId('ChildComponent', 'child1');
+            childDecl[COMPONENT_ID] = new ComponentId('ChildComponent', 'child1');
 
             const parent = await registry.create(
                 componentId,
@@ -1035,7 +1036,7 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const childDecl = new ChildComponent();
-            childDecl._componentId = new ComponentId('ChildComponent', 'child1');
+            childDecl[COMPONENT_ID] = new ComponentId('ChildComponent', 'child1');
 
             const parent = await registry.create(
                 componentId,
@@ -1069,9 +1070,9 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const card1 = new ChildComponent();
-            card1._componentId = new ComponentId('ChildComponent', 'c1');
+            card1[COMPONENT_ID] = new ComponentId('ChildComponent', 'c1');
             const card2 = new ChildComponent();
-            card2._componentId = new ComponentId('ChildComponent', 'c2');
+            card2[COMPONENT_ID] = new ComponentId('ChildComponent', 'c2');
             const cards = [card1, card2];
 
             const parent = await registry.create(

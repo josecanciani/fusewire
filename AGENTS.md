@@ -93,7 +93,7 @@ npm run lint && npm run format:check && npm run jsdoc-check && npm run typecheck
 
 - **Browser-compatible JavaScript only.** Use ES2020+ features that work in modern browsers.
 - **ES modules only.** All files use `import`/`export`. No CommonJS.
-- **No setters.** Avoid setter methods and `set` accessors. Prefer passing state at construction time (via constructor/config). Follow a functional pattern — objects should be configured once, not mutated after creation. Internal framework wiring (e.g., setting `_reactor` on instances) is acceptable.
+- **No setters.** Avoid setter methods and `set` accessors. Prefer passing state at construction time (via constructor/config). Follow a functional pattern — objects should be configured once, not mutated after creation. Internal framework wiring (e.g., setting Symbol-keyed state on instances) is acceptable.
 
 ## Code Style
 
@@ -172,7 +172,8 @@ After a component has been rendered (template lazy-loaded), read its source from
 
 ```javascript
 // Template is auto-loaded on first render; read it from the store afterward
-const template = this._reactor._templateStore.get(name);
+import { REACTOR } from './symbols.js';
+const template = this[REACTOR]._templateStore.get(name);
 // template.htmlCode, template.cssCode are available
 ```
 

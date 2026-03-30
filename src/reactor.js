@@ -5,6 +5,7 @@ import { TemplateStore } from './template-store.js';
 import { InstanceRegistry } from './instance.js';
 import { Renderer } from './renderer.js';
 import { Idiomorph } from './lib/idiomorph/idiomorph.esm.js';
+import { REACTOR, LIFECYCLE_ACTIVE } from './symbols.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
 /** @typedef {{log: function(...*): void, warn: function(...*): void, error: function(...*): void}} ConsoleLike */
@@ -172,7 +173,7 @@ export class Reactor {
         const instance = await this._instanceRegistry.createFromReference(ref, renderContainer);
 
         // Ensure reactor is attached (also set by create() if registry has reactor ref)
-        instance._reactor = this;
+        instance[REACTOR] = this;
 
         return instance;
     }
@@ -226,11 +227,11 @@ export class Reactor {
                 this._queue.delete(code);
                 await this._instanceRegistry.render(id);
                 const instance = this._instanceRegistry.get(id);
-                instance._lifecycleActive = 'afterRender';
+                instance[LIFECYCLE_ACTIVE] = 'afterRender';
                 try {
                     instance.afterRender();
                 } finally {
-                    instance._lifecycleActive = null;
+                    instance[LIFECYCLE_ACTIVE] = null;
                 }
             }
         } finally {

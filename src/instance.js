@@ -4,6 +4,7 @@ import { ComponentReference } from './component-reference.js';
 import { Component } from './component.js';
 import { LogMessage } from './log-message.js';
 import { compileTemplate } from './template-compiler.js';
+import { COMPONENT_ID, REGISTRY_ENTRY, CONSOLE, REACTOR, LIFECYCLE_ACTIVE } from './symbols.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
 /** @typedef {import('./component.js').VarValue} VarValue */
@@ -11,9 +12,8 @@ import { compileTemplate } from './template-compiler.js';
 
 /**
  * Collect component vars from an instance's own properties.
- * Returns all own enumerable string-keyed properties whose name does NOT
- * start with '_'. Framework-managed properties (_componentId, _reactor, etc.)
- * are excluded.
+ * Returns all own enumerable string-keyed properties. Framework state is stored
+ * under Symbol keys (invisible to Object.keys), so no filtering is needed.
  * @param {Component} instance - Component instance
  * @returns {ComponentVars} Plain object with component vars
  */
@@ -21,7 +21,7 @@ function collectVars(instance) {
     /** @type {ComponentVars} */
     const vars = {};
     for (const key of Object.keys(instance)) {
-        if (!key.startsWith('_')) vars[key] = instance[key];
+        vars[key] = instance[key];
     }
     return vars;
 }
@@ -35,7 +35,7 @@ function collectVars(instance) {
  * - Coordinate rendering with Renderer
  * - Manage component tree (parent/child relationships)
  * - Resolve ComponentReference declarations to real Component instances
- * - Wire framework properties: _componentId, _registryEntry, _console, _reactor
+ * - Wire framework state via Symbol keys: COMPONENT_ID, REGISTRY_ENTRY, CONSOLE, REACTOR
  * - Apply initial vars onto instance (overriding class field defaults)
  */
 export class InstanceRegistry {
@@ -81,11 +81,11 @@ export class InstanceRegistry {
     /**
      * Create a new component instance.
      *
-     * Wires all framework-managed properties on the instance:
-     *   - _componentId    → ComponentId object (name, id, version, code)
-     *   - _registryEntry  → shared entry object (container, parent) — same object stored in the registry
-     *   - _console        → pre-built console wrapper with component context
-     *   - _reactor        → Reactor reference
+     * Wires all framework state on the instance via Symbol keys:
+     *   - COMPONENT_ID    → ComponentId object (name, id, version, code)
+     *   - REGISTRY_ENTRY  → shared entry object (container, parent) — same object stored in the registry
+     *   - CONSOLE         → pre-built console wrapper with component context
+     *   - REACTOR         → Reactor reference
      *
      * @param {ComponentId} componentId - Component identifier
      * @param {ComponentConstructor} ComponentClass - Component class constructor
@@ -106,34 +106,34 @@ export class InstanceRegistry {
         Object.assign(instance, vars);
 
         // Build registry entry — the single source of truth for container/parent.
-        // The component holds a reference to this same object via _registryEntry,
+        // The component holds a reference to this same object via REGISTRY_ENTRY,
         // so updates here are immediately visible through the getters.
         const entry = { instance, container, parent: null, children: null };
         this._instances.set(code, entry);
 
-        // Wire framework properties
-        instance._componentId = componentId;
-        instance._registryEntry = entry;
-        instance._reactor = this._reactor;
-        instance._console = this._buildConsoleFor(componentId);
+        // Wire framework state (Symbol-keyed, invisible to Object.keys)
+        instance[COMPONENT_ID] = componentId;
+        instance[REGISTRY_ENTRY] = entry;
+        instance[REACTOR] = this._reactor;
+        instance[CONSOLE] = this._buildConsoleFor(componentId);
 
         // Call hydrate hook
-        instance._lifecycleActive = 'hydrate';
+        instance[LIFECYCLE_ACTIVE] = 'hydrate';
         try {
             await instance.hydrate();
         } finally {
-            instance._lifecycleActive = null;
+            instance[LIFECYCLE_ACTIVE] = null;
         }
 
         // Initial render
         await this.render(componentId);
 
         // Call afterRender hook
-        instance._lifecycleActive = 'afterRender';
+        instance[LIFECYCLE_ACTIVE] = 'afterRender';
         try {
             instance.afterRender();
         } finally {
-            instance._lifecycleActive = null;
+            instance[LIFECYCLE_ACTIVE] = null;
         }
 
         return instance;
@@ -168,22 +168,22 @@ export class InstanceRegistry {
         const { instance } = entry;
 
         // Merge vars without triggering react — we handle rendering below
-        instance._lifecycleActive = 'update';
+        instance[LIFECYCLE_ACTIVE] = 'update';
         try {
             instance.update(newVars, false);
         } finally {
-            instance._lifecycleActive = null;
+            instance[LIFECYCLE_ACTIVE] = null;
         }
 
         // Re-render
         await this.render(componentId);
 
         // Call afterRender hook
-        instance._lifecycleActive = 'afterRender';
+        instance[LIFECYCLE_ACTIVE] = 'afterRender';
         try {
             instance.afterRender();
         } finally {
-            instance._lifecycleActive = null;
+            instance[LIFECYCLE_ACTIVE] = null;
         }
     }
 
@@ -356,11 +356,11 @@ export class InstanceRegistry {
                 mountPoint,
             );
             // Link declaration to reactor so it can trigger re-renders via react()
-            decl._reactor = this._reactor;
-            decl._componentId = childId;
+            decl[REACTOR] = this._reactor;
+            decl[COMPONENT_ID] = childId;
         }
         // Set parent on the child's registry entry
-        this._instances.get(childInstance._componentId.code).parent = parentInstance;
+        this._instances.get(childInstance[COMPONENT_ID].code).parent = parentInstance;
     }
 
     /**
@@ -372,7 +372,6 @@ export class InstanceRegistry {
      */
     _findChildDeclaration(instance, childId) {
         for (const key of Object.keys(instance)) {
-            if (key.startsWith('_')) continue;
             const value = instance[key];
             if (this._matchesChildId(value, childId)) {
                 return /** @type {Component|ComponentReference} */ (value);
@@ -515,7 +514,6 @@ export class InstanceRegistry {
     _collectChildComponents(instance) {
         const children = new Map();
         for (const key of Object.keys(instance)) {
-            if (key.startsWith('_')) continue;
             const value = instance[key];
             this._collectIfComponent(/** @type {VarValue} */ (value), children);
             if (Array.isArray(value)) {
@@ -561,7 +559,7 @@ export class InstanceRegistry {
 
     /**
      * Replace a ComponentReference with the real Component instance in the parent's
-     * own properties. Searches non-framework properties and array items by identity (===).
+     * own properties. Searches string-keyed properties and array items by identity (===).
      * @private
      * @param {Component} parentInstance - Parent component instance
      * @param {ComponentReference} ref - The reference to replace
@@ -569,7 +567,6 @@ export class InstanceRegistry {
      */
     _replaceRefInVars(parentInstance, ref, childInstance) {
         for (const key of Object.keys(parentInstance)) {
-            if (key.startsWith('_')) continue;
             const value = parentInstance[key];
             if (value === ref) {
                 parentInstance[key] = childInstance;

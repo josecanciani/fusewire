@@ -1,4 +1,5 @@
 import { ComponentReference } from './component-reference.js';
+import { COMPONENT_ID, REGISTRY_ENTRY, CONSOLE, REACTOR, LIFECYCLE_ACTIVE } from './symbols.js';
 
 /** @typedef {string|number|boolean|null} Scalar */
 /** @typedef {{[key: string]: Scalar}} ScalarObject */
@@ -16,16 +17,12 @@ import { ComponentReference } from './component-reference.js';
  *       count = 0;
  *   }
  *
- * Any own enumerable string-keyed property whose name does NOT start with '_'
- * is treated as a component var. The template engine collects these automatically
- * for rendering. Access vars directly: `this.count`, not through an accessor.
+ * Every own enumerable string-keyed property is a component var. The template
+ * engine collects these automatically for rendering via Object.keys().
+ * Access vars directly: `this.count`, not through an accessor.
  *
- * Framework-managed properties (set by the engine, read-only for developers):
- *   - _componentId   ComponentId object (name, id, version, code)
- *   - _registryEntry  Shared entry object with container/parent (managed by InstanceRegistry)
- *   - _console        Pre-built console wrapper (creates LogMessage with component context)
- *   - _reactor        Reactor reference (enables react(), console, etc.)
- *   - _lifecycleActive  Name of the active lifecycle hook or null (guards against react() during hooks)
+ * Framework-managed state is stored under Symbol keys (see symbols.js) so it
+ * never appears in Object.keys() and cannot collide with component vars.
  */
 export class Component {
     /**
@@ -41,24 +38,11 @@ export class Component {
     }
 
     /**
-     * Create a new Component instance.
-     * Subclasses declare vars as class fields — the framework applies initial
-     * values via Object.assign after construction (overriding class field defaults).
-     */
-    constructor() {
-        this._componentId = null; // Set by framework (ComponentId)
-        this._registryEntry = null; // Set by framework ({ container, parent })
-        this._console = null; // Set by framework (pre-built console wrapper)
-        this._reactor = null; // Set by framework (Reactor)
-        this._lifecycleActive = null; // Set by framework during lifecycle hooks (string name or null)
-    }
-
-    /**
      * Component name — the class/template name (e.g. "Counter", "Table/Person").
      * @returns {string} The component name
      */
     get componentName() {
-        return this._componentId.name;
+        return this[COMPONENT_ID].name;
     }
 
     /**
@@ -66,7 +50,7 @@ export class Component {
      * @returns {string} The instance identifier
      */
     get componentId() {
-        return this._componentId.id;
+        return this[COMPONENT_ID].id;
     }
 
     /**
@@ -74,7 +58,7 @@ export class Component {
      * @returns {string} The template version
      */
     get componentVersion() {
-        return this._componentId.version;
+        return this[COMPONENT_ID].version;
     }
 
     /**
@@ -82,7 +66,7 @@ export class Component {
      * @returns {string} The component code
      */
     get componentCode() {
-        return this._componentId.code;
+        return this[COMPONENT_ID].code;
     }
 
     /**
@@ -92,7 +76,7 @@ export class Component {
      * @returns {HTMLElement} The container element
      */
     get componentContainer() {
-        return this._registryEntry.container;
+        return this[REGISTRY_ENTRY].container;
     }
 
     /**
@@ -102,7 +86,7 @@ export class Component {
      * @returns {Component|null} The parent component or null if root
      */
     get componentParent() {
-        return this._registryEntry.parent;
+        return this[REGISTRY_ENTRY].parent;
     }
 
     /**
@@ -185,7 +169,7 @@ export class Component {
      * @returns {import('./reactor.js').ConsoleLike} Console-like object with log, warn, error methods
      */
     get console() {
-        return this._console;
+        return this[CONSOLE];
     }
 
     /**
@@ -195,15 +179,15 @@ export class Component {
      * @param {string} mode - Render mode ('CSR' for client-side only)
      */
     react(mode = 'CSR') {
-        if (this._lifecycleActive) {
-            this._console.warn(
-                `react() called during ${this._lifecycleActive}() — ignored (the framework renders automatically after lifecycle hooks)`,
+        if (this[LIFECYCLE_ACTIVE]) {
+            this[CONSOLE].warn(
+                `react() called during ${this[LIFECYCLE_ACTIVE]}() — ignored (the framework renders automatically after lifecycle hooks)`,
             );
             return;
         }
-        if (!this._reactor) {
+        if (!this[REACTOR]) {
             throw new Error('Component: Cannot react - reactor not attached');
         }
-        this._reactor.react(this._componentId, mode);
+        this[REACTOR].react(this[COMPONENT_ID], mode);
     }
 }

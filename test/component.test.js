@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import { Component } from '../src/component.js';
 import { ComponentId } from '../src/component-id.js';
 import { ComponentReference } from '../src/component-reference.js';
+import { COMPONENT_ID, CONSOLE, REACTOR, LIFECYCLE_ACTIVE } from '../src/symbols.js';
 
 describe('Component', () => {
 	describe('Constructor', () => {
@@ -97,9 +98,9 @@ describe('Component', () => {
 
 		it('triggers react() by default', () => {
 			const comp = Object.assign(new Component(), { x: 0 });
-			comp._componentId = new ComponentId('Test', 'u1');
+			comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
 			const reactCalls = [];
-			comp._reactor = {
+			comp[REACTOR] = {
 				react(componentId, mode) {
 					reactCalls.push({ code: componentId.code, mode });
 				},
@@ -113,9 +114,9 @@ describe('Component', () => {
 
 		it('does not react when react=false', () => {
 			const comp = Object.assign(new Component(), { x: 0 });
-			comp._componentId = new ComponentId('Test', 'u1');
+			comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
 			const reactCalls = [];
-			comp._reactor = {
+			comp[REACTOR] = {
 				react(componentId, mode) {
 					reactCalls.push({ code: componentId.code, mode });
 				},
@@ -130,10 +131,10 @@ describe('Component', () => {
 	describe('react()', () => {
 		it('calls reactor.react when attached', () => {
 			const comp = new Component();
-			comp._componentId = new ComponentId('Component', 'test');
+			comp[COMPONENT_ID] = new ComponentId('Component', 'test');
 			const reactCalls = [];
 
-			comp._reactor = {
+			comp[REACTOR] = {
 				react(componentId, mode) {
 					reactCalls.push({ code: componentId.code, mode });
 				},
@@ -148,10 +149,10 @@ describe('Component', () => {
 
 		it('defaults to CSR mode', () => {
 			const comp = new Component();
-			comp._componentId = new ComponentId('Component', 'test');
+			comp[COMPONENT_ID] = new ComponentId('Component', 'test');
 			const reactCalls = [];
 
-			comp._reactor = {
+			comp[REACTOR] = {
 				react(componentId, mode) {
 					reactCalls.push({ mode });
 				},
@@ -162,24 +163,24 @@ describe('Component', () => {
 			assert.strictEqual(reactCalls[0].mode, 'CSR');
 		});
 
-		it('skips react() and warns when _lifecycleActive is set', () => {
+		it('skips react() and warns when LIFECYCLE_ACTIVE is set', () => {
 			const comp = new Component();
-			comp._componentId = new ComponentId('Component', 'test');
+			comp[COMPONENT_ID] = new ComponentId('Component', 'test');
 			const reactCalls = [];
 			const warnings = [];
 
-			comp._reactor = {
+			comp[REACTOR] = {
 				react(componentId, mode) {
 					reactCalls.push({ code: componentId.code, mode });
 				},
 			};
-			comp._console = {
+			comp[CONSOLE] = {
 				log() {},
 				warn(...args) { warnings.push(args); },
 				error() {},
 			};
 
-			comp._lifecycleActive = 'hydrate';
+			comp[LIFECYCLE_ACTIVE] = 'hydrate';
 			comp.react();
 
 			assert.strictEqual(reactCalls.length, 0, 'reactor.react should not be called');
@@ -190,18 +191,18 @@ describe('Component', () => {
 			);
 		});
 
-		it('allows react() when _lifecycleActive is null', () => {
+		it('allows react() when LIFECYCLE_ACTIVE is null', () => {
 			const comp = new Component();
-			comp._componentId = new ComponentId('Component', 'test');
+			comp[COMPONENT_ID] = new ComponentId('Component', 'test');
 			const reactCalls = [];
 
-			comp._reactor = {
+			comp[REACTOR] = {
 				react(componentId, mode) {
 					reactCalls.push({ code: componentId.code, mode });
 				},
 			};
 
-			comp._lifecycleActive = null;
+			comp[LIFECYCLE_ACTIVE] = null;
 			comp.react();
 
 			assert.strictEqual(reactCalls.length, 1);

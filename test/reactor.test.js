@@ -8,6 +8,7 @@ import { Renderer } from '../src/renderer.js';
 import { TemplateStore } from '../src/template-store.js';
 import { FuseWire } from '../src/fusewire.js';
 import { JSDOM } from 'jsdom';
+import { REACTOR, LIFECYCLE_ACTIVE } from '../src/symbols.js';
 
 // Mock idiomorph for testing
 const mockMorph = () => {};
@@ -186,7 +187,7 @@ describe('Reactor', () => {
             
             const instance = await reactor.start(container, 'Counter', 'main', {});
 
-            assert.strictEqual(instance._reactor, reactor);
+            assert.strictEqual(instance[REACTOR], reactor);
         });
 
         it('delegates to instanceRegistry.createFromReference()', async () => {
@@ -746,12 +747,12 @@ describe('Reactor', () => {
             assert.strictEqual(reactor._queue.size, 0);
         });
 
-        it('sets _lifecycleActive during afterRender in drain', async () => {
+        it('sets LIFECYCLE_ACTIVE during afterRender in drain', async () => {
             let capturedFlag = 'not-captured';
             const fakeInstance = {
-                _lifecycleActive: null,
+                [LIFECYCLE_ACTIVE]: null,
                 afterRender() {
-                    capturedFlag = this._lifecycleActive;
+                    capturedFlag = this[LIFECYCLE_ACTIVE];
                 },
             };
             const mockRegistry = {
@@ -767,12 +768,12 @@ describe('Reactor', () => {
             await reactor.react('Counter#main');
 
             assert.strictEqual(capturedFlag, 'afterRender');
-            assert.strictEqual(fakeInstance._lifecycleActive, null, 'flag cleared after afterRender');
+            assert.strictEqual(fakeInstance[LIFECYCLE_ACTIVE], null, 'flag cleared after afterRender');
         });
 
-        it('clears _lifecycleActive even when afterRender throws in drain', async () => {
+        it('clears LIFECYCLE_ACTIVE even when afterRender throws in drain', async () => {
             const fakeInstance = {
-                _lifecycleActive: null,
+                [LIFECYCLE_ACTIVE]: null,
                 afterRender() {
                     throw new Error('afterRender failed');
                 },
@@ -792,7 +793,7 @@ describe('Reactor', () => {
                 /afterRender failed/,
             );
 
-            assert.strictEqual(fakeInstance._lifecycleActive, null, 'flag cleared despite throw');
+            assert.strictEqual(fakeInstance[LIFECYCLE_ACTIVE], null, 'flag cleared despite throw');
         });
     });
 
