@@ -236,11 +236,19 @@ class Chart extends Component {
 
 ### Avoid Infinite Loops
 
+The framework includes a **lifecycle guard** that prevents `react()` from being called during `hydrate()`, `update()`, or `afterRender()`. These hooks run inside the framework's render pipeline, which already renders the component after each hook returns. Calling `react()` would trigger a redundant double render.
+
+If a component calls `react()` during one of these hooks, the call is **silently ignored** and a warning is logged to the console:
+
+```
+react() called during hydrate() — ignored (the framework renders automatically after lifecycle hooks)
+```
+
 ```js
 class BadExample extends Component {
   update(newVars, react = true) {
     super.update(newVars, react);
-    // DON'T DO THIS - infinite loop!
+    // This react() call is ignored by the lifecycle guard:
     this.react();
   }
 }
@@ -257,6 +265,8 @@ class GoodExample extends Component {
 }
 ```
 
+Calling `react()` is appropriate from **event handlers**, **timers**, and **async callbacks** — contexts outside the lifecycle pipeline.
+
 ## Best Practices
 
 ### ✅ Do
@@ -270,7 +280,7 @@ class GoodExample extends Component {
 
 ### ❌ Don't
 
-- Don't call `react()` inside `update()` (infinite loop)
+- Don't call `react()` inside `hydrate()`, `update()`, or `afterRender()` (the framework guards against this and logs a warning — the render already happens automatically)
 - Don't access DOM in `constructor` or `hydrate()` (not ready yet)
 - Don't forget to clean up in `destroy()`
 - Don't perform expensive sync operations in `update()`

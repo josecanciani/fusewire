@@ -14,6 +14,7 @@ import { ComponentReference } from './component-reference.js';
  *   - _registryEntry  Shared entry object with container/parent (managed by InstanceRegistry)
  *   - _console        Pre-built console wrapper (creates LogMessage with component context)
  *   - _reactor        Reactor reference (enables react(), console, etc.)
+ *   - _lifecycleActive  Name of the active lifecycle hook or null (guards against react() during hooks)
  */
 export class Component {
     /**
@@ -38,6 +39,7 @@ export class Component {
         this._registryEntry = null; // Set by framework ({ container, parent })
         this._console = null; // Set by framework (pre-built console wrapper)
         this._reactor = null; // Set by framework (Reactor)
+        this._lifecycleActive = null; // Set by framework during lifecycle hooks (string name or null)
     }
 
     /**
@@ -185,10 +187,18 @@ export class Component {
     }
 
     /**
-     * Trigger re-render of this component
+     * Trigger re-render of this component.
+     * Ignored during lifecycle hooks (hydrate, update, afterRender) because
+     * the framework already renders the component after those hooks return.
      * @param {string} mode - Render mode ('CSR' for client-side only)
      */
     react(mode = 'CSR') {
+        if (this._lifecycleActive) {
+            this._console.warn(
+                `react() called during ${this._lifecycleActive}() — ignored (the framework renders automatically after lifecycle hooks)`,
+            );
+            return;
+        }
         if (!this._reactor) {
             throw new Error('Component: Cannot react - reactor not attached');
         }

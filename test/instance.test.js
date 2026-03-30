@@ -221,6 +221,171 @@ describe('InstanceRegistry', () => {
         });
     });
 
+    describe('lifecycle guard', () => {
+        it('prevents react() during hydrate() in create()', async () => {
+            const reactCalls = [];
+            const warnings = [];
+            registry._reactor = {
+                _console: {
+                    log() {},
+                    warn(...args) { warnings.push(args); },
+                    error() {},
+                },
+                _basePath: './components',
+                react() { reactCalls.push('react'); },
+            };
+
+            class HydrateReacter extends Component {
+                async hydrate() {
+                    this.react();
+                }
+            }
+
+            const componentId = new ComponentId('HydrateReacter', 'test1');
+            templateStore.set('HydrateReacter', {
+                htmlCode: '<div>guarded</div>',
+                cssCode: '',
+                version: 'v1',
+            });
+            registry.registerComponent('HydrateReacter', HydrateReacter);
+
+            await registry.create(componentId, HydrateReacter, {}, container);
+
+            assert.strictEqual(reactCalls.length, 0, 'reactor.react should not be called');
+            assert.strictEqual(warnings.length, 1, 'should warn once');
+            assert.ok(
+                warnings[0][0].message.includes('hydrate'),
+                'warning should mention hydrate',
+            );
+        });
+
+        it('prevents react() during afterRender() in create()', async () => {
+            const reactCalls = [];
+            const warnings = [];
+            registry._reactor = {
+                _console: {
+                    log() {},
+                    warn(...args) { warnings.push(args); },
+                    error() {},
+                },
+                _basePath: './components',
+                react() { reactCalls.push('react'); },
+            };
+
+            class AfterRenderReacter extends Component {
+                afterRender() {
+                    this.react();
+                }
+            }
+
+            const componentId = new ComponentId('AfterRenderReacter', 'test1');
+            templateStore.set('AfterRenderReacter', {
+                htmlCode: '<div>guarded</div>',
+                cssCode: '',
+                version: 'v1',
+            });
+            registry.registerComponent('AfterRenderReacter', AfterRenderReacter);
+
+            await registry.create(componentId, AfterRenderReacter, {}, container);
+
+            assert.strictEqual(reactCalls.length, 0, 'reactor.react should not be called');
+            assert.strictEqual(warnings.length, 1, 'should warn once');
+            assert.ok(
+                warnings[0][0].message.includes('afterRender'),
+                'warning should mention afterRender',
+            );
+        });
+
+        it('clears _lifecycleActive after create() completes', async () => {
+            const componentId = new ComponentId('TestComponent', 'test1');
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>Test</div>',
+                cssCode: '',
+                version: 'v1',
+            });
+
+            const instance = await registry.create(
+                componentId,
+                TestComponent,
+                {},
+                container,
+            );
+
+            assert.strictEqual(instance._lifecycleActive, null);
+        });
+
+        it('clears _lifecycleActive even when hydrate() throws', async () => {
+            class ThrowingHydrate extends Component {
+                async hydrate() {
+                    throw new Error('hydrate failed');
+                }
+            }
+
+            const componentId = new ComponentId('ThrowingHydrate', 'test1');
+            templateStore.set('ThrowingHydrate', {
+                htmlCode: '<div>fail</div>',
+                cssCode: '',
+                version: 'v1',
+            });
+            registry.registerComponent('ThrowingHydrate', ThrowingHydrate);
+
+            await assert.rejects(
+                () => registry.create(componentId, ThrowingHydrate, {}, container),
+                /hydrate failed/,
+            );
+
+            const instance = registry.get(componentId);
+            assert.strictEqual(instance._lifecycleActive, null);
+        });
+
+        // Note: update() triggers re-render which uses morphing.
+        // Morphing tests are skipped in Node/JSDOM — see test/browser/morphing.spec.js
+        // The guard logic itself is tested at the Component level in component.test.js
+        it.skip('prevents react() during update() in InstanceRegistry.update()', async () => {
+            const reactCalls = [];
+            const warnings = [];
+            registry._reactor = {
+                _console: {
+                    log() {},
+                    warn(...args) { warnings.push(args); },
+                    error() {},
+                },
+                _basePath: './components',
+                react() { reactCalls.push('react'); },
+            };
+
+            class UpdateReacter extends Component {
+                update(newVars, react = true) {
+                    super.update(newVars, react);
+                    // Explicitly call react() — should be guarded
+                    this.react();
+                }
+            }
+
+            const componentId = new ComponentId('UpdateReacter', 'test1');
+            templateStore.set('UpdateReacter', {
+                htmlCode: '<div>((message))</div>',
+                cssCode: '',
+                version: 'v1',
+            });
+            registry.registerComponent('UpdateReacter', UpdateReacter);
+
+            await registry.create(componentId, UpdateReacter, { message: 'a' }, container);
+            // Clear warnings from create() — the update() override also fires during create
+            warnings.length = 0;
+            reactCalls.length = 0;
+
+            await registry.update(componentId, { message: 'b' });
+
+            assert.strictEqual(reactCalls.length, 0, 'reactor.react should not be called');
+            assert.strictEqual(warnings.length, 1, 'should warn once');
+            assert.ok(
+                warnings[0][0].includes('update'),
+                'warning should mention update',
+            );
+        });
+    });
+
     describe('get()', () => {
         it('returns existing instance', async () => {
             const componentId = new ComponentId('TestComponent', 'test1');

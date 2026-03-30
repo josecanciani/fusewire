@@ -745,5 +745,54 @@ describe('Reactor', () => {
             assert.strictEqual(reactor._draining, false);
             assert.strictEqual(reactor._queue.size, 0);
         });
+
+        it('sets _lifecycleActive during afterRender in drain', async () => {
+            let capturedFlag = 'not-captured';
+            const fakeInstance = {
+                _lifecycleActive: null,
+                afterRender() {
+                    capturedFlag = this._lifecycleActive;
+                },
+            };
+            const mockRegistry = {
+                async render() {},
+                get() { return fakeInstance; },
+            };
+
+            const reactor = createReactor('test-queue-5', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+            });
+
+            await reactor.react('Counter#main');
+
+            assert.strictEqual(capturedFlag, 'afterRender');
+            assert.strictEqual(fakeInstance._lifecycleActive, null, 'flag cleared after afterRender');
+        });
+
+        it('clears _lifecycleActive even when afterRender throws in drain', async () => {
+            const fakeInstance = {
+                _lifecycleActive: null,
+                afterRender() {
+                    throw new Error('afterRender failed');
+                },
+            };
+            const mockRegistry = {
+                async render() {},
+                get() { return fakeInstance; },
+            };
+
+            const reactor = createReactor('test-queue-6', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+            });
+
+            await assert.rejects(
+                () => reactor.react('Counter#main'),
+                /afterRender failed/,
+            );
+
+            assert.strictEqual(fakeInstance._lifecycleActive, null, 'flag cleared despite throw');
+        });
     });
 });

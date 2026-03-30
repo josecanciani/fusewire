@@ -220,7 +220,13 @@ export class Reactor {
                 const [code, { id }] = this._queue.entries().next().value;
                 this._queue.delete(code);
                 await this._instanceRegistry.render(id);
-                this._instanceRegistry.get(id).afterRender();
+                const instance = this._instanceRegistry.get(id);
+                instance._lifecycleActive = 'afterRender';
+                try {
+                    instance.afterRender();
+                } finally {
+                    instance._lifecycleActive = null;
+                }
             }
         } finally {
             this._draining = false;

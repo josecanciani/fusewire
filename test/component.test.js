@@ -168,6 +168,51 @@ describe('Component', () => {
 
 			assert.strictEqual(reactCalls[0].mode, 'CSR');
 		});
+
+		it('skips react() and warns when _lifecycleActive is set', () => {
+			const comp = new Component();
+			comp._componentId = new ComponentId('Component', 'test');
+			const reactCalls = [];
+			const warnings = [];
+
+			comp._reactor = {
+				react(componentId, mode) {
+					reactCalls.push({ code: componentId.code, mode });
+				},
+			};
+			comp._console = {
+				log() {},
+				warn(...args) { warnings.push(args); },
+				error() {},
+			};
+
+			comp._lifecycleActive = 'hydrate';
+			comp.react();
+
+			assert.strictEqual(reactCalls.length, 0, 'reactor.react should not be called');
+			assert.strictEqual(warnings.length, 1, 'should warn once');
+			assert.ok(
+				warnings[0][0].includes('hydrate'),
+				'warning should mention the active lifecycle hook',
+			);
+		});
+
+		it('allows react() when _lifecycleActive is null', () => {
+			const comp = new Component();
+			comp._componentId = new ComponentId('Component', 'test');
+			const reactCalls = [];
+
+			comp._reactor = {
+				react(componentId, mode) {
+					reactCalls.push({ code: componentId.code, mode });
+				},
+			};
+
+			comp._lifecycleActive = null;
+			comp.react();
+
+			assert.strictEqual(reactCalls.length, 1);
+		});
 	});
 
 	describe('Subclassing', () => {

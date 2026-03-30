@@ -99,13 +99,23 @@ export class InstanceRegistry {
         instance._console = this._buildConsoleFor(componentId);
 
         // Call hydrate hook
-        await instance.hydrate();
+        instance._lifecycleActive = 'hydrate';
+        try {
+            await instance.hydrate();
+        } finally {
+            instance._lifecycleActive = null;
+        }
 
         // Initial render
         await this.render(componentId);
 
         // Call afterRender hook
-        instance.afterRender();
+        instance._lifecycleActive = 'afterRender';
+        try {
+            instance.afterRender();
+        } finally {
+            instance._lifecycleActive = null;
+        }
 
         return instance;
     }
@@ -139,13 +149,23 @@ export class InstanceRegistry {
         const { instance } = entry;
 
         // Merge vars without triggering react — we handle rendering below
-        instance.update(newVars, false);
+        instance._lifecycleActive = 'update';
+        try {
+            instance.update(newVars, false);
+        } finally {
+            instance._lifecycleActive = null;
+        }
 
         // Re-render
         await this.render(componentId);
 
         // Call afterRender hook
-        instance.afterRender();
+        instance._lifecycleActive = 'afterRender';
+        try {
+            instance.afterRender();
+        } finally {
+            instance._lifecycleActive = null;
+        }
     }
 
     /**
