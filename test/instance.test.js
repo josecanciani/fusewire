@@ -23,14 +23,14 @@ describe('InstanceRegistry', () => {
     class TestComponent extends Component {
         constructor() {
             super();
-            this._hydrateCalled = false;
+            this._initCalled = false;
             this._updateCalled = false;
             this._destroyCalled = false;
             this._afterRenderCalled = false;
         }
 
-        async hydrate() {
-            this._hydrateCalled = true;
+        async init() {
+            this._initCalled = true;
         }
 
         update(newVars, react = true) {
@@ -119,7 +119,7 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(instance.message, 'Hello');
         });
 
-        it('calls hydrate hook', async () => {
+        it('calls init hook', async () => {
             const componentId = new ComponentId('TestComponent', 'test1');
             templateStore.set('TestComponent', {
                 htmlCode: '<div>Test</div>',
@@ -134,7 +134,7 @@ describe('InstanceRegistry', () => {
                 container
             );
 
-            assert.strictEqual(instance._hydrateCalled, true);
+            assert.strictEqual(instance._initCalled, true);
         });
 
         it('calls afterRender hook', async () => {
@@ -224,7 +224,7 @@ describe('InstanceRegistry', () => {
     });
 
     describe('lifecycle guard', () => {
-        it('prevents react() during hydrate() in create()', async () => {
+        it('prevents react() during init() in create()', async () => {
             const reactCalls = [];
             const warnings = [];
             registry._reactor = {
@@ -238,27 +238,27 @@ describe('InstanceRegistry', () => {
                 react() { reactCalls.push('react'); },
             };
 
-            class HydrateReacter extends Component {
-                async hydrate() {
+            class InitReacter extends Component {
+                async init() {
                     this.react();
                 }
             }
 
-            const componentId = new ComponentId('HydrateReacter', 'test1');
-            templateStore.set('HydrateReacter', {
+            const componentId = new ComponentId('InitReacter', 'test1');
+            templateStore.set('InitReacter', {
                 htmlCode: '<div>guarded</div>',
                 cssCode: '',
                 version: 'v1',
             });
-            registry.registerComponent('HydrateReacter', HydrateReacter);
+            registry.registerComponent('InitReacter', InitReacter);
 
-            await registry.create(componentId, HydrateReacter, {}, container);
+            await registry.create(componentId, InitReacter, {}, container);
 
             assert.strictEqual(reactCalls.length, 0, 'reactor.react should not be called');
             assert.strictEqual(warnings.length, 1, 'should warn once');
             assert.ok(
-                warnings[0][0].message.includes('hydrate'),
-                'warning should mention hydrate',
+                warnings[0][0].message.includes('init'),
+                'warning should mention init',
             );
         });
 
@@ -318,24 +318,24 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(instance[LIFECYCLE_ACTIVE], null);
         });
 
-        it('clears LIFECYCLE_ACTIVE even when hydrate() throws', async () => {
-            class ThrowingHydrate extends Component {
-                async hydrate() {
-                    throw new Error('hydrate failed');
+        it('clears LIFECYCLE_ACTIVE even when init() throws', async () => {
+            class ThrowingInit extends Component {
+                async init() {
+                    throw new Error('init failed');
                 }
             }
 
-            const componentId = new ComponentId('ThrowingHydrate', 'test1');
-            templateStore.set('ThrowingHydrate', {
+            const componentId = new ComponentId('ThrowingInit', 'test1');
+            templateStore.set('ThrowingInit', {
                 htmlCode: '<div>fail</div>',
                 cssCode: '',
                 version: 'v1',
             });
-            registry.registerComponent('ThrowingHydrate', ThrowingHydrate);
+            registry.registerComponent('ThrowingInit', ThrowingInit);
 
             await assert.rejects(
-                () => registry.create(componentId, ThrowingHydrate, {}, container),
-                /hydrate failed/,
+                () => registry.create(componentId, ThrowingInit, {}, container),
+                /init failed/,
             );
 
             const instance = registry.get(componentId);
@@ -1140,7 +1140,7 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(instance.componentId, 'test1');
         });
 
-        it('calls hydrate and afterRender hooks', async () => {
+        it('calls init and afterRender hooks', async () => {
             registry.registerComponent('TestComponent', TestComponent);
             templateStore.set('TestComponent', {
                 htmlCode: '<div>Test</div>',
@@ -1151,7 +1151,7 @@ describe('InstanceRegistry', () => {
             const ref = new ComponentReference('TestComponent', 'test1', {});
             const instance = await registry.createFromReference(ref, container);
 
-            assert.strictEqual(instance._hydrateCalled, true);
+            assert.strictEqual(instance._initCalled, true);
             assert.strictEqual(instance._afterRenderCalled, true);
         });
 

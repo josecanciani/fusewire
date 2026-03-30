@@ -96,7 +96,7 @@ FuseWire uses **simple property path evaluation**, not JavaScript expressions:
 
 ```js
 class MyComponent extends Component {
-  async hydrate() {
+  async init() {
     this.shouldShow = this.count > 5;
     this.isReady = this.status === 'ready';
   }
@@ -170,7 +170,7 @@ When a variable value is a Component instance, it renders as a mount point:
 
 ```js
 class Dashboard extends Component {
-  async hydrate() {
+  async init() {
     this.sidebar = this.createChild('Sidebar', 'main', { collapsed: false });
   }
 }
@@ -204,7 +204,7 @@ If a variable is an array of Components, each renders as a mount point:
 
 ```js
 class UserList extends Component {
-  async hydrate() {
+  async init() {
     this.users = [
       this.createChild('UserCard', 'user1', { name: 'Alice' }),
       this.createChild('UserCard', 'user2', { name: 'Bob' })
@@ -332,7 +332,7 @@ The container element automatically gets the scoping class applied.
 **Counter.js:**
 ```js
 export class Counter extends Component {
-  async hydrate() {
+  async init() {
     if (!this.history) {
       this.history = [];
     }

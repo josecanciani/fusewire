@@ -207,7 +207,7 @@ afterRender() {
 
 `on()` returns an unsubscribe function. Subscriptions are cleared automatically when the child is destroyed — no manual cleanup is needed.
 
-Do not call `emit()` inside `hydrate()`, `update()`, or `afterRender()` — parent listeners are not registered yet and a warning will be logged.
+Do not call `emit()` inside `init()`, `update()`, or `afterRender()` — parent listeners are not registered yet and a warning will be logged.
 
 ### afterRender() for post-render DOM work
 

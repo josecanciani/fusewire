@@ -20,9 +20,9 @@ describe('Component', () => {
 	});
 
 	describe('Lifecycle Hooks', () => {
-		it('has default hydrate hook', async () => {
+		it('has default init hook', async () => {
 			const comp = new Component();
-			await comp.hydrate(); // Should not throw
+			await comp.init(); // Should not throw
 		});
 
 		it('has default update method', () => {
@@ -44,14 +44,14 @@ describe('Component', () => {
 			class TestComponent extends Component {
 				constructor() {
 					super();
-					this._hydrateCalled = false;
+					this._initCalled = false;
 					this._updateCalled = false;
 					this._destroyCalled = false;
 					this._afterRenderCalled = false;
 				}
 
-				async hydrate() {
-					this._hydrateCalled = true;
+				async init() {
+					this._initCalled = true;
 				}
 
 				update(newVars, react = true) {
@@ -71,8 +71,8 @@ describe('Component', () => {
 
 			const comp = Object.assign(new TestComponent(), { count: 0 });
 
-			await comp.hydrate();
-			assert.strictEqual(comp._hydrateCalled, true);
+			await comp.init();
+			assert.strictEqual(comp._initCalled, true);
 
 			comp.update({ count: 1 }, false);
 			assert.strictEqual(comp._updateCalled, true);
@@ -180,13 +180,13 @@ describe('Component', () => {
 				error() {},
 			};
 
-			comp[LIFECYCLE_ACTIVE] = 'hydrate';
+			comp[LIFECYCLE_ACTIVE] = 'init';
 			comp.react();
 
 			assert.strictEqual(reactCalls.length, 0, 'reactor.react should not be called');
 			assert.strictEqual(warnings.length, 1, 'should warn once');
 			assert.ok(
-				warnings[0][0].includes('hydrate'),
+				warnings[0][0].includes('init'),
 				'warning should mention the active lifecycle hook',
 			);
 		});
@@ -431,10 +431,10 @@ describe('Component', () => {
 			const calls = [];
 			comp[CONSOLE] = { log() {}, warn(...args) { warnings.push(args); }, error() {} };
 			comp.on('ready', () => calls.push(1));
-			comp[LIFECYCLE_ACTIVE] = 'hydrate';
+			comp[LIFECYCLE_ACTIVE] = 'init';
 			comp.emit('ready');
 			assert.strictEqual(warnings.length, 1);
-			assert.ok(warnings[0][0].includes('hydrate'), 'warning should mention the lifecycle hook');
+			assert.ok(warnings[0][0].includes('init'), 'warning should mention the lifecycle hook');
 			assert.ok(warnings[0][0].includes('ready'), 'warning should mention the event name');
 			assert.strictEqual(calls.length, 1, 'handler should still be called');
 		});

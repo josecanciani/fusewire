@@ -38,7 +38,7 @@ function collectVars(instance) {
  *
  * Responsibilities:
  * - Create/update/remove component instances
- * - Call lifecycle hooks (hydrate, update, destroy)
+ * - Call lifecycle hooks (init, update, destroy)
  * - Coordinate rendering with Renderer
  * - Manage component tree (parent/child relationships)
  * - Resolve ComponentReference declarations to real Component instances
@@ -124,10 +124,10 @@ export class InstanceRegistry {
         instance[REACTOR] = this._reactor;
         instance[CONSOLE] = this._buildConsoleFor(componentId);
 
-        // Call hydrate hook
-        instance[LIFECYCLE_ACTIVE] = 'hydrate';
+        // Call init hook
+        instance[LIFECYCLE_ACTIVE] = 'init';
         try {
-            await instance.hydrate();
+            await instance.init();
         } finally {
             instance[LIFECYCLE_ACTIVE] = null;
         }

@@ -27,14 +27,14 @@ constructor(vars = {}) {
 
 ---
 
-### `async hydrate()`
+### `async init()`
 
 **When:** After vars are set/updated, before first render  
 **Type:** Async  
 **Purpose:** Perform async initialization
 
 ```js
-async hydrate() {
+async init() {
   // Fetch initial data
   const data = await fetch('/api/data').then(r => r.json());
   this.items = data.items;
@@ -148,7 +148,7 @@ destroy() {
 
 ```
 1. new Component(vars)
-2. hydrate()                    # Async, can modify properties
+2. init()                    # Async, can modify properties
 3. [render DOM]
 4. afterRender()
 ```
@@ -175,7 +175,7 @@ destroy() {
 
 ```js
 class UserList extends Component {
-  async hydrate() {
+  async init() {
     if (!this.users) {
       // Only fetch if not already provided
       const response = await fetch('/api/users');
@@ -237,18 +237,18 @@ class Chart extends Component {
 
 ### Avoid Infinite Loops
 
-The framework includes a **lifecycle guard** that monitors calls to `react()` and `emit()` during `hydrate()`, `update()`, or `afterRender()`.
+The framework includes a **lifecycle guard** that monitors calls to `react()` and `emit()` during `init()`, `update()`, or `afterRender()`.
 
 **`react()` inside a lifecycle hook** is **silently ignored** — these hooks already run inside the render pipeline, which re-renders the component after the hook returns. A warning is logged:
 
 ```
-react() called during hydrate() — ignored (the framework renders automatically after lifecycle hooks)
+react() called during init() — ignored (the framework renders automatically after lifecycle hooks)
 ```
 
 **`emit()` inside a lifecycle hook** still fires but logs a warning, because parent listeners are typically set up in the parent's `afterRender()` which runs after the child's hooks. The emit proceeds in case some listener is already registered, but the warning signals a likely ordering problem:
 
 ```
-emit('ready') called during hydrate() — listeners may not be registered yet
+emit('ready') called during init() — listeners may not be registered yet
 ```
 
 ```js
@@ -282,14 +282,14 @@ Calling `react()` is appropriate from **event handlers**, **timers**, and **asyn
 - Always call `super.update(newVars, react)` in overrides
 - Clean up resources in `destroy()`
 - Use `afterRender()` for DOM manipulation
-- Use `hydrate()` for async initialization
+- Use `init()` for async initialization
 - Compare specific vars in `update()` rather than reacting to all changes
 
 ### ❌ Don't
 
-- Don't call `react()` inside `hydrate()`, `update()`, or `afterRender()` (the framework guards against this and logs a warning — the render already happens automatically)
+- Don't call `react()` inside `init()`, `update()`, or `afterRender()` (the framework guards against this and logs a warning — the render already happens automatically)
 - Don't call `emit()` inside lifecycle hooks — parent listeners are not yet registered at that point (a warning is logged if you do)
-- Don't access DOM in `constructor` or `hydrate()` (not ready yet)
+- Don't access DOM in `constructor` or `init()` (not ready yet)
 - Don't forget to clean up in `destroy()`
 - Don't perform expensive sync operations in `update()`
 - Don't modify DOM directly outside `afterRender()`
@@ -305,10 +305,10 @@ class DebugComponent extends Component {
     console.log('[constructor]', this.componentName, this.componentId, vars);
   }
   
-  async hydrate() {
-    console.log('[hydrate] start', this.componentName, this.componentId);
-    await super.hydrate();
-    console.log('[hydrate] end', this.componentName, this.componentId);
+  async init() {
+    console.log('[init] start', this.componentName, this.componentId);
+    await super.init();
+    console.log('[init] end', this.componentName, this.componentId);
   }
   
   update(newVars, react = true) {

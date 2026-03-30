@@ -71,7 +71,7 @@ src/
 1. Create
    - Instantiate component class
    - Set initial vars
-   - Call hydrate() hook (async)
+   - Call init() hook (async)
 
 2. Render
    - Compile template (once)
@@ -149,7 +149,7 @@ If a handler throws, `emit()` catches the error, logs it via the component conso
 
 ### Lifecycle guard
 
-Calling `emit()` during `hydrate()`, `update()`, or `afterRender()` triggers a console warning — listeners registered by the parent are typically set up in the parent's `afterRender()`, which runs after the child's lifecycle hooks. The emit still proceeds, but the warning signals a likely ordering problem.
+Calling `emit()` during `init()`, `update()`, or `afterRender()` triggers a console warning — listeners registered by the parent are typically set up in the parent's `afterRender()`, which runs after the child's lifecycle hooks. The emit still proceeds, but the warning signals a likely ordering problem.
 
 ## Design Decisions
 
@@ -185,9 +185,9 @@ All component instances are tracked in a central registry. This:
 - Supports instance reuse
 - Provides debugging visibility
 
-### Async Hydration
+### Async Initialization
 
-The `hydrate()` hook is async, allowing components to:
+The `init()` hook is async, allowing components to:
 - Fetch initial data
 - Initialize async resources
 - Set up event listeners

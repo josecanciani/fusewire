@@ -169,7 +169,7 @@ export class Reactor {
 
         const ref = new ComponentReference(componentName, id, vars);
 
-        // Create instance via registry (resolves class, hydrate, render, afterRender)
+        // Create instance via registry (resolves class, init, render, afterRender)
         const instance = await this._instanceRegistry.createFromReference(ref, renderContainer);
 
         // Ensure reactor is attached (also set by create() if registry has reactor ref)

@@ -98,12 +98,12 @@ export class Component {
     }
 
     /**
-     * Hydrate hook - called after vars are set/updated, before render
-     * Override in subclasses for initialization logic
+     * Init hook - called after vars are set and framework is wired, before first render.
+     * Override in subclasses for initialization logic.
      * @async
      * @returns {Promise<void>}
      */
-    async hydrate() {
+    async init() {
         // Override in subclasses
     }
 
@@ -215,7 +215,7 @@ export class Component {
 
     /**
      * Trigger re-render of this component.
-     * Ignored during lifecycle hooks (hydrate, update, afterRender) because
+     * Ignored during lifecycle hooks (init, update, afterRender) because
      * the framework already renders the component after those hooks return.
      * @param {string} mode - Render mode ('CSR' for client-side only)
      */
