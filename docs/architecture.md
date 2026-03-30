@@ -52,10 +52,11 @@ Updates use DOM morphing (idiomorph) to efficiently patch the existing DOM:
 src/
   component.js         # Base Component class
   component-id.js      # ComponentId helper
+  event-emitter.js     # Per-component pub/sub service (used by on()/emit())
   reactor.js           # Main orchestrator
   instance.js          # Instance registry and lifecycle
-  template.js          # Template storage
   template-compiler.js # Template → render function
+  template-store.js    # Template storage and versioning
   renderer.js          # DOM rendering with morphing
   config.js            # Configuration
   errors/
@@ -109,6 +110,46 @@ Recursively render children
     ↓
 Call afterRender() hook
 ```
+
+## Component Communication
+
+Child components communicate with their parent through a lightweight pub/sub mechanism built into the `Component` base class.
+
+### Subscribing (parent side)
+
+A parent subscribes to a child's events in `afterRender()`, once the child instance has been mounted:
+
+```javascript
+afterRender() {
+    if (!this._ready) {
+        this._ready = true;
+        this.sidebarComponent.on('selectDemo', (name) => this.selectDemo(name));
+        this.sidebarComponent.on('back', () => this.back());
+    }
+}
+```
+
+`on()` returns an unsubscribe function. Subscriptions are cleared automatically when the child component is destroyed by the `InstanceRegistry`, so manual cleanup is not normally needed.
+
+### Emitting (child side)
+
+A child calls `this.emit()` from its own methods in response to user interaction:
+
+```javascript
+back() {
+    this.emit('back');
+}
+```
+
+`emit()` is intended for use within the component's own methods. Calling it from outside the component is possible but discouraged.
+
+### Error isolation
+
+If a handler throws, `emit()` catches the error, logs it via the component console, and continues calling remaining handlers. One bad handler never silences the others.
+
+### Lifecycle guard
+
+Calling `emit()` during `hydrate()`, `update()`, or `afterRender()` triggers a console warning — listeners registered by the parent are typically set up in the parent's `afterRender()`, which runs after the child's lifecycle hooks. The emit still proceeds, but the warning signals a likely ordering problem.
 
 ## Design Decisions
 

@@ -14,6 +14,7 @@ lib/fusewire/
   src/                      # Source files (browser ES modules)
     component.js
     component-id.js
+    event-emitter.js
     instance.js
     reactor.js
     renderer.js
@@ -50,7 +51,7 @@ lib/fusewire/
 ```bash
 npm test
 ```
-- **200 tests:** 193 passing, 7 skipped (JSDOM/idiomorph incompatibility)
+- **380 tests:** 367 passing, 13 skipped (JSDOM/idiomorph incompatibility)
 - Runs in Node.js using JSDOM for DOM emulation
 - **Use for:** Development, CI, quick validation
 - **Limitation:** Cannot test DOM morphing (idiomorph requires real browser)
@@ -71,7 +72,7 @@ npm run test:browser
 npm run test:all
 ```
 - Runs Node tests followed by browser tests
-- **Total:** 197 tests passing (193 Node + 4 Browser)
+- **Total:** 371 tests passing (367 Node + 4 Browser)
 
 **Note:** The 7 skipped Node tests are covered by the 4 browser tests. They're skipped because JSDOM doesn't fully emulate the `Document` constructor that idiomorph checks during morphing operations.
 
@@ -176,6 +177,37 @@ import { REACTOR } from './symbols.js';
 const template = this[REACTOR]._templateStore.get(name);
 // template.htmlCode, template.cssCode are available
 ```
+
+### Child-to-parent communication (pub/sub)
+
+Children emit events; parents subscribe. This keeps children decoupled from their parent — a child never holds a reference to the parent.
+
+**Child emits** from its own methods in response to user interaction:
+
+```javascript
+back() {
+    this.emit('back');
+}
+selectDemo(name) {
+    this.emit('selectDemo', name);
+}
+```
+
+**Parent subscribes** in `afterRender()`, once the child instance has been mounted. The framework replaces a `ComponentReference` with the real `Component` instance before `afterRender()` runs, so `child.on()` is always called on the live instance:
+
+```javascript
+afterRender() {
+    if (!this._ready) {
+        this._ready = true;
+        this.sidebarComponent.on('back', () => this.back());
+        this.sidebarComponent.on('selectDemo', (name) => this.selectDemo(name));
+    }
+}
+```
+
+`on()` returns an unsubscribe function. Subscriptions are cleared automatically when the child is destroyed — no manual cleanup is needed.
+
+Do not call `emit()` inside `hydrate()`, `update()`, or `afterRender()` — parent listeners are not registered yet and a warning will be logged.
 
 ### afterRender() for post-render DOM work
 

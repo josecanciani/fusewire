@@ -1,5 +1,13 @@
 import { ComponentReference } from './component-reference.js';
-import { COMPONENT_ID, REGISTRY_ENTRY, CONSOLE, REACTOR, LIFECYCLE_ACTIVE } from './symbols.js';
+import { EventEmitter } from './event-emitter.js';
+import {
+    COMPONENT_ID,
+    REGISTRY_ENTRY,
+    CONSOLE,
+    REACTOR,
+    LIFECYCLE_ACTIVE,
+    EVENTS,
+} from './symbols.js';
 
 /** @typedef {string|number|boolean|null} Scalar */
 /** @typedef {{[key: string]: Scalar}} ScalarObject */
@@ -170,6 +178,39 @@ export class Component {
      */
     get console() {
         return this[CONSOLE];
+    }
+
+    /**
+     * Subscribe to an event emitted by this component.
+     * Returns an unsubscribe function. All subscriptions are cleared automatically
+     * when the component is destroyed by the InstanceRegistry.
+     * @param {string} eventName - Event name to listen for
+     * @param {function(...*): void} handler - Callback invoked when the event fires
+     * @returns {function(): void} Unsubscribe function — call it to remove this handler early
+     */
+    on(eventName, handler) {
+        if (!this[EVENTS]) this[EVENTS] = new EventEmitter();
+        return this[EVENTS].on(eventName, handler);
+    }
+
+    /**
+     * Emit an event, calling all registered handlers with the given arguments.
+     * Intended for use within the component's own methods (subclass-internal).
+     * Warns if called during a lifecycle hook, since listeners may not be registered yet.
+     * All handlers are called even if one throws — errors are logged via the component console.
+     * @param {string} eventName - Event name to emit
+     * @param {...*} args - Arguments forwarded to each handler
+     */
+    emit(eventName, ...args) {
+        if (this[LIFECYCLE_ACTIVE]) {
+            this[CONSOLE].warn(
+                `emit('${eventName}') called during ${this[LIFECYCLE_ACTIVE]}() — listeners may not be registered yet`,
+            );
+        }
+        if (!this[EVENTS]) return;
+        for (const err of this[EVENTS].emit(eventName, ...args)) {
+            this[CONSOLE].error(`emit('${eventName}') listener threw: ${err.message}`);
+        }
     }
 
     /**

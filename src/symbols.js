@@ -27,3 +27,6 @@ export const REACTOR = Symbol('reactor');
 
 /** @type {symbol} Name of the active lifecycle hook, or null (guards react() during hooks) */
 export const LIFECYCLE_ACTIVE = Symbol('lifecycleActive');
+
+/** @type {symbol} Event handlers map for pub/sub (Map<string, Set<function>>) — cleared by InstanceRegistry on destroy */
+export const EVENTS = Symbol('events');

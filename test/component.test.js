@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import { Component } from '../src/component.js';
 import { ComponentId } from '../src/component-id.js';
 import { ComponentReference } from '../src/component-reference.js';
-import { COMPONENT_ID, CONSOLE, REACTOR, LIFECYCLE_ACTIVE } from '../src/symbols.js';
+import { COMPONENT_ID, CONSOLE, REACTOR, LIFECYCLE_ACTIVE, EVENTS } from '../src/symbols.js';
 
 describe('Component', () => {
 	describe('Constructor', () => {
@@ -354,6 +354,102 @@ describe('Component', () => {
 			const ref = comp.createChild('Sidebar', 'main', { collapsed: false });
 
 			assert.ok(ref instanceof ComponentReference);
+		});
+	});
+
+	describe('Event pub/sub', () => {
+		it('on() registers a handler that emit() calls', () => {
+			const comp = new Component();
+			const calls = [];
+			comp.on('change', () => calls.push('called'));
+			comp.emit('change');
+			assert.strictEqual(calls.length, 1);
+		});
+
+		it('emit() forwards all arguments to the handler', () => {
+			const comp = new Component();
+			const received = [];
+			comp.on('select', (...args) => received.push(args));
+			comp.emit('select', 'foo', 42);
+			assert.deepStrictEqual(received, [['foo', 42]]);
+		});
+
+		it('multiple handlers for the same event are all called', () => {
+			const comp = new Component();
+			const log = [];
+			comp.on('ping', () => log.push('a'));
+			comp.on('ping', () => log.push('b'));
+			comp.emit('ping');
+			assert.deepStrictEqual(log, ['a', 'b']);
+		});
+
+		it('handlers for different events do not cross-fire', () => {
+			const comp = new Component();
+			const aLog = [];
+			const bLog = [];
+			comp.on('a', () => aLog.push(1));
+			comp.on('b', () => bLog.push(2));
+			comp.emit('a');
+			assert.deepStrictEqual(aLog, [1]);
+			assert.deepStrictEqual(bLog, []);
+		});
+
+		it('on() returns an unsubscribe function that stops the handler', () => {
+			const comp = new Component();
+			const calls = [];
+			const unsub = comp.on('click', () => calls.push('click'));
+			comp.emit('click');
+			unsub();
+			comp.emit('click');
+			assert.strictEqual(calls.length, 1);
+		});
+
+		it('emit() before any on() call does not throw', () => {
+			const comp = new Component();
+			assert.doesNotThrow(() => comp.emit('noop', 1, 2, 3));
+		});
+
+		it('EVENTS symbol key is not visible in Object.keys()', () => {
+			const comp = new Component();
+			comp.on('test', () => {});
+			assert.ok(!Object.keys(comp).includes(EVENTS.toString()));
+			assert.ok(!(String(EVENTS) in comp) || typeof EVENTS === 'symbol');
+		});
+
+		it('handlers are not called after instance[EVENTS].clear()', () => {
+			const comp = new Component();
+			const calls = [];
+			comp.on('done', () => calls.push(1));
+			comp[EVENTS].clear();
+			comp.emit('done');
+			assert.strictEqual(calls.length, 0);
+		});
+
+		it('emit() warns when called during a lifecycle hook but still fires handlers', () => {
+			const comp = new Component();
+			const warnings = [];
+			const calls = [];
+			comp[CONSOLE] = { log() {}, warn(...args) { warnings.push(args); }, error() {} };
+			comp.on('ready', () => calls.push(1));
+			comp[LIFECYCLE_ACTIVE] = 'hydrate';
+			comp.emit('ready');
+			assert.strictEqual(warnings.length, 1);
+			assert.ok(warnings[0][0].includes('hydrate'), 'warning should mention the lifecycle hook');
+			assert.ok(warnings[0][0].includes('ready'), 'warning should mention the event name');
+			assert.strictEqual(calls.length, 1, 'handler should still be called');
+		});
+
+		it('emit() calls all handlers even if one throws, and logs the error', () => {
+			const comp = new Component();
+			const errors = [];
+			const calls = [];
+			comp[CONSOLE] = { log() {}, warn() {}, error(...args) { errors.push(args); } };
+			comp.on('tick', () => { throw new Error('boom'); });
+			comp.on('tick', () => calls.push('ran'));
+			comp.emit('tick');
+			assert.strictEqual(calls.length, 1, 'second handler should still run');
+			assert.strictEqual(errors.length, 1, 'error should be logged');
+			assert.ok(errors[0][0].includes('boom'), 'log should include the error message');
 		});
 	});
 });

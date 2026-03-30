@@ -4,7 +4,14 @@ import { ComponentReference } from './component-reference.js';
 import { Component } from './component.js';
 import { LogMessage } from './log-message.js';
 import { compileTemplate } from './template-compiler.js';
-import { COMPONENT_ID, REGISTRY_ENTRY, CONSOLE, REACTOR, LIFECYCLE_ACTIVE } from './symbols.js';
+import {
+    COMPONENT_ID,
+    REGISTRY_ENTRY,
+    CONSOLE,
+    REACTOR,
+    LIFECYCLE_ACTIVE,
+    EVENTS,
+} from './symbols.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
 /** @typedef {import('./component.js').VarValue} VarValue */
@@ -210,6 +217,9 @@ export class InstanceRegistry {
 
         // Call destroy hook
         await instance.destroy();
+
+        // Clear event subscriptions so handlers don't keep parent instances alive
+        if (instance[EVENTS]) instance[EVENTS].clear();
 
         // Remove from DOM
         if (container.parentNode) {

@@ -138,6 +138,7 @@ destroy() {
 - Destroy child resources
 - Clear timers/intervals
 - Called automatically by framework when component removed
+- Event subscriptions (`on()` handlers) are cleared automatically after `destroy()` runs — no manual cleanup needed
 
 ---
 
@@ -236,12 +237,18 @@ class Chart extends Component {
 
 ### Avoid Infinite Loops
 
-The framework includes a **lifecycle guard** that prevents `react()` from being called during `hydrate()`, `update()`, or `afterRender()`. These hooks run inside the framework's render pipeline, which already renders the component after each hook returns. Calling `react()` would trigger a redundant double render.
+The framework includes a **lifecycle guard** that monitors calls to `react()` and `emit()` during `hydrate()`, `update()`, or `afterRender()`.
 
-If a component calls `react()` during one of these hooks, the call is **silently ignored** and a warning is logged to the console:
+**`react()` inside a lifecycle hook** is **silently ignored** — these hooks already run inside the render pipeline, which re-renders the component after the hook returns. A warning is logged:
 
 ```
 react() called during hydrate() — ignored (the framework renders automatically after lifecycle hooks)
+```
+
+**`emit()` inside a lifecycle hook** still fires but logs a warning, because parent listeners are typically set up in the parent's `afterRender()` which runs after the child's hooks. The emit proceeds in case some listener is already registered, but the warning signals a likely ordering problem:
+
+```
+emit('ready') called during hydrate() — listeners may not be registered yet
 ```
 
 ```js
@@ -281,6 +288,7 @@ Calling `react()` is appropriate from **event handlers**, **timers**, and **asyn
 ### ❌ Don't
 
 - Don't call `react()` inside `hydrate()`, `update()`, or `afterRender()` (the framework guards against this and logs a warning — the render already happens automatically)
+- Don't call `emit()` inside lifecycle hooks — parent listeners are not yet registered at that point (a warning is logged if you do)
 - Don't access DOM in `constructor` or `hydrate()` (not ready yet)
 - Don't forget to clean up in `destroy()`
 - Don't perform expensive sync operations in `update()`
