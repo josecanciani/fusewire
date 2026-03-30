@@ -107,7 +107,7 @@ export class Renderer {
     _scopeCSS(css, cssName) {
         if (!css || !css.trim()) return '';
 
-        return `.${this._appName} {\n  .fusewire-component-${cssName} {\n    ${css.trim()}\n  }\n}`;
+        return `.${this._appName} {\n  .${cssName} {\n    ${css.trim()}\n  }\n}`;
     }
 
     /**

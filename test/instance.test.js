@@ -842,7 +842,7 @@ describe('InstanceRegistry', () => {
             );
         });
 
-        it('adds fusewire-component class to child container', async () => {
+        it('adds component class to child container', async () => {
             registry.registerComponent('ChildComponent', ChildComponent);
             templateStore.set('TestComponent', {
                 htmlCode: '<div>((child))</div>',
@@ -868,7 +868,7 @@ describe('InstanceRegistry', () => {
 
             const childId = new ComponentId('ChildComponent', 'child1');
             const childContainer = registry.getContainer(childId);
-            assert.ok(childContainer.classList.contains('fusewire-component-ChildComponent'));
+            assert.ok(childContainer.classList.contains('ChildComponent'));
         });
 
         it('passes child vars to created instance', async () => {

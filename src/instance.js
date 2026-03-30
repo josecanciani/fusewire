@@ -82,7 +82,7 @@ export class InstanceRegistry {
         }
 
         // Add component scope class to container
-        container.classList.add(`fusewire-component-${toCssName(componentId.name)}`);
+        container.classList.add(toCssName(componentId.name));
 
         const instance = new ComponentClass(vars);
 
@@ -262,11 +262,14 @@ export class InstanceRegistry {
         // Build template constants
         const constants = { version: componentId.version };
 
-        // Render to DOM and find child mount points
+        // Render to DOM and find child mount points.
+        // Global vars (registered via reactor.registerGlobal) are merged at lower
+        // priority — component vars override on name collision.
+        const vars = { ...this._reactor._globalVars, ...instance.componentVars };
         const mountPoints = this._renderer.render(
             container,
             compiled,
-            instance.componentVars,
+            vars,
             componentId,
             constants,
         );
@@ -302,7 +305,7 @@ export class InstanceRegistry {
             // Child already exists — update container reference (morphing may replace elements)
             const entry = this._instances.get(childId.code);
             entry.container = mountPoint;
-            mountPoint.classList.add(`fusewire-component-${toCssName(childId.name)}`);
+            mountPoint.classList.add(toCssName(childId.name));
             await this.render(childId);
             return;
         }

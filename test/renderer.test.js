@@ -112,7 +112,7 @@ describe('Renderer', () => {
             assert.ok(styleEl);
             // CSS should be scoped with appName + component class
             assert.ok(styleEl.textContent.includes(`.${appName}`));
-            assert.ok(styleEl.textContent.includes('.fusewire-component-TestComponent'));
+            assert.ok(styleEl.textContent.includes('.TestComponent'));
             assert.ok(styleEl.textContent.includes('.test'));
         });
 
@@ -240,7 +240,7 @@ describe('Renderer', () => {
             const scoped = renderer._scopeCSS('.test { color: red; }', 'Counter');
 
             assert.ok(scoped.startsWith(`.${appName} {`));
-            assert.ok(scoped.includes('.fusewire-component-Counter {'));
+            assert.ok(scoped.includes('.Counter {'));
             assert.ok(scoped.includes('.test { color: red; }'));
         });
 

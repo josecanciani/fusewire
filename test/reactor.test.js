@@ -249,8 +249,8 @@ describe('Reactor', () => {
             assert.ok(container.classList.contains('fusewire'));
             assert.ok(container.classList.contains(appName));
             // Root component class is on a child element (CSS scoping needs nesting)
-            assert.ok(!container.classList.contains('fusewire-component-Counter'));
-            assert.ok(container.firstChild.classList.contains('fusewire-component-Counter'));
+            assert.ok(!container.classList.contains('Counter'));
+            assert.ok(container.firstChild.classList.contains('Counter'));
         });
 
         it('adds app classes only to first container', async () => {
@@ -286,7 +286,7 @@ describe('Reactor', () => {
             assert.ok(rootContainer.classList.contains(appName));
 
             // Child container gets component class but NOT fusewire/appName
-            assert.ok(childContainer.classList.contains('fusewire-component-Child'));
+            assert.ok(childContainer.classList.contains('Child'));
             assert.ok(!childContainer.classList.contains('fusewire'));
         });
 
@@ -793,6 +793,97 @@ describe('Reactor', () => {
             );
 
             assert.strictEqual(fakeInstance._lifecycleActive, null, 'flag cleared despite throw');
+        });
+    });
+
+    describe('globalVars config', () => {
+        it('_globalVars defaults to empty object when not provided', () => {
+            const reactor = createReactor('test-global-1', { morphFunction: mockMorph });
+            assert.deepStrictEqual(reactor._globalVars, {});
+        });
+
+        it('stores globalVars passed at construction time', () => {
+            const reactor = createReactor('test-global-2', {
+                morphFunction: mockMorph,
+                globalVars: { bs: { card: 'card', h100: 'h-100' } },
+            });
+            assert.deepStrictEqual(reactor._globalVars, { bs: { card: 'card', h100: 'h-100' } });
+        });
+
+        it('stores multiple named globals independently', () => {
+            const reactor = createReactor('test-global-3', {
+                morphFunction: mockMorph,
+                globalVars: { bs: { card: 'card' }, icons: { chevron: 'bi-chevron-right' } },
+            });
+            assert.deepStrictEqual(reactor._globalVars.bs, { card: 'card' });
+            assert.deepStrictEqual(reactor._globalVars.icons, { chevron: 'bi-chevron-right' });
+        });
+
+        it('global vars are merged into render context at lower priority than component vars', async () => {
+            const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
+            global.document = dom.window.document;
+
+            class Counter extends Component {}
+
+            const appName = 'test-global-4';
+            const templateStore = new TemplateStore();
+            // Template uses a global var ((bs.card)) and a component var ((count))
+            templateStore.set('Counter', {
+                version: 'test',
+                htmlCode: '<div class="((bs.card))">((count))</div>',
+                cssCode: '',
+            });
+
+            const renderer = new Renderer(mockMorph, appName);
+            const registry = new InstanceRegistry(renderer, templateStore, appName);
+            registry.registerComponent('Counter', Counter);
+            const reactor = createReactor(appName, {
+                instanceRegistry: registry,
+                templateStore,
+                renderer,
+                globalVars: { bs: { card: 'card-component' } },
+            });
+
+            const container = dom.window.document.getElementById('app');
+            const instance = await reactor.start(container, 'Counter', 'main', { count: 5 });
+
+            // Global var resolved: ((bs.card)) → 'card-component'
+            // Component var resolved: ((count)) → 5
+            assert.ok(container.innerHTML.includes('card-component'));
+            assert.ok(container.innerHTML.includes('5'));
+            assert.ok(instance instanceof Counter);
+        });
+
+        it('component vars override global vars on name collision', async () => {
+            const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
+            global.document = dom.window.document;
+
+            class Widget extends Component {}
+
+            const appName = 'test-global-5';
+            const templateStore = new TemplateStore();
+            templateStore.set('Widget', {
+                version: 'test',
+                htmlCode: '<div>((shared))</div>',
+                cssCode: '',
+            });
+
+            const renderer = new Renderer(mockMorph, appName);
+            const registry = new InstanceRegistry(renderer, templateStore, appName);
+            registry.registerComponent('Widget', Widget);
+            const reactor = createReactor(appName, {
+                instanceRegistry: registry,
+                templateStore,
+                renderer,
+                globalVars: { shared: 'global-value' },
+            });
+
+            const container = dom.window.document.getElementById('app');
+            // Component var 'shared' should override the global
+            await reactor.start(container, 'Widget', 'main', { shared: 'component-value' });
+
+            assert.ok(container.innerHTML.includes('component-value'));
+            assert.ok(!container.innerHTML.includes('global-value'));
         });
     });
 });

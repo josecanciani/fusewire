@@ -8,7 +8,7 @@ import { Idiomorph } from './lib/idiomorph/idiomorph.esm.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
 /** @typedef {{log: function(...*): void, warn: function(...*): void, error: function(...*): void}} ConsoleLike */
-/** @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: Function, instanceRegistry?: InstanceRegistry, basePath?: string}} ReactorConfig */
+/** @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: Function, instanceRegistry?: InstanceRegistry, basePath?: string, globalVars?: ComponentVars}} ReactorConfig */
 
 /**
  * Reactor - Orchestrator for CSR_ONLY mode
@@ -70,6 +70,11 @@ export class Reactor {
 
         // Register this reactor with FuseWire global registry
         FuseWire.register(this._appName, this);
+
+        // Global vars — merged into every render's var context with lower priority
+        // than component-local vars. Configured at construction time via config.globalVars.
+        /** @type {ComponentVars} */
+        this._globalVars = { ...config.globalVars };
     }
 
     /**
