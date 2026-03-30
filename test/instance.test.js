@@ -20,30 +20,30 @@ describe('InstanceRegistry', () => {
 
     // Test component class
     class TestComponent extends Component {
-        constructor(vars) {
-            super(vars);
-            this.hydrateCalled = false;
-            this.updateCalled = false;
-            this.destroyCalled = false;
-            this.afterRenderCalled = false;
+        constructor() {
+            super();
+            this._hydrateCalled = false;
+            this._updateCalled = false;
+            this._destroyCalled = false;
+            this._afterRenderCalled = false;
         }
 
         async hydrate() {
-            this.hydrateCalled = true;
+            this._hydrateCalled = true;
         }
 
         update(newVars, react = true) {
-            this.updateCalled = true;
-            this.receivedVars = newVars;
+            this._updateCalled = true;
+            this._receivedVars = newVars;
             super.update(newVars, react);
         }
 
         async destroy() {
-            this.destroyCalled = true;
+            this._destroyCalled = true;
         }
 
         async afterRender() {
-            this.afterRenderCalled = true;
+            this._afterRenderCalled = true;
         }
     }
 
@@ -84,6 +84,7 @@ describe('InstanceRegistry', () => {
         registry._reactor = {
             _console: console,
             _basePath: './components',
+            _globalVars: {},
         };
 
         // Create a fresh container for each test
@@ -114,7 +115,7 @@ describe('InstanceRegistry', () => {
             );
 
             assert.ok(instance instanceof TestComponent);
-            assert.strictEqual(instance.vars.message, 'Hello');
+            assert.strictEqual(instance.message, 'Hello');
         });
 
         it('calls hydrate hook', async () => {
@@ -132,7 +133,7 @@ describe('InstanceRegistry', () => {
                 container
             );
 
-            assert.strictEqual(instance.hydrateCalled, true);
+            assert.strictEqual(instance._hydrateCalled, true);
         });
 
         it('calls afterRender hook', async () => {
@@ -150,7 +151,7 @@ describe('InstanceRegistry', () => {
                 container
             );
 
-            assert.strictEqual(instance.afterRenderCalled, true);
+            assert.strictEqual(instance._afterRenderCalled, true);
         });
 
         it('stores instance in registry', async () => {
@@ -232,6 +233,7 @@ describe('InstanceRegistry', () => {
                     error() {},
                 },
                 _basePath: './components',
+                _globalVars: {},
                 react() { reactCalls.push('react'); },
             };
 
@@ -269,6 +271,7 @@ describe('InstanceRegistry', () => {
                     error() {},
                 },
                 _basePath: './components',
+                _globalVars: {},
                 react() { reactCalls.push('react'); },
             };
 
@@ -351,6 +354,7 @@ describe('InstanceRegistry', () => {
                     error() {},
                 },
                 _basePath: './components',
+                _globalVars: {},
                 react() { reactCalls.push('react'); },
             };
 
@@ -454,7 +458,7 @@ describe('InstanceRegistry', () => {
             await registry.update(componentId, { message: 'Updated' });
 
             const instance = registry.get(componentId);
-            assert.strictEqual(instance.vars.message, 'Updated');
+            assert.strictEqual(instance.message, 'Updated');
         });
 
         it.skip('calls update hook with old vars', async () => {
@@ -475,8 +479,8 @@ describe('InstanceRegistry', () => {
             await registry.update(componentId, { message: 'Updated' });
 
             const instance = registry.get(componentId);
-            assert.strictEqual(instance.updateCalled, true);
-            assert.strictEqual(instance.receivedVars.message, 'Updated');
+            assert.strictEqual(instance._updateCalled, true);
+            assert.strictEqual(instance._receivedVars.message, 'Updated');
         });
 
         it.skip('calls afterRender hook', async () => {
@@ -496,11 +500,11 @@ describe('InstanceRegistry', () => {
 
             // Reset the flag
             const instance = registry.get(componentId);
-            instance.afterRenderCalled = false;
+            instance._afterRenderCalled = false;
 
             await registry.update(componentId, { message: 'Updated' });
 
-            assert.strictEqual(instance.afterRenderCalled, true);
+            assert.strictEqual(instance._afterRenderCalled, true);
         });
 
         it.skip('re-renders component', async () => {
@@ -549,7 +553,7 @@ describe('InstanceRegistry', () => {
 
             await registry.remove(componentId);
 
-            assert.strictEqual(instance.destroyCalled, true);
+            assert.strictEqual(instance._destroyCalled, true);
         });
 
         it('removes instance from registry', async () => {
@@ -746,8 +750,8 @@ describe('InstanceRegistry', () => {
 
             await registry.clearAll();
 
-            assert.strictEqual(instance1.destroyCalled, true);
-            assert.strictEqual(instance2.destroyCalled, true);
+            assert.strictEqual(instance1._destroyCalled, true);
+            assert.strictEqual(instance2._destroyCalled, true);
         });
     });
 
@@ -768,7 +772,7 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new ChildComponent({});
+            const childDecl = new ChildComponent();
             childDecl._componentId = new ComponentId('ChildComponent', 'child1');
 
             await registry.create(
@@ -800,9 +804,9 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const card1 = new ChildComponent({});
+            const card1 = new ChildComponent();
             card1._componentId = new ComponentId('ChildComponent', 'c1');
-            const card2 = new ChildComponent({});
+            const card2 = new ChildComponent();
             card2._componentId = new ComponentId('ChildComponent', 'c2');
             const cards = [card1, card2];
 
@@ -828,7 +832,7 @@ describe('InstanceRegistry', () => {
             registry.registerComponent('UnregisteredChild', UnregisteredChild);
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new UnregisteredChild({});
+            const childDecl = new UnregisteredChild();
             childDecl._componentId = new ComponentId('UnregisteredChild', 'u1');
 
             await assert.rejects(
@@ -856,7 +860,7 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new ChildComponent({});
+            const childDecl = new ChildComponent();
             childDecl._componentId = new ComponentId('ChildComponent', 'child1');
 
             await registry.create(
@@ -885,7 +889,7 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new ChildComponent({ label: 'Hello' });
+            const childDecl = Object.assign(new ChildComponent(), { label: 'Hello' });
             childDecl._componentId = new ComponentId('ChildComponent', 'child1');
 
             await registry.create(
@@ -897,7 +901,7 @@ describe('InstanceRegistry', () => {
 
             const childId = new ComponentId('ChildComponent', 'child1');
             const childInstance = registry.get(childId);
-            assert.strictEqual(childInstance.vars.label, 'Hello');
+            assert.strictEqual(childInstance.label, 'Hello');
             assert.ok(container.innerHTML.includes('Hello'));
         });
 
@@ -918,7 +922,7 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new ChildComponent({});
+            const childDecl = new ChildComponent();
             childDecl._componentId = new ComponentId('ChildComponent', 'child1');
 
             const parent = await registry.create(
@@ -932,7 +936,7 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(registry.has(childId), true);
 
             // Set child var to null and re-render parent
-            parent.vars.child = null;
+            parent.child = null;
             await registry.render(componentId);
 
             // Child should be auto-removed
@@ -959,7 +963,7 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new ChildComponent({});
+            const childDecl = new ChildComponent();
             childDecl._componentId = new ComponentId('ChildComponent', 'c1');
             const parent = await registry.create(
                 componentId,
@@ -972,9 +976,9 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(registry.has(oldChildId), true);
 
             // Replace with different component type
-            const altDecl = new AltChild({});
+            const altDecl = new AltChild();
             altDecl._componentId = new ComponentId('AltChild', 'c1');
-            parent.vars.child = altDecl;
+            parent.child = altDecl;
             await registry.render(componentId);
 
             // Old child removed, new child created
@@ -997,7 +1001,7 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new ChildComponent({});
+            const childDecl = new ChildComponent();
             childDecl._componentId = new ComponentId('ChildComponent', 'child1');
 
             const parent = await registry.create(
@@ -1011,10 +1015,10 @@ describe('InstanceRegistry', () => {
             const childInstance = registry.get(childId);
 
             // Set child var to null and re-render
-            parent.vars.child = null;
+            parent.child = null;
             await registry.render(componentId);
 
-            assert.strictEqual(childInstance.destroyCalled, true);
+            assert.strictEqual(childInstance._destroyCalled, true);
         });
 
         it.skip('keeps child that remains in vars', async () => {
@@ -1030,7 +1034,7 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childDecl = new ChildComponent({});
+            const childDecl = new ChildComponent();
             childDecl._componentId = new ComponentId('ChildComponent', 'child1');
 
             const parent = await registry.create(
@@ -1044,7 +1048,7 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(registry.has(childId), true);
 
             // Change a scalar var but keep the child
-            parent.vars.label = 'v2';
+            parent.label = 'v2';
             await registry.render(componentId);
 
             // Child should still exist
@@ -1064,9 +1068,9 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const card1 = new ChildComponent({});
+            const card1 = new ChildComponent();
             card1._componentId = new ComponentId('ChildComponent', 'c1');
-            const card2 = new ChildComponent({});
+            const card2 = new ChildComponent();
             card2._componentId = new ComponentId('ChildComponent', 'c2');
             const cards = [card1, card2];
 
@@ -1081,7 +1085,7 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c2')), true);
 
             // Clear the array
-            parent.vars.cards = [];
+            parent.cards = [];
             await registry.render(componentId);
 
             assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c1')), false);
@@ -1130,7 +1134,7 @@ describe('InstanceRegistry', () => {
             const instance = await registry.createFromReference(ref, container);
 
             assert.ok(instance instanceof TestComponent);
-            assert.strictEqual(instance.vars.message, 'Hello');
+            assert.strictEqual(instance.message, 'Hello');
             assert.strictEqual(instance.componentName, 'TestComponent');
             assert.strictEqual(instance.componentId, 'test1');
         });
@@ -1146,8 +1150,8 @@ describe('InstanceRegistry', () => {
             const ref = new ComponentReference('TestComponent', 'test1', {});
             const instance = await registry.createFromReference(ref, container);
 
-            assert.strictEqual(instance.hydrateCalled, true);
-            assert.strictEqual(instance.afterRenderCalled, true);
+            assert.strictEqual(instance._hydrateCalled, true);
+            assert.strictEqual(instance._afterRenderCalled, true);
         });
 
         it('throws if component class not found', async () => {
@@ -1246,7 +1250,7 @@ describe('InstanceRegistry', () => {
 
             const childId = new ComponentId('ChildComponent', 'child1');
             const childInstance = registry.get(childId);
-            assert.strictEqual(childInstance.vars.label, 'Hello');
+            assert.strictEqual(childInstance.label, 'Hello');
         });
 
         it('replaces ComponentReference with Component instance in parent vars (top-level)', async () => {
@@ -1269,7 +1273,7 @@ describe('InstanceRegistry', () => {
             await registry.create(componentId, TestComponent, parentVars, container);
 
             const parentInstance = registry.get(componentId);
-            assert.ok(parentInstance.vars.child instanceof Component, 'ref should be replaced with Component');
+            assert.ok(parentInstance.child instanceof Component, 'ref should be replaced with Component');
             assert.strictEqual(childRef._replaced, true, 'original ref should be marked as replaced');
         });
 
@@ -1294,8 +1298,8 @@ describe('InstanceRegistry', () => {
             await registry.create(componentId, TestComponent, { items }, container);
 
             const parentInstance = registry.get(componentId);
-            assert.ok(parentInstance.vars.items[0] instanceof Component, 'first ref should be replaced');
-            assert.ok(parentInstance.vars.items[1] instanceof Component, 'second ref should be replaced');
+            assert.ok(parentInstance.items[0] instanceof Component, 'first ref should be replaced');
+            assert.ok(parentInstance.items[1] instanceof Component, 'second ref should be replaced');
             assert.strictEqual(ref1._replaced, true);
             assert.strictEqual(ref2._replaced, true);
         });
@@ -1319,9 +1323,9 @@ describe('InstanceRegistry', () => {
             await registry.create(componentId, TestComponent, { child: childRef }, container);
 
             const parentInstance = registry.get(componentId);
-            // After mount, parent.vars.child is the real Component — update() should work
-            parentInstance.vars.child.update({ msg: 'b' }, false);
-            assert.strictEqual(parentInstance.vars.child.vars.msg, 'b');
+            // After mount, parent.child is the real Component — update() should work
+            parentInstance.child.update({ msg: 'b' }, false);
+            assert.strictEqual(parentInstance.child.msg, 'b');
         });
     });
 

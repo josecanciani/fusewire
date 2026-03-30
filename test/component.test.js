@@ -8,21 +8,12 @@ describe('Component', () => {
 	describe('Constructor', () => {
 		it('creates instance with default values', () => {
 			const comp = new Component();
-			assert.deepStrictEqual(comp.componentVars, {});
-			assert.deepStrictEqual(comp.vars, {});
+			assert.ok(comp instanceof Component);
 		});
 
 		it('creates instance with vars', () => {
-			const comp = new Component({ count: 0 });
-			assert.deepStrictEqual(comp.componentVars, { count: 0 });
-			assert.deepStrictEqual(comp.vars, { count: 0 });
-		});
-
-		it('vars getter returns componentVars', () => {
-			const comp = new Component({ count: 0 });
-			assert.strictEqual(comp.vars, comp.componentVars);
-			comp.componentVars.count = 5;
-			assert.strictEqual(comp.vars.count, 5);
+			const comp = Object.assign(new Component(), { count: 0 });
+			assert.strictEqual(comp.count, 0);
 		});
 
 	});
@@ -50,60 +41,62 @@ describe('Component', () => {
 
 		it('allows overriding hooks', async () => {
 			class TestComponent extends Component {
-				constructor(vars) {
-					super(vars);
-					this.hydrateCalled = false;
-					this.updateCalled = false;
-					this.destroyCalled = false;
-					this.afterRenderCalled = false;
+				constructor() {
+					super();
+					this._hydrateCalled = false;
+					this._updateCalled = false;
+					this._destroyCalled = false;
+					this._afterRenderCalled = false;
 				}
 
 				async hydrate() {
-					this.hydrateCalled = true;
+					this._hydrateCalled = true;
 				}
 
 				update(newVars, react = true) {
-					this.updateCalled = true;
-					this.receivedVars = newVars;
+					this._updateCalled = true;
+					this._receivedVars = newVars;
 					super.update(newVars, react);
 				}
 
 				destroy() {
-					this.destroyCalled = true;
+					this._destroyCalled = true;
 				}
 
 				afterRender() {
-					this.afterRenderCalled = true;
+					this._afterRenderCalled = true;
 				}
 			}
 
-			const comp = new TestComponent({ count: 0 });
+			const comp = Object.assign(new TestComponent(), { count: 0 });
 
 			await comp.hydrate();
-			assert.strictEqual(comp.hydrateCalled, true);
+			assert.strictEqual(comp._hydrateCalled, true);
 
 			comp.update({ count: 1 }, false);
-			assert.strictEqual(comp.updateCalled, true);
-			assert.deepStrictEqual(comp.receivedVars, { count: 1 });
-			assert.strictEqual(comp.vars.count, 1, 'vars should be merged');
+			assert.strictEqual(comp._updateCalled, true);
+			assert.deepStrictEqual(comp._receivedVars, { count: 1 });
+			assert.strictEqual(comp.count, 1, 'vars should be merged');
 
 			comp.destroy();
-			assert.strictEqual(comp.destroyCalled, true);
+			assert.strictEqual(comp._destroyCalled, true);
 
 			comp.afterRender();
-			assert.strictEqual(comp.afterRenderCalled, true);
+			assert.strictEqual(comp._afterRenderCalled, true);
 		});
 	});
 
 	describe('update()', () => {
 		it('shallow-merges newVars into componentVars', () => {
-			const comp = new Component({ a: 1, b: 2 });
+			const comp = Object.assign(new Component(), { a: 1, b: 2 });
 			comp.update({ b: 99, c: 3 }, false);
-			assert.deepStrictEqual(comp.vars, { a: 1, b: 99, c: 3 });
+			assert.strictEqual(comp.a, 1);
+			assert.strictEqual(comp.b, 99);
+			assert.strictEqual(comp.c, 3);
 		});
 
 		it('triggers react() by default', () => {
-			const comp = new Component({ x: 0 });
+			const comp = Object.assign(new Component(), { x: 0 });
 			comp._componentId = new ComponentId('Test', 'u1');
 			const reactCalls = [];
 			comp._reactor = {
@@ -113,13 +106,13 @@ describe('Component', () => {
 			};
 
 			comp.update({ x: 5 });
-			assert.strictEqual(comp.vars.x, 5);
+			assert.strictEqual(comp.x, 5);
 			assert.strictEqual(reactCalls.length, 1);
 			assert.strictEqual(reactCalls[0].code, 'Test#u1');
 		});
 
 		it('does not react when react=false', () => {
-			const comp = new Component({ x: 0 });
+			const comp = Object.assign(new Component(), { x: 0 });
 			comp._componentId = new ComponentId('Test', 'u1');
 			const reactCalls = [];
 			comp._reactor = {
@@ -129,7 +122,7 @@ describe('Component', () => {
 			};
 
 			comp.update({ x: 5 }, false);
-			assert.strictEqual(comp.vars.x, 5);
+			assert.strictEqual(comp.x, 5);
 			assert.strictEqual(reactCalls.length, 0);
 		});
 	});
@@ -219,7 +212,7 @@ describe('Component', () => {
 		it('inherits from Component', () => {
 			class Counter extends Component {}
 
-			const counter = new Counter({ count: 0 });
+			const counter = Object.assign(new Counter(), { count: 0 });
 			assert.ok(counter instanceof Component);
 			assert.ok(counter instanceof Counter);
 		});
@@ -228,31 +221,31 @@ describe('Component', () => {
 			class Counter extends Component {
 
 				increment() {
-					this.vars.count++;
+					this.count++;
 				}
 
 				decrement() {
-					this.vars.count--;
+					this.count--;
 				}
 			}
 
-			const counter = new Counter({ count: 5 });
+			const counter = Object.assign(new Counter(), { count: 5 });
 			counter.increment();
-			assert.strictEqual(counter.vars.count, 6);
+			assert.strictEqual(counter.count, 6);
 			counter.decrement();
-			assert.strictEqual(counter.vars.count, 5);
+			assert.strictEqual(counter.count, 5);
 		});
 	});
 
 	describe('Vars Management', () => {
 		it('allows direct vars mutation', () => {
-			const comp = new Component({ count: 0 });
-			comp.vars.count = 10;
-			assert.strictEqual(comp.vars.count, 10);
+			const comp = Object.assign(new Component(), { count: 0 });
+			comp.count = 10;
+			assert.strictEqual(comp.count, 10);
 		});
 
 		it('allows nested object vars', () => {
-			const comp = new Component({
+			const comp = Object.assign(new Component(), {
 				user: {
 					name: 'Alice',
 					profile: {
@@ -261,8 +254,8 @@ describe('Component', () => {
 				},
 			});
 
-			assert.strictEqual(comp.vars.user.name, 'Alice');
-			assert.strictEqual(comp.vars.user.profile.role, 'admin');
+			assert.strictEqual(comp.user.name, 'Alice');
+			assert.strictEqual(comp.user.profile.role, 'admin');
 		});
 	});
 

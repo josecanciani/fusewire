@@ -37,7 +37,7 @@ constructor(vars = {}) {
 async hydrate() {
   // Fetch initial data
   const data = await fetch('/api/data').then(r => r.json());
-  this.vars.items = data.items;
+  this.items = data.items;
   
   // Initialize external libraries
   await this.initChart();
@@ -49,7 +49,7 @@ async hydrate() {
 
 **Guidelines:**
 - Safe for async operations (fetch, timers, etc.)
-- Can modify `this.vars` before render
+- Can modify component properties before render
 - Called before `update()` on var changes
 - Don't access DOM directly (use `afterRender()` instead)
 
@@ -63,11 +63,11 @@ async hydrate() {
 
 ```js
 update(newVars, react = true) {
-  const oldSearch = this.vars.search;
+  const oldSearch = this.search;
   super.update(newVars, react);
   
-  if (oldSearch !== this.vars.search) {
-    console.log('Search changed:', oldSearch, '->', this.vars.search);
+  if (oldSearch !== this.search) {
+    console.log('Search changed:', oldSearch, '->', this.search);
     this.performSearch();
   }
 }
@@ -147,7 +147,7 @@ destroy() {
 
 ```
 1. new Component(vars)
-2. hydrate()                    # Async, can modify vars
+2. hydrate()                    # Async, can modify properties
 3. [render DOM]
 4. afterRender()
 ```
@@ -175,10 +175,10 @@ destroy() {
 ```js
 class UserList extends Component {
   async hydrate() {
-    if (!this.vars.users) {
+    if (!this.users) {
       // Only fetch if not already provided
       const response = await fetch('/api/users');
-      this.vars.users = await response.json();
+      this.users = await response.json();
     }
   }
 }
@@ -189,9 +189,9 @@ class UserList extends Component {
 ```js
 class SearchBox extends Component {
   update(newVars, react = true) {
-    const oldQuery = this.vars.query;
+    const oldQuery = this.query;
     super.update(newVars, react);
-    if (oldQuery !== this.vars.query) {
+    if (oldQuery !== this.query) {
       this.debounceSearch();
     }
   }
@@ -222,7 +222,7 @@ class Chart extends Component {
     // Initialize new chart
     const canvas = this.componentContainer.querySelector('canvas');
     this.chart = new ChartLibrary(canvas, {
-      data: this.vars.data
+      data: this.data
     });
   }
   
@@ -255,11 +255,11 @@ class BadExample extends Component {
 
 class GoodExample extends Component {
   update(newVars, react = true) {
-    const oldInput = this.vars.input;
+    const oldInput = this.input;
     super.update(newVars, react);
     // Only derive state if the relevant var changed
-    if (oldInput !== this.vars.input) {
-      this.vars.output = this.calculateOutput(this.vars.input);
+    if (oldInput !== this.input) {
+      this.output = this.calculateOutput(this.input);
     }
   }
 }
@@ -298,13 +298,13 @@ class DebugComponent extends Component {
   }
   
   async hydrate() {
-    console.log('[hydrate] start', this.vars);
+    console.log('[hydrate] start', this.componentName, this.componentId);
     await super.hydrate();
-    console.log('[hydrate] end', this.vars);
+    console.log('[hydrate] end', this.componentName, this.componentId);
   }
   
   update(newVars, react = true) {
-    console.log('[update]', { newVars, currentVars: { ...this.vars } });
+    console.log('[update]', { newVars });
     super.update(newVars, react);
   }
   

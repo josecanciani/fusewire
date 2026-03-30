@@ -97,8 +97,8 @@ FuseWire uses **simple property path evaluation**, not JavaScript expressions:
 ```js
 class MyComponent extends Component {
   async hydrate() {
-    this.vars.shouldShow = this.vars.count > 5;
-    this.vars.isReady = this.vars.status === 'ready';
+    this.shouldShow = this.count > 5;
+    this.isReady = this.status === 'ready';
   }
 }
 ```
@@ -171,7 +171,7 @@ When a variable value is a Component instance, it renders as a mount point:
 ```js
 class Dashboard extends Component {
   async hydrate() {
-    this.vars.sidebar = this.createChild('Sidebar', 'main', { collapsed: false });
+    this.sidebar = this.createChild('Sidebar', 'main', { collapsed: false });
   }
 }
 ```
@@ -205,7 +205,7 @@ If a variable is an array of Components, each renders as a mount point:
 ```js
 class UserList extends Component {
   async hydrate() {
-    this.vars.users = [
+    this.users = [
       this.createChild('UserCard', 'user1', { name: 'Alice' }),
       this.createChild('UserCard', 'user2', { name: 'Bob' })
     ];
@@ -250,12 +250,12 @@ Component:
 ```js
 class SearchBox extends Component {
   increment() {
-    this.vars.count++;
+    this.count++;
     this.react();
   }
   
   search(event) {
-    this.vars.searchQuery = event.target.value;
+    this.searchQuery = event.target.value;
     this.react();
   }
 }
@@ -333,19 +333,19 @@ The container element automatically gets the scoping class applied.
 ```js
 export class Counter extends Component {
   async hydrate() {
-    if (!this.vars.history) {
-      this.vars.history = [];
+    if (!this.history) {
+      this.history = [];
     }
   }
   
   increment() {
-    this.vars.count++;
-    this.vars.history.push(this.vars.count);
+    this.count++;
+    this.history.push(this.count);
     this.react();
   }
   
   reset() {
-    this.vars.count = 0;
+    this.count = 0;
     this.react();
   }
 }

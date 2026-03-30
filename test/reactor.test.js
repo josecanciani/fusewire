@@ -157,7 +157,7 @@ describe('Reactor', () => {
             assert.ok(instance instanceof Counter);
             assert.strictEqual(instance.componentName, 'Counter');
             assert.strictEqual(instance.componentId, 'main');
-            assert.deepStrictEqual(instance.vars, { count: 0 });
+            assert.strictEqual(instance.count, 0);
         });
 
         it('attaches reactor to component', async () => {

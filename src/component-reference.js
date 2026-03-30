@@ -20,7 +20,7 @@ import { ComponentId } from './component-id.js';
  *
  * @example
  * // Inside a component method:
- * this.vars.sidebar = this.createChild('Sidebar', 'main', { collapsed: false });
+ * this.sidebar = this.createChild('Sidebar', 'main', { collapsed: false });
  * this.react();
  */
 export class ComponentReference {

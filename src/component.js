@@ -4,10 +4,21 @@ import { ComponentReference } from './component-reference.js';
 /** @typedef {{[key: string]: Scalar}} ScalarObject */
 /** @typedef {Scalar|ScalarObject|Component|ComponentReference} VarValue */
 /** @typedef {{[key: string]: (VarValue|Array<VarValue>)}} ComponentVars */
-/** @typedef {{new(vars: ComponentVars): Component, componentName: string}} ComponentConstructor */
+/** @typedef {{new(): Component, componentName: string}} ComponentConstructor */
 
 /**
  * Base class for all FuseWire components.
+ *
+ * Component vars are declared as public class fields on subclasses:
+ *
+ *   class Counter extends Component {
+ *       /&#42;&#42; @type {number} &#42;/
+ *       count = 0;
+ *   }
+ *
+ * Any own enumerable string-keyed property whose name does NOT start with '_'
+ * is treated as a component var. The template engine collects these automatically
+ * for rendering. Access vars directly: `this.count`, not through an accessor.
  *
  * Framework-managed properties (set by the engine, read-only for developers):
  *   - _componentId   ComponentId object (name, id, version, code)
@@ -30,11 +41,11 @@ export class Component {
     }
 
     /**
-     * Create a new Component instance
-     * @param {ComponentVars} vars - Component variables/data
+     * Create a new Component instance.
+     * Subclasses declare vars as class fields — the framework applies initial
+     * values via Object.assign after construction (overriding class field defaults).
      */
-    constructor(vars = {}) {
-        this.componentVars = vars;
+    constructor() {
         this._componentId = null; // Set by framework (ComponentId)
         this._registryEntry = null; // Set by framework ({ container, parent })
         this._console = null; // Set by framework (pre-built console wrapper)
@@ -95,14 +106,6 @@ export class Component {
     }
 
     /**
-     * Alias for componentVars
-     * @returns {ComponentVars} Component variables/data
-     */
-    get vars() {
-        return this.componentVars;
-    }
-
-    /**
      * Hydrate hook - called after vars are set/updated, before render
      * Override in subclasses for initialization logic
      * @async
@@ -115,11 +118,10 @@ export class Component {
     /**
      * Update component vars via shallow merge (Object.assign semantics).
      *
-     * Works the same way on both Component and ComponentReference — call
-     * `ref.update({ badge: '2' })` regardless of whether the child has been
-     * created yet. Before creation the ComponentReference merges vars locally;
-     * after creation the framework replaces the reference in the parent's vars
-     * with the real Component, so the same call reaches here.
+     * Merges newVars directly onto the instance's own properties — the same
+     * properties declared as class fields. Works the same way on both
+     * Component and ComponentReference — call `ref.update({ badge: '2' })`
+     * regardless of whether the child has been created yet.
      *
      * The server-side flow (InstanceRegistry) calls `update(newVars, false)`
      * because it handles rendering itself. Developer code should use the
@@ -133,7 +135,7 @@ export class Component {
      * @param {boolean} react - Whether to trigger a re-render (default true)
      */
     update(newVars, react = true) {
-        Object.assign(this.componentVars, newVars);
+        Object.assign(this, newVars);
         if (react) this.react();
     }
 

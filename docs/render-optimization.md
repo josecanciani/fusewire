@@ -55,8 +55,8 @@ Every `react()` call diffs all N elements.
 ```js
 // Console.js
 _addLog(level, message) {
-    const id = String(this.vars.logs.length);
-    this.vars.logs.push(this.createChild('LogLine', id, { level, message }));
+    const id = String(this.logs.length);
+    this.logs.push(this.createChild('LogLine', id, { level, message }));
     this.react();
 }
 ```

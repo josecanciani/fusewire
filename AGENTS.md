@@ -153,8 +153,8 @@ The core principle of FuseWire is: **you manage data, the template manages the U
 // WRONG: manually toggling UI
 this.componentContainer.querySelector('.details').style.display = 'block';
 
-// RIGHT: set a var, let the template handle it
-this.vars.showDetails = true;
+// RIGHT: set a property, let the template handle it
+this.showDetails = true;
 this.react();
 ```
 
@@ -162,9 +162,9 @@ this.react();
 
 The template compiler handles nested same-tag elements correctly. You can freely nest `<div>` inside a `<div fw-if="...">`, use `<li fw-each>` inside another `<li fw-each>`, etc. The parser tracks tag depth to find the correct closing tag.
 
-### Child components via vars
+### Child components via properties
 
-To include a child component, put its instance in vars. The template renders it as a mount point via `((varName))`. The engine auto-mounts child components: after rendering the parent, it finds mount points and creates/renders the child instances automatically. No manual `reactor.start()` or `afterRender()` is needed for child components.
+To include a child component, assign its instance to a property. The template renders it as a mount point via `((varName))`. The engine auto-mounts child components: after rendering the parent, it finds mount points and creates/renders the child instances automatically. No manual `reactor.start()` or `afterRender()` is needed for child components.
 
 ### Introspection over re-fetching
 

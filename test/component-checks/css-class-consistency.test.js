@@ -9,12 +9,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Read project-level global CSS classes from package.json fusewire config.
 // These are classes available in all templates (e.g. Bootstrap utility classes).
 // Add classes here rather than annotating every component CSS file.
-const pkg = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf-8'));
+const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf-8'));
 const globalClasses = new Set(pkg.fusewire?.globalClasses ?? []);
 
 // Component directories to scan. Each entry is a root from which .html/.css
 // pairs are discovered recursively.
-const componentDirs = [join(__dirname, '../examples/client-only/components')];
+const componentDirs = [join(__dirname, '../../examples/client-only/components')];
 
 /**
  * Extract static CSS class tokens from an HTML string.

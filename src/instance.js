@@ -10,6 +10,23 @@ import { compileTemplate } from './template-compiler.js';
 /** @typedef {import('./component.js').ComponentConstructor} ComponentConstructor */
 
 /**
+ * Collect component vars from an instance's own properties.
+ * Returns all own enumerable string-keyed properties whose name does NOT
+ * start with '_'. Framework-managed properties (_componentId, _reactor, etc.)
+ * are excluded.
+ * @param {Component} instance - Component instance
+ * @returns {ComponentVars} Plain object with component vars
+ */
+function collectVars(instance) {
+    /** @type {ComponentVars} */
+    const vars = {};
+    for (const key of Object.keys(instance)) {
+        if (!key.startsWith('_')) vars[key] = instance[key];
+    }
+    return vars;
+}
+
+/**
  * InstanceRegistry manages component instances and their lifecycle.
  *
  * Responsibilities:
@@ -19,6 +36,7 @@ import { compileTemplate } from './template-compiler.js';
  * - Manage component tree (parent/child relationships)
  * - Resolve ComponentReference declarations to real Component instances
  * - Wire framework properties: _componentId, _registryEntry, _console, _reactor
+ * - Apply initial vars onto instance (overriding class field defaults)
  */
 export class InstanceRegistry {
     constructor(renderer, templateStore, appName = 'default') {
@@ -84,7 +102,8 @@ export class InstanceRegistry {
         // Add component scope class to container
         container.classList.add(toCssName(componentId.name));
 
-        const instance = new ComponentClass(vars);
+        const instance = new ComponentClass();
+        Object.assign(instance, vars);
 
         // Build registry entry — the single source of truth for container/parent.
         // The component holds a reference to this same object via _registryEntry,
@@ -257,7 +276,7 @@ export class InstanceRegistry {
         }
 
         // Snapshot current child declarations from vars before rendering
-        const currentChildren = this._collectChildComponents(instance.componentVars);
+        const currentChildren = this._collectChildComponents(instance);
 
         // Build template constants
         const constants = { version: componentId.version };
@@ -265,7 +284,7 @@ export class InstanceRegistry {
         // Render to DOM and find child mount points.
         // Global vars (registered via reactor.registerGlobal) are merged at lower
         // priority — component vars override on name collision.
-        const vars = { ...this._reactor._globalVars, ...instance.componentVars };
+        const vars = { ...this._reactor._globalVars, ...collectVars(instance) };
         const mountPoints = this._renderer.render(
             container,
             compiled,
@@ -311,7 +330,7 @@ export class InstanceRegistry {
         }
 
         // Find matching child declaration in parent's vars
-        const decl = this._findChildDeclaration(parentInstance.componentVars, childId);
+        const decl = this._findChildDeclaration(parentInstance, childId);
         if (!decl) {
             throw new Error(
                 `Mount point for "${childId.code}" found in DOM but no matching declaration in parent vars`,
@@ -322,18 +341,18 @@ export class InstanceRegistry {
         if (decl instanceof ComponentReference) {
             childInstance = await this.createFromReference(decl, mountPoint);
             // Replace the transient ComponentReference with the real Component in the
-            // parent's vars. From this point on, parent code that accesses the var
-            // (e.g. this.vars.logs.at(-1)) gets the Component directly and can call
-            // update() on it. The old reference is marked as replaced so that any
+            // parent's own properties. From this point on, parent code that accesses
+            // the property (e.g. this.logs.at(-1)) gets the Component directly and can
+            // call update() on it. The old reference is marked as replaced so that any
             // stale usage throws.
-            this._replaceRefInVars(parentInstance.componentVars, decl, childInstance);
+            this._replaceRefInVars(parentInstance, decl, childInstance);
             decl._replaced = true;
         } else {
             // Legacy: Component instance used as declaration
             childInstance = await this.create(
                 childId,
                 /** @type {ComponentConstructor} */ (decl.constructor),
-                { ...decl.componentVars },
+                collectVars(decl),
                 mountPoint,
             );
             // Link declaration to reactor so it can trigger re-renders via react()
@@ -345,14 +364,16 @@ export class InstanceRegistry {
     }
 
     /**
-     * Search component vars for a child component declaration matching the given ID
+     * Search a component instance's own properties for a child declaration matching the given ID
      * @private
-     * @param {ComponentVars} vars - Parent component variables
+     * @param {Component} instance - Parent component instance
      * @param {ComponentId} childId - Child component ID to match
      * @returns {Component|ComponentReference|null} Matching declaration or null
      */
-    _findChildDeclaration(vars, childId) {
-        for (const value of Object.values(vars)) {
+    _findChildDeclaration(instance, childId) {
+        for (const key of Object.keys(instance)) {
+            if (key.startsWith('_')) continue;
+            const value = instance[key];
             if (this._matchesChildId(value, childId)) {
                 return /** @type {Component|ComponentReference} */ (value);
             }
@@ -485,15 +506,17 @@ export class InstanceRegistry {
     }
 
     /**
-     * Collect component declarations from vars (top-level values and array items).
+     * Collect component declarations from an instance's own properties (top-level values and array items).
      * Recognises both ComponentReference and legacy Component instances.
      * @private
-     * @param {ComponentVars} vars - Component variables
+     * @param {Component} instance - Component instance
      * @returns {Map<string, ComponentId>} Map of component code to ComponentId
      */
-    _collectChildComponents(vars) {
+    _collectChildComponents(instance) {
         const children = new Map();
-        for (const value of Object.values(vars)) {
+        for (const key of Object.keys(instance)) {
+            if (key.startsWith('_')) continue;
+            const value = instance[key];
             this._collectIfComponent(/** @type {VarValue} */ (value), children);
             if (Array.isArray(value)) {
                 for (const item of value) {
@@ -537,23 +560,25 @@ export class InstanceRegistry {
     }
 
     /**
-     * Replace a ComponentReference with the real Component instance in the parent's vars.
-     * Searches top-level values and array items by identity (===).
+     * Replace a ComponentReference with the real Component instance in the parent's
+     * own properties. Searches non-framework properties and array items by identity (===).
      * @private
-     * @param {ComponentVars} vars - Parent component variables
+     * @param {Component} parentInstance - Parent component instance
      * @param {ComponentReference} ref - The reference to replace
-     * @param {Component} instance - The real Component instance
+     * @param {Component} childInstance - The real Component instance
      */
-    _replaceRefInVars(vars, ref, instance) {
-        for (const [key, value] of Object.entries(vars)) {
+    _replaceRefInVars(parentInstance, ref, childInstance) {
+        for (const key of Object.keys(parentInstance)) {
+            if (key.startsWith('_')) continue;
+            const value = parentInstance[key];
             if (value === ref) {
-                vars[key] = instance;
+                parentInstance[key] = childInstance;
                 return;
             }
             if (Array.isArray(value)) {
                 const idx = value.indexOf(ref);
                 if (idx !== -1) {
-                    value[idx] = instance;
+                    value[idx] = childInstance;
                     return;
                 }
             }
