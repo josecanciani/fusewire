@@ -169,7 +169,7 @@ export class Component {
      * @param {string|ComponentVars} idOrVars - Instance id, or vars if id is omitted
      * @param {ComponentVars|import('./component-reference.js').ComponentReferenceOptions} [maybeVarsOrOptions] - Vars when id is provided, or options when id is omitted
      * @param {import('./component-reference.js').ComponentReferenceOptions} [maybeOptions] - Options when id and vars are provided
-     * @returns {ComponentReference} A reference the framework will resolve at render time
+     * @returns {Component|ComponentReference} Reference that the framework replaces with the real instance after mounting
      */
     createChild(name, idOrVars, maybeVarsOrOptions, maybeOptions) {
         let id;
@@ -200,7 +200,7 @@ export class Component {
      * @param {string|ComponentVars} idOrVars - Instance id, or vars if id is omitted
      * @param {ComponentVars|import('./component-reference.js').ComponentReferenceOptions} [maybeVarsOrOptions] - Vars when id is provided, or options when id is omitted
      * @param {import('./component-reference.js').ComponentReferenceOptions} [maybeOptions] - Options when id and vars are provided
-     * @returns {ComponentReference} A reference the framework will resolve at render time
+     * @returns {Component|ComponentReference} Reference that the framework replaces with the real instance after mounting
      */
     createLazyChild(name, idOrVars, maybeVarsOrOptions, maybeOptions) {
         let id;
@@ -325,20 +325,24 @@ export class Component {
      * Query this component's own DOM for the first element matching a CSS selector,
      * excluding child component subtrees.
      * @param {string} selector - CSS selector
-     * @returns {Element|null} The first matching element, or null if none found
+     * @returns {HTMLElement|null} The first matching element, or null if none found
      */
     querySelector(selector) {
-        return this.componentContainer.querySelector(this._scopeSelector(selector));
+        return /** @type {HTMLElement|null} */ (
+            this.componentContainer.querySelector(this._scopeSelector(selector))
+        );
     }
 
     /**
      * Query this component's own DOM for all elements matching a CSS selector,
      * excluding child component subtrees.
      * @param {string} selector - CSS selector
-     * @returns {Array.<Element>} Array of matching elements
+     * @returns {Array.<HTMLElement>} Array of matching elements
      */
     querySelectorAll(selector) {
-        return Array.from(this.componentContainer.querySelectorAll(this._scopeSelector(selector)));
+        return /** @type {Array.<HTMLElement>} */ (
+            Array.from(this.componentContainer.querySelectorAll(this._scopeSelector(selector)))
+        );
     }
 
     /**
@@ -346,7 +350,7 @@ export class Component {
      * excluding child component subtrees.
      * Accepts space-separated class names (same as Element.getElementsByClassName).
      * @param {string} classNames - One or more class names separated by spaces
-     * @returns {Array.<Element>} Array of matching elements
+     * @returns {Array.<HTMLElement>} Array of matching elements
      */
     getElementsByClassName(classNames) {
         const selector = classNames

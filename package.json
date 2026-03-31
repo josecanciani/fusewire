@@ -23,10 +23,10 @@
     "test:browser": "playwright test",
     "test:all": "npm test && npm run test:browser",
     "examples": "node examples-server.js",
-    "lint": "oxlint src/",
-    "format": "oxfmt --write src/",
-    "format:check": "oxfmt --check src/",
-    "jsdoc-check": "eslint src/",
+    "lint": "oxlint src/ examples/",
+    "format": "oxfmt --write 'src/**/*.{js,css}' 'examples/**/*.{js,css}'",
+    "format:check": "oxfmt --check 'src/**/*.{js,css}' 'examples/**/*.{js,css}'",
+    "jsdoc-check": "eslint src/ examples/",
     "typecheck": "tsc -p jsconfig.json --noEmit"
   },
   "devDependencies": {
@@ -63,8 +63,12 @@
       "card-text", "d-flex", "vh-100", "flex-column", "border-end", "bg-body-tertiary",
       "list-group", "list-group-flush", "flex-grow-1", "overflow-auto", "list-group-item",
       "list-group-item-action", "p-2", "border-top", "border-bottom", "btn", "btn-sm",
-      "btn-outline-secondary", "btn-primary", "w-100", "py-0", "px-2",
-      "justify-content-between", "align-items-center"
+      "btn-outline-secondary", "btn-primary", "btn-success", "btn-warning",
+      "btn-secondary", "btn-outline-danger", "form-range",
+      "w-100", "py-0", "px-2", "mt-4", "mt-1",
+      "justify-content-between", "align-items-center",
+      "flex-shrink-0", "me-2",
+      "px-3", "fw-bold", "mb-0", "overflow-hidden"
     ]
   }
 }

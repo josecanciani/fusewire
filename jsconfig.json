@@ -11,6 +11,6 @@
             "/js/*": ["./src/*"]
         }
     },
-    "include": ["src/**/*.js"],
+    "include": ["src/**/*.js", "examples/**/*.js"],
     "exclude": ["src/lib/**"]
 }
