@@ -303,10 +303,7 @@ Tested in:
 The following features are planned but not yet implemented in this client-only library:
 
 - Service Worker caching (for templates and state)
-- Parallel child creation with detached rendering (see [parallel-creation.md](parallel-creation.md))
 - Batched template fetching (DataLoader pattern)
-- Error fallback components (`fallback` option on `createChild`)
-- Lazy child loading (`createLazyChild` with placeholder)
 - Navigation/routing support
 - Live push updates via WebSocket
 

@@ -20,6 +20,7 @@ export class TemplateStore {
     constructor() {
         this._templates = new Map();
         this._compiled = new Map();
+        this._inFlight = new Map();
     }
 
     /**
@@ -124,6 +125,7 @@ export class TemplateStore {
     clearAll() {
         this._templates.clear();
         this._compiled.clear();
+        this._inFlight.clear();
     }
 
     /**
@@ -193,6 +195,29 @@ export class TemplateStore {
         this.set(componentName, { version, htmlCode, cssCode, jsCode, fetchedAt, etags: newEtags });
 
         return { version, htmlCode, cssCode, jsCode, fetchedAt, etags: newEtags };
+    }
+
+    /**
+     * Request a template with in-flight deduplication.
+     * If the template is already cached, resolves immediately. If a fetch for
+     * this component is already in progress, returns the same promise (no
+     * duplicate request). Otherwise starts a new fetch.
+     * @param {string} componentName - Component name
+     * @param {string} basePath - Base URL path for component files
+     * @returns {Promise<TemplateData>} Template data
+     */
+    async requestTemplate(componentName, basePath = './components') {
+        if (this.has(componentName)) {
+            return this.get(componentName);
+        }
+        if (this._inFlight.has(componentName)) {
+            return this._inFlight.get(componentName);
+        }
+        const promise = this.fetch(componentName, basePath).finally(() => {
+            this._inFlight.delete(componentName);
+        });
+        this._inFlight.set(componentName, promise);
+        return promise;
     }
 
     /**

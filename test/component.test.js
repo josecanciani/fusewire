@@ -356,6 +356,58 @@ describe('Component', () => {
 
 			assert.ok(ref instanceof ComponentReference);
 		});
+
+		it('passes options to ComponentReference', () => {
+			const comp = new Component();
+			const ref = comp.createChild('Sidebar', 'main', {}, { fallback: 'ErrorCard' });
+
+			assert.strictEqual(ref._options.fallback, 'ErrorCard');
+		});
+
+		it('passes options when id is omitted', () => {
+			const comp = new Component();
+			const ref = comp.createChild('Sidebar', { page: 1 }, { fallback: 'ErrorCard' });
+
+			assert.strictEqual(ref.id, '');
+			assert.deepStrictEqual(ref.vars, { page: 1 });
+			assert.strictEqual(ref._options.fallback, 'ErrorCard');
+		});
+	});
+
+	describe('createLazyChild()', () => {
+		it('returns a ComponentReference with lazy option set', () => {
+			const comp = new Component();
+			const ref = comp.createLazyChild('HeavyChart', 'chart', {});
+
+			assert.ok(ref instanceof ComponentReference);
+			assert.strictEqual(ref._options.lazy, true);
+		});
+
+		it('sets placeholder option', () => {
+			const comp = new Component();
+			const ref = comp.createLazyChild('HeavyChart', 'chart', {}, { placeholder: 'Skeleton' });
+
+			assert.strictEqual(ref._options.lazy, true);
+			assert.strictEqual(ref._options.placeholder, 'Skeleton');
+		});
+
+		it('passes fallback option', () => {
+			const comp = new Component();
+			const ref = comp.createLazyChild('HeavyChart', 'chart', {}, { fallback: 'ErrorCard' });
+
+			assert.strictEqual(ref._options.lazy, true);
+			assert.strictEqual(ref._options.fallback, 'ErrorCard');
+		});
+
+		it('works with omitted id', () => {
+			const comp = new Component();
+			const ref = comp.createLazyChild('HeavyChart', { data: [] });
+
+			assert.strictEqual(ref.componentName, 'HeavyChart');
+			assert.strictEqual(ref.id, '');
+			assert.deepStrictEqual(ref.vars, { data: [] });
+			assert.strictEqual(ref._options.lazy, true);
+		});
 	});
 
 	describe('Event pub/sub', () => {

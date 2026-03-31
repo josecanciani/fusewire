@@ -160,24 +160,66 @@ export class Component {
 
     /**
      * Create a lightweight reference to a child component.
-     * The InstanceRegistry will create the real Component when it encounters
-     * this reference in vars during rendering.
+     * When called during init(), the framework starts the child's creation
+     * pipeline immediately — loading the class and template, running init(),
+     * and rendering into a detached container — all in parallel with other
+     * children. The child is attached to the document when the parent renders
+     * and discovers the mount point.
      * @param {string} name - Component name (e.g., 'Counter', 'Basics/Counter')
      * @param {string|ComponentVars} idOrVars - Instance id, or vars if id is omitted
-     * @param {ComponentVars} [maybeVars] - Vars when id is provided as second argument
+     * @param {ComponentVars|import('./component-reference.js').ComponentReferenceOptions} [maybeVarsOrOptions] - Vars when id is provided, or options when id is omitted
+     * @param {import('./component-reference.js').ComponentReferenceOptions} [maybeOptions] - Options when id and vars are provided
      * @returns {ComponentReference} A reference the framework will resolve at render time
      */
-    createChild(name, idOrVars, maybeVars) {
+    createChild(name, idOrVars, maybeVarsOrOptions, maybeOptions) {
         let id;
         let vars;
+        let options;
         if (typeof idOrVars === 'string') {
             id = idOrVars;
-            vars = maybeVars || {};
+            vars = maybeVarsOrOptions || {};
+            options = maybeOptions;
         } else {
             id = '';
             vars = idOrVars || {};
+            options = maybeVarsOrOptions;
         }
-        return new ComponentReference(name, id, vars);
+        const ref = new ComponentReference(name, id, vars, null, options);
+        if (this[REACTOR]) {
+            this[REACTOR]._instanceRegistry.startEagerCreation(ref);
+        }
+        return ref;
+    }
+
+    /**
+     * Create a lazy child component that loads in the background.
+     * The parent renders immediately with a placeholder component. When the
+     * real child is ready, the framework swaps the placeholder for the real
+     * component and triggers a re-render of the parent.
+     * @param {string} name - Component name (e.g., 'Analytics/HeavyChart')
+     * @param {string|ComponentVars} idOrVars - Instance id, or vars if id is omitted
+     * @param {ComponentVars|import('./component-reference.js').ComponentReferenceOptions} [maybeVarsOrOptions] - Vars when id is provided, or options when id is omitted
+     * @param {import('./component-reference.js').ComponentReferenceOptions} [maybeOptions] - Options when id and vars are provided
+     * @returns {ComponentReference} A reference the framework will resolve at render time
+     */
+    createLazyChild(name, idOrVars, maybeVarsOrOptions, maybeOptions) {
+        let id;
+        let vars;
+        let options;
+        if (typeof idOrVars === 'string') {
+            id = idOrVars;
+            vars = maybeVarsOrOptions || {};
+            options = maybeOptions || {};
+        } else {
+            id = '';
+            vars = idOrVars || {};
+            options = maybeVarsOrOptions || {};
+        }
+        const ref = new ComponentReference(name, id, vars, null, { ...options, lazy: true });
+        if (this[REACTOR]) {
+            this[REACTOR]._instanceRegistry.startEagerCreation(ref);
+        }
+        return ref;
     }
 
     /**

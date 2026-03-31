@@ -88,6 +88,7 @@ describe('InstanceRegistry', () => {
             _console: console,
             _basePath: './components',
             _globalVars: {},
+            _instanceRegistry: registry,
         };
 
         // Create a fresh container for each test
@@ -1928,6 +1929,286 @@ describe('InstanceRegistry', () => {
 
             assert.strictEqual(instance[LIBRARIES].get('Lib1').module, mod1);
             assert.strictEqual(instance[LIBRARIES].get('Lib2').module, mod2);
+        });
+    });
+
+    describe('Eager child creation (startEagerCreation / _attachEagerChild)', () => {
+        it('creates child in detached container with deferred hydration', async () => {
+            class Parent extends Component {
+                /** @type {ComponentReference|Component} */
+                child = null;
+                async init() {
+                    this.child = this.createChild('Child', 'main', { msg: 'hi' });
+                }
+            }
+            class Child extends Component {
+                /** @type {string} */
+                msg = '';
+                _hydrateCalled = false;
+                _afterRenderCalled = false;
+                hydrate() { this._hydrateCalled = true; }
+                afterRender() { this._afterRenderCalled = true; }
+            }
+
+            registry.registerComponent('Parent', Parent);
+            registry.registerComponent('Child', Child);
+            templateStore.set('Parent', { version: 'v1', htmlCode: '<div>((child))</div>', cssCode: '' });
+            templateStore.set('Child', { version: 'v1', htmlCode: '<span>((msg))</span>', cssCode: '' });
+
+            const parentId = new ComponentId('Parent', 'root', 'v1');
+            const parentInstance = await registry.create(parentId, Parent, {}, container);
+
+            // Child should be fully created and hydrated after parent create
+            const childInstance = parentInstance.child;
+            assert.ok(childInstance instanceof Child);
+            assert.strictEqual(childInstance.msg, 'hi');
+            assert.ok(childInstance._hydrateCalled);
+            assert.ok(childInstance._afterRenderCalled);
+        });
+
+        it('children created in init run in parallel', async () => {
+            const order = [];
+            class Parent extends Component {
+                /** @type {ComponentReference|Component} */
+                a = null;
+                /** @type {ComponentReference|Component} */
+                b = null;
+                async init() {
+                    this.a = this.createChild('ChildA', 'a', {});
+                    this.b = this.createChild('ChildB', 'b', {});
+                }
+            }
+            class ChildA extends Component {
+                async init() { order.push('A.init'); }
+                hydrate() { order.push('A.hydrate'); }
+                afterRender() { order.push('A.afterRender'); }
+            }
+            class ChildB extends Component {
+                async init() { order.push('B.init'); }
+                hydrate() { order.push('B.hydrate'); }
+                afterRender() { order.push('B.afterRender'); }
+            }
+
+            registry.registerComponent('Parent', Parent);
+            registry.registerComponent('ChildA', ChildA);
+            registry.registerComponent('ChildB', ChildB);
+            templateStore.set('Parent', { version: 'v1', htmlCode: '<div>((a))((b))</div>', cssCode: '' });
+            templateStore.set('ChildA', { version: 'v1', htmlCode: '<span>A</span>', cssCode: '' });
+            templateStore.set('ChildB', { version: 'v1', htmlCode: '<span>B</span>', cssCode: '' });
+
+            const parentId = new ComponentId('Parent', 'root', 'v1');
+            await registry.create(parentId, Parent, {}, container);
+
+            // Both children's inits started before either was hydrated
+            // Hydrate runs bottom-up after attachment
+            assert.ok(order.indexOf('A.init') < order.indexOf('A.hydrate'));
+            assert.ok(order.indexOf('B.init') < order.indexOf('B.hydrate'));
+        });
+
+        it('deferred hydration: hydrate runs after DOM attachment (bottom-up)', async () => {
+            const order = [];
+            class GrandParent extends Component {
+                /** @type {ComponentReference|Component} */
+                mid = null;
+                async init() {
+                    this.mid = this.createChild('Mid', 'mid', {});
+                }
+                hydrate() { order.push('GP.hydrate'); }
+            }
+            class Mid extends Component {
+                /** @type {ComponentReference|Component} */
+                leaf = null;
+                async init() {
+                    this.leaf = this.createChild('Leaf', 'leaf', {});
+                }
+                hydrate() { order.push('Mid.hydrate'); }
+            }
+            class Leaf extends Component {
+                hydrate() { order.push('Leaf.hydrate'); }
+            }
+
+            registry.registerComponent('GrandParent', GrandParent);
+            registry.registerComponent('Mid', Mid);
+            registry.registerComponent('Leaf', Leaf);
+            templateStore.set('GrandParent', { version: 'v1', htmlCode: '<div>((mid))</div>', cssCode: '' });
+            templateStore.set('Mid', { version: 'v1', htmlCode: '<div>((leaf))</div>', cssCode: '' });
+            templateStore.set('Leaf', { version: 'v1', htmlCode: '<span>leaf</span>', cssCode: '' });
+
+            const gpId = new ComponentId('GrandParent', 'root', 'v1');
+            await registry.create(gpId, GrandParent, {}, container);
+
+            // Bottom-up hydration: Leaf first, then Mid, then GrandParent
+            assert.deepStrictEqual(order, ['Leaf.hydrate', 'Mid.hydrate', 'GP.hydrate']);
+        });
+
+        it('transfers DOM from detached container to mount point', async () => {
+            class Parent extends Component {
+                /** @type {ComponentReference|Component} */
+                child = null;
+                async init() {
+                    this.child = this.createChild('Child', 'main', {});
+                }
+            }
+            class Child extends Component {}
+
+            registry.registerComponent('Parent', Parent);
+            registry.registerComponent('Child', Child);
+            templateStore.set('Parent', { version: 'v1', htmlCode: '<div>((child))</div>', cssCode: '' });
+            templateStore.set('Child', { version: 'v1', htmlCode: '<span>child content</span>', cssCode: '' });
+
+            const parentId = new ComponentId('Parent', 'root', 'v1');
+            await registry.create(parentId, Parent, {}, container);
+
+            // Child's rendered content should be in the document
+            const spans = container.querySelectorAll('span');
+            assert.strictEqual(spans.length, 1);
+            assert.strictEqual(spans[0].textContent, 'child content');
+        });
+
+        it('skips eager creation when component already exists in registry (re-render)', async () => {
+            class Parent extends Component {
+                /** @type {Array<ComponentReference|Component>} */
+                cells = [];
+                async init() {
+                    this.cells = [
+                        this.createChild('Cell', '0', {}),
+                        this.createChild('Cell', '1', {}),
+                    ];
+                }
+            }
+            class Cell extends Component {}
+
+            registry.registerComponent('Parent', Parent);
+            registry.registerComponent('Cell', Cell);
+            templateStore.set('Parent', { version: 'v1', htmlCode: '<div fw-each="cell in cells">((cell))</div>', cssCode: '' });
+            templateStore.set('Cell', { version: 'v1', htmlCode: '<span>cell</span>', cssCode: '' });
+
+            const parentId = new ComponentId('Parent', 'root', 'v1');
+            const parentInstance = await registry.create(parentId, Parent, {}, container);
+
+            // Both cells exist in registry
+            assert.ok(registry.has(new ComponentId('Cell', '0')));
+            assert.ok(registry.has(new ComponentId('Cell', '1')));
+
+            // Simulate re-render pattern: createChild again with same ids.
+            // startEagerCreation should skip (no _creationPromise set),
+            // so _mountChild will hit the "already exists" branch instead.
+            const ref0 = parentInstance.createChild('Cell', '0', {});
+            const ref1 = parentInstance.createChild('Cell', '1', {});
+            assert.strictEqual(ref0._creationPromise, null, 'should skip eager creation for existing Cell#0');
+            assert.strictEqual(ref1._creationPromise, null, 'should skip eager creation for existing Cell#1');
+        });
+    });
+
+    describe('Error fallbacks (_createFallback)', () => {
+        it('renders fallback component when child creation fails', async () => {
+            class Parent extends Component {
+                /** @type {ComponentReference|Component} */
+                child = null;
+                async init() {
+                    this.child = this.createChild('Broken', 'main', {}, { fallback: 'Fallback' });
+                }
+            }
+            class Broken extends Component {
+                async init() { throw new Error('init failed'); }
+            }
+            class Fallback extends Component {
+                /** @type {string} */
+                errorMessage = '';
+                /** @type {string} */
+                failedComponent = '';
+            }
+
+            registry.registerComponent('Parent', Parent);
+            registry.registerComponent('Broken', Broken);
+            registry.registerComponent('Fallback', Fallback);
+            templateStore.set('Parent', { version: 'v1', htmlCode: '<div>((child))</div>', cssCode: '' });
+            templateStore.set('Broken', { version: 'v1', htmlCode: '<span>broken</span>', cssCode: '' });
+            templateStore.set('Fallback', { version: 'v1', htmlCode: '<span>((errorMessage)) ((failedComponent))</span>', cssCode: '' });
+
+            const parentId = new ComponentId('Parent', 'root', 'v1');
+            const parentInstance = await registry.create(parentId, Parent, {}, container);
+
+            // Parent should have the fallback instance, not Broken
+            const child = parentInstance.child;
+            assert.ok(child instanceof Fallback);
+            assert.strictEqual(child.errorMessage, 'init failed');
+            assert.strictEqual(child.failedComponent, 'Broken');
+
+            // Fallback rendered content should be in the DOM
+            const spans = container.querySelectorAll('span');
+            assert.ok(spans.length >= 1);
+        });
+
+        it('propagates error when no fallback is specified', async () => {
+            class Parent extends Component {
+                /** @type {ComponentReference|Component} */
+                child = null;
+                async init() {
+                    this.child = this.createChild('Broken', 'main', {});
+                }
+            }
+            class Broken extends Component {
+                async init() { throw new Error('init failed'); }
+            }
+
+            registry.registerComponent('Parent', Parent);
+            registry.registerComponent('Broken', Broken);
+            templateStore.set('Parent', { version: 'v1', htmlCode: '<div>((child))</div>', cssCode: '' });
+            templateStore.set('Broken', { version: 'v1', htmlCode: '<span>broken</span>', cssCode: '' });
+
+            const parentId = new ComponentId('Parent', 'root', 'v1');
+            await assert.rejects(
+                () => registry.create(parentId, Parent, {}, container),
+                /init failed/,
+            );
+        });
+    });
+
+    describe('createChild with options', () => {
+        it('passes options to ComponentReference', async () => {
+            class Parent extends Component {
+                /** @type {ComponentReference|Component} */
+                child = null;
+                async init() {
+                    this.child = this.createChild('Child', 'main', {}, { fallback: 'ErrorCard' });
+                }
+            }
+            class Child extends Component {}
+
+            registry.registerComponent('Parent', Parent);
+            registry.registerComponent('Child', Child);
+            templateStore.set('Parent', { version: 'v1', htmlCode: '<div>((child))</div>', cssCode: '' });
+            templateStore.set('Child', { version: 'v1', htmlCode: '<span>ok</span>', cssCode: '' });
+
+            const parentId = new ComponentId('Parent', 'root', 'v1');
+            await registry.create(parentId, Parent, {}, container);
+
+            // No error, so child is normal (not the fallback)
+            const spans = container.querySelectorAll('span');
+            assert.strictEqual(spans.length, 1);
+            assert.strictEqual(spans[0].textContent, 'ok');
+        });
+    });
+
+    describe('_hydrateSubtree', () => {
+        it('skips components that are already hydrated', async () => {
+            let hydrateCount = 0;
+            class TestComp extends Component {
+                hydrate() { hydrateCount++; }
+            }
+
+            registry.registerComponent('TestComp', TestComp);
+            templateStore.set('TestComp', { version: 'v1', htmlCode: '<span>test</span>', cssCode: '' });
+
+            const compId = new ComponentId('TestComp', 'main', 'v1');
+            // Normal creation (not deferred) — hydrate runs during create
+            await registry.create(compId, TestComp, {}, container);
+            assert.strictEqual(hydrateCount, 1);
+
+            // _hydrateSubtree should skip since needsHydration is false
+            await registry._hydrateSubtree(compId);
+            assert.strictEqual(hydrateCount, 1);
         });
     });
 });

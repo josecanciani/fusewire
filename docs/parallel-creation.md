@@ -1,5 +1,17 @@
 # Parallel Component Creation
 
+## Implementation Status
+
+| Feature | Status |
+|---|---|
+| Eager child creation (`createChild` kicks off immediately) | Implemented |
+| Detached rendering (children render off-document) | Implemented |
+| Deferred hydration (bottom-up `hydrate()` after attachment) | Implemented |
+| Template request deduplication (in-flight sharing) | Implemented |
+| Error fallback components (`fallback` option) | Implemented |
+| Lazy child components (`createLazyChild` with placeholder) | Implemented |
+| Batched template fetching (DataLoader pattern) | Planned |
+
 ## Problem
 
 When a parent component declares multiple children, the current framework creates them sequentially during the parent's render phase:
@@ -283,6 +295,8 @@ selectDemo(name) {
 ```
 
 If the child isn't ready by render time, the mount phase awaits the creation promise (brief block).
+
+**Re-render safety:** When a parent re-renders without creating new children, `startEagerCreation()` checks whether the component already exists in the instance registry and skips creation. This is critical for components that call `createChild()` on every render cycle (e.g., a grid where `createChild()` is called for each existing cell in a loop). Without this guard, re-renders would attempt duplicate creation and fail.
 
 ### Same component used twice
 

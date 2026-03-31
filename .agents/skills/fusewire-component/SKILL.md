@@ -95,9 +95,6 @@ The framework runs these hooks in order during component creation:
 init()  →  render()  →  hydrate()  →  afterRender()
 ```
 
-> **Note:** `createLazyChild()` is planned but not yet implemented. Until it
-> ships, use `createChild()` for all children.
-
 **`async init()`** — runs once after the framework is wired up (you have access
 to `this.console`, `this.createChild()`, `this.loadLibrary()`, etc.) and before
 the first render. Use it for:
@@ -372,9 +369,6 @@ programmatic behavior (e.g., reconfiguring a third-party widget).
 ---
 
 ## Lazy child components
-
-> **Planned.** `createLazyChild()` is not yet implemented. Until it ships, use
-> `createChild()` (children load eagerly).
 
 Use `createLazyChild()` for children that should load in the background without
 blocking the parent's render:

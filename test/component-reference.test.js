@@ -123,6 +123,45 @@ describe('ComponentReference', () => {
         });
     });
 
+    describe('_options', () => {
+        it('defaults to empty object', () => {
+            const ref = new ComponentReference('App');
+            assert.deepStrictEqual(ref._options, {});
+        });
+
+        it('stores fallback option', () => {
+            const ref = new ComponentReference('App', '', {}, null, { fallback: 'ErrorCard' });
+            assert.strictEqual(ref._options.fallback, 'ErrorCard');
+        });
+
+        it('stores lazy option', () => {
+            const ref = new ComponentReference('App', '', {}, null, { lazy: true });
+            assert.strictEqual(ref._options.lazy, true);
+        });
+
+        it('stores placeholder option', () => {
+            const ref = new ComponentReference('App', '', {}, null, { placeholder: 'Skeleton' });
+            assert.strictEqual(ref._options.placeholder, 'Skeleton');
+        });
+    });
+
+    describe('eager creation fields', () => {
+        it('_creationPromise defaults to null', () => {
+            const ref = new ComponentReference('App');
+            assert.strictEqual(ref._creationPromise, null);
+        });
+
+        it('_detachedContainer defaults to null', () => {
+            const ref = new ComponentReference('App');
+            assert.strictEqual(ref._detachedContainer, null);
+        });
+
+        it('_creationError defaults to null', () => {
+            const ref = new ComponentReference('App');
+            assert.strictEqual(ref._creationError, null);
+        });
+    });
+
     describe('on() — buffered event subscriptions', () => {
         it('buffers a subscription', () => {
             const ref = new ComponentReference('Child', 'c1');

@@ -3,6 +3,14 @@ import { ComponentId } from './component-id.js';
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
 
 /**
+ * @typedef {{
+ *   fallback?: string,
+ *   lazy?: boolean,
+ *   placeholder?: string
+ * }} ComponentReferenceOptions
+ */
+
+/**
  * ComponentReference - A lightweight declaration of a child component.
  *
  * This is NOT a Component instance. It carries only the data needed for
@@ -30,8 +38,9 @@ export class ComponentReference {
      * @param {string} id - Instance identifier (may be empty)
      * @param {ComponentVars} vars - Initial variables for the component
      * @param {string|null} version - Template version hash, or null for latest
+     * @param {ComponentReferenceOptions} options - Creation options (fallback, lazy, placeholder)
      */
-    constructor(componentName, id = '', vars = {}, version = null) {
+    constructor(componentName, id = '', vars = {}, version = null, options = {}) {
         if (!componentName || typeof componentName !== 'string') {
             throw new Error('ComponentReference: componentName must be a non-empty string');
         }
@@ -39,8 +48,12 @@ export class ComponentReference {
         this.id = id;
         this.vars = vars;
         this.version = version;
+        this._options = options;
         this._replaced = false;
         this._bufferedEvents = [];
+        this._creationPromise = null;
+        this._detachedContainer = null;
+        this._creationError = null;
     }
 
     /**

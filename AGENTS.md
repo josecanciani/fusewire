@@ -51,7 +51,7 @@ lib/fusewire/
 ```bash
 npm test
 ```
-- **489 tests:** 476 passing, 13 skipped (JSDOM/idiomorph incompatibility)
+- **521 tests:** 508 passing, 13 skipped (JSDOM/idiomorph incompatibility)
 - Runs in Node.js using JSDOM for DOM emulation
 - **Use for:** Development, CI, quick validation
 - **Limitation:** Cannot test DOM morphing (idiomorph requires real browser)
@@ -72,7 +72,7 @@ npm run test:browser
 npm run test:all
 ```
 - Runs Node tests followed by browser tests
-- **Total:** 480 tests passing (476 Node + 4 Browser)
+- **Total:** 512 tests passing (508 Node + 4 Browser)
 
 **Note:** The 7 skipped Node tests are covered by the 4 browser tests. They're skipped because JSDOM doesn't fully emulate the `Document` constructor that idiomorph checks during morphing operations.
 
@@ -162,12 +162,9 @@ The framework runs these hooks in order:
 | `destroy()` | No | Once | Cleanup (timers, observers, service detachments) |
 
 **Planned features not yet implemented:**
-- `createLazyChild()` — until available, use `createChild()` (loads eagerly)
-- Parallel child creation with detached rendering — see [docs/parallel-creation.md](docs/parallel-creation.md)
-- Batched template fetching (DataLoader pattern)
-- Error fallback components (`fallback` option on `createChild`)
+- Batched template fetching (DataLoader pattern) — see [docs/parallel-creation.md](docs/parallel-creation.md)
 
-See [docs/parallel-creation.md](docs/parallel-creation.md) for the full design.
+See [docs/parallel-creation.md](docs/parallel-creation.md) for the full design of the parallel creation architecture (eager children, lazy children, error fallbacks, template deduplication).
 
 Never call `this.react()` inside `init()`, `hydrate()`, or `afterRender()` — the framework renders automatically after those hooks return. `react()` is always safe to call from event handlers, timers, and async callbacks — the framework batches re-renders via the reactor queue.
 

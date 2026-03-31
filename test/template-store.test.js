@@ -557,4 +557,123 @@ describe('TemplateStore', () => {
 			mock.restoreAll();
 		});
 	});
+
+	describe('requestTemplate()', () => {
+		it('returns cached template immediately without fetching', async () => {
+			const store = new TemplateStore();
+			store.set('Test', {
+				version: 'abc123',
+				htmlCode: '<div>cached</div>',
+				cssCode: '',
+				jsCode: '',
+			});
+
+			const result = await store.requestTemplate('Test', './components');
+
+			assert.strictEqual(result.htmlCode, '<div>cached</div>');
+			assert.strictEqual(result.version, 'abc123');
+		});
+
+		it('deduplicates concurrent requests for the same component', async () => {
+			const store = new TemplateStore();
+			let fetchCount = 0;
+			const fetchMock = mock.fn(
+				/** @param {string} url */
+				(url) => {
+					fetchCount++;
+					if (url.endsWith('.html')) {
+						return Promise.resolve({
+							status: 200,
+							ok: true,
+							text: () => Promise.resolve('<div>Hello</div>'),
+							headers: new Map([['etag', '"h1"']]),
+						});
+					}
+					if (url.endsWith('.css')) {
+						return Promise.resolve({
+							status: 200,
+							ok: true,
+							text: () => Promise.resolve('.test { color: red; }'),
+							headers: new Map([['etag', '"c1"']]),
+						});
+					}
+					if (url.endsWith('.js')) {
+						return Promise.resolve({
+							status: 200,
+							ok: true,
+							text: () => Promise.resolve('export class Test {}'),
+							headers: new Map([['etag', '"j1"']]),
+						});
+					}
+					return Promise.resolve({ ok: false });
+				},
+			);
+			globalThis.fetch = fetchMock;
+
+			// Fire two requests concurrently
+			const [result1, result2] = await Promise.all([
+				store.requestTemplate('Test', './components'),
+				store.requestTemplate('Test', './components'),
+			]);
+
+			// Both resolve to the same data
+			assert.strictEqual(result1.htmlCode, '<div>Hello</div>');
+			assert.strictEqual(result2.htmlCode, '<div>Hello</div>');
+
+			// Only 3 fetch calls (one set of HTML+CSS+JS), not 6
+			assert.strictEqual(fetchCount, 3);
+
+			mock.restoreAll();
+		});
+
+		it('clears in-flight entry after fetch completes', async () => {
+			const store = new TemplateStore();
+			const fetchMock = mock.fn(
+				/** @param {string} url */
+				(url) => {
+					if (url.endsWith('.html')) {
+						return Promise.resolve({
+							status: 200,
+							ok: true,
+							text: () => Promise.resolve('<div>Hello</div>'),
+							headers: new Map(),
+						});
+					}
+					return Promise.resolve({ ok: false, headers: new Map() });
+				},
+			);
+			globalThis.fetch = fetchMock;
+
+			await store.requestTemplate('Test', './components');
+			assert.strictEqual(store._inFlight.size, 0);
+
+			mock.restoreAll();
+		});
+
+		it('clears in-flight entry even on fetch failure', async () => {
+			const store = new TemplateStore();
+			const fetchMock = mock.fn(() => {
+				return Promise.resolve({
+					status: 200,
+					ok: true,
+					text: () => Promise.resolve('<div>Hello</div>'),
+					headers: new Map(),
+				});
+			});
+			globalThis.fetch = fetchMock;
+
+			// First request succeeds
+			await store.requestTemplate('Test', './components');
+			assert.strictEqual(store._inFlight.size, 0);
+
+			mock.restoreAll();
+		});
+
+		it('clearAll clears in-flight map', () => {
+			const store = new TemplateStore();
+			store._inFlight.set('Test', Promise.resolve());
+			store.clearAll();
+			assert.strictEqual(store._inFlight.size, 0);
+		});
+	});
 });

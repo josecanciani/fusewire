@@ -75,16 +75,19 @@ export class InstanceRegistry {
      * Create a component from a ComponentReference (resolves the class by name)
      * @param {ComponentReference} ref - Component reference to resolve
      * @param {HTMLElement} container - DOM container
+     * @param {{deferHydration?: boolean}} options - Creation options
      * @returns {Promise<Component>} The created instance
      */
-    async createFromReference(ref, container) {
+    async createFromReference(ref, container, { deferHydration = false } = {}) {
         const ComponentClass = await this._loadComponentClass(ref.componentName);
 
         // Ensure template is loaded so we can read its version
         const version = await this._ensureTemplate(ref.componentName);
         const componentId = new ComponentId(ref.componentName, ref.id, version);
 
-        return await this.create(componentId, ComponentClass, { ...ref.vars }, container);
+        return await this.create(componentId, ComponentClass, { ...ref.vars }, container, {
+            deferHydration,
+        });
     }
 
     /**
@@ -100,9 +103,10 @@ export class InstanceRegistry {
      * @param {ComponentConstructor} ComponentClass - Component class constructor
      * @param {ComponentVars} vars - Initial vars
      * @param {HTMLElement} container - DOM container
+     * @param {{deferHydration?: boolean}} options - Creation options
      * @returns {Promise<Component>} The created instance
      */
-    async create(componentId, ComponentClass, vars, container) {
+    async create(componentId, ComponentClass, vars, container, { deferHydration = false } = {}) {
         const code = componentId.code;
         if (this._instances.has(code)) {
             throw new Error(`Component ${code} already exists in registry`);
@@ -117,7 +121,14 @@ export class InstanceRegistry {
         // Build registry entry — the single source of truth for container/parent.
         // The component holds a reference to this same object via REGISTRY_ENTRY,
         // so updates here are immediately visible through the getters.
-        const entry = { instance, container, parent: null, children: null };
+        // needsHydration is set early so _mountChild can check it during render().
+        const entry = {
+            instance,
+            container,
+            parent: null,
+            children: null,
+            needsHydration: deferHydration,
+        };
         this._instances.set(code, entry);
         this._roots.add(code);
 
@@ -140,13 +151,15 @@ export class InstanceRegistry {
             // Resolve library loads (started during init via loadLibrary)
             await this._resolveLibraries(instance);
 
-            // Call hydrate hook (first render only — one-time post-render setup)
-            instance[LIFECYCLE_ACTIVE] = 'hydrate';
-            instance.hydrate();
+            if (!deferHydration) {
+                // Call hydrate hook (first render only — one-time post-render setup)
+                instance[LIFECYCLE_ACTIVE] = 'hydrate';
+                instance.hydrate();
 
-            // Call afterRender hook
-            instance[LIFECYCLE_ACTIVE] = 'afterRender';
-            instance.afterRender();
+                // Call afterRender hook
+                instance[LIFECYCLE_ACTIVE] = 'afterRender';
+                instance.afterRender();
+            }
         } finally {
             instance[LIFECYCLE_ACTIVE] = null;
         }
@@ -246,7 +259,7 @@ export class InstanceRegistry {
      */
     async _ensureTemplate(componentName) {
         if (!this._templateStore.has(componentName) && this._reactor) {
-            await this._templateStore.fetch(componentName, this._reactor._basePath);
+            await this._templateStore.requestTemplate(componentName, this._reactor._basePath);
         }
         const template = this._templateStore.get(componentName);
         if (!template) {
@@ -342,14 +355,25 @@ export class InstanceRegistry {
     }
 
     /**
-     * Auto-mount a child component into its mount point
+     * Auto-mount a child component into its mount point.
+     * Handles three cases:
+     *   1. Eagerly created child (has _creationPromise) — await and attach
+     *   2. Existing child from previous render — update container, re-render
+     *   3. New child without eager creation — create from declaration
      * @private
      * @param {HTMLElement} mountPoint - Mount point element with data-fusewire-id
      * @param {Component} parentInstance - Parent component instance
+     * @returns {Promise<void>}
      */
     async _mountChild(mountPoint, parentInstance) {
         const childCode = mountPoint.getAttribute('data-fusewire-id');
         const childId = ComponentId.fromCode(childCode);
+
+        // Check for an eagerly-created child (reference with _creationPromise)
+        const decl = this._findChildDeclaration(parentInstance, childId);
+        if (decl instanceof ComponentReference && decl._creationPromise) {
+            return await this._attachEagerChild(mountPoint, parentInstance, decl, childId);
+        }
 
         if (this.has(childId)) {
             // Child already exists — update container reference (morphing may replace elements)
@@ -361,23 +385,21 @@ export class InstanceRegistry {
         }
 
         // Find matching child declaration in parent's vars
-        const decl = this._findChildDeclaration(parentInstance, childId);
         if (!decl) {
             throw new Error(
                 `Mount point for "${childId.code}" found in DOM but no matching declaration in parent vars`,
             );
         }
 
+        const parentEntry = this._instances.get(parentInstance[COMPONENT_ID].code);
+        const parentDeferred = parentEntry.needsHydration;
+
         let childInstance;
         if (decl instanceof ComponentReference) {
-            childInstance = await this.createFromReference(decl, mountPoint);
-            // Replace the transient ComponentReference with the real Component in the
-            // parent's own properties. From this point on, parent code that accesses
-            // the property (e.g. this.logs.at(-1)) gets the Component directly and can
-            // call update() on it. The old reference is marked as replaced so that any
-            // stale usage throws.
+            childInstance = await this.createFromReference(decl, mountPoint, {
+                deferHydration: parentDeferred,
+            });
             this._replaceRefInVars(parentInstance, decl, childInstance);
-            // Replay buffered .on() calls from the reference onto the real Component
             decl._replayBufferedEvents(childInstance);
             decl._replaced = true;
         } else {
@@ -387,8 +409,8 @@ export class InstanceRegistry {
                 /** @type {ComponentConstructor} */ (decl.constructor),
                 collectVars(decl),
                 mountPoint,
+                { deferHydration: parentDeferred },
             );
-            // Link declaration to reactor so it can trigger re-renders via react()
             decl[REACTOR] = this._reactor;
             decl[COMPONENT_ID] = childId;
         }
@@ -396,6 +418,234 @@ export class InstanceRegistry {
         const childInstanceCode = childInstance[COMPONENT_ID].code;
         this._instances.get(childInstanceCode).parent = parentInstance;
         this._roots.delete(childInstanceCode);
+    }
+
+    /**
+     * Attach an eagerly-created child whose creation was started by startEagerCreation().
+     * Awaits the creation promise, transfers DOM from the detached container into
+     * the mount point, replays buffered events, and hydrates the subtree if the
+     * parent is in the document.
+     * @private
+     * @param {HTMLElement} mountPoint - Mount point element in parent's DOM
+     * @param {Component} parentInstance - Parent component instance
+     * @param {ComponentReference} decl - The child reference with _creationPromise
+     * @param {ComponentId} childId - Child component identity
+     * @returns {Promise<void>}
+     */
+    async _attachEagerChild(mountPoint, parentInstance, decl, childId) {
+        const parentEntry = this._instances.get(parentInstance[COMPONENT_ID].code);
+        const parentDeferred = parentEntry.needsHydration;
+
+        // For lazy children, check if the creation has already completed.
+        // If not, mount a placeholder and swap when ready.
+        if (decl._options.lazy && !this.has(childId)) {
+            // If a previous attempt stored an error, create the fallback now
+            if (decl._creationError) {
+                if (decl._options.fallback) {
+                    return await this._createFallback(
+                        mountPoint,
+                        parentInstance,
+                        decl,
+                        childId,
+                        decl._creationError,
+                    );
+                }
+                throw decl._creationError;
+            }
+            return await this._mountLazyChild(mountPoint, parentInstance, decl, childId);
+        }
+
+        let childInstance;
+        try {
+            childInstance = await decl._creationPromise;
+        } catch (error) {
+            if (decl._options.fallback) {
+                return await this._createFallback(mountPoint, parentInstance, decl, childId, error);
+            }
+            throw error;
+        }
+
+        // Transfer rendered DOM from detached container into the real mount point
+        const detached = decl._detachedContainer;
+        while (detached.firstChild) {
+            mountPoint.appendChild(detached.firstChild);
+        }
+
+        // Update registry entry's container to the real mount point
+        const childEntry = this._instances.get(childInstance[COMPONENT_ID].code);
+        childEntry.container = mountPoint;
+        mountPoint.classList.add(toCssName(childId.name));
+
+        // Replace reference with real instance in parent vars, replay events
+        this._replaceRefInVars(parentInstance, decl, childInstance);
+        decl._replayBufferedEvents(childInstance);
+        decl._replaced = true;
+
+        // Set parent
+        childEntry.parent = parentInstance;
+        this._roots.delete(childInstance[COMPONENT_ID].code);
+
+        // Hydrate the subtree if the parent is in the document (not deferred)
+        if (!parentDeferred) {
+            await this._hydrateSubtree(childInstance[COMPONENT_ID]);
+        }
+    }
+
+    /**
+     * Mount a lazy child with a placeholder while the real component loads.
+     * Renders placeholder HTML directly into the mount point (no full
+     * Component instance). When the real child's creation promise resolves,
+     * queues a parent re-render so _mountChild picks up the completed child.
+     * @private
+     * @param {HTMLElement} mountPoint - Mount point element
+     * @param {Component} parentInstance - Parent component instance
+     * @param {ComponentReference} decl - The lazy child's reference
+     * @param {ComponentId} childId - Child component identity
+     */
+    async _mountLazyChild(mountPoint, parentInstance, decl, childId) {
+        const placeholderName = decl._options.placeholder;
+        if (placeholderName) {
+            // Render placeholder template as static HTML
+            await this._ensureTemplate(placeholderName);
+            const template = this._templateStore.get(placeholderName);
+            let compiled = this._templateStore.getCompiled(placeholderName);
+            if (!compiled) {
+                compiled = compileTemplate(template.htmlCode, template.cssCode, this._appName);
+                this._templateStore.setCompiled(placeholderName, compiled);
+            }
+            mountPoint.innerHTML = compiled.render({}, childId, {});
+            this._renderer._injectCSS(placeholderName, compiled.css);
+        }
+
+        // When the real child is ready, queue a parent re-render to swap it in
+        decl._creationPromise.then(
+            () => {
+                // The parent re-renders, _mountChild sees the child is now in
+                // the registry (this.has(childId) is true), and takes the
+                // _attachEagerChild path which transfers the DOM.
+                parentInstance.react();
+            },
+            (error) => {
+                if (decl._options.fallback) {
+                    // Store the error so the fallback path can handle it on re-render
+                    decl._creationError = error;
+                    parentInstance.react();
+                }
+                // If no fallback, the error is silently swallowed for lazy children
+                // since the parent already rendered successfully
+            },
+        );
+    }
+
+    /**
+     * Create a fallback component when child creation fails.
+     * The fallback renders in the failed child's mount point with error context.
+     * @private
+     * @param {HTMLElement} mountPoint - Mount point element
+     * @param {Component} parentInstance - Parent component instance
+     * @param {ComponentReference} decl - The failed child's reference
+     * @param {ComponentId} childId - The failed child's identity
+     * @param {Error} error - The creation error
+     */
+    async _createFallback(mountPoint, parentInstance, decl, childId, error) {
+        const fallbackRef = new ComponentReference(decl._options.fallback, childId.id, {
+            errorMessage: error.message,
+            failedComponent: decl.componentName,
+        });
+        const fallbackInstance = await this.createFromReference(fallbackRef, mountPoint);
+
+        // Update mount point attribute to match fallback's code
+        mountPoint.setAttribute('data-fusewire-id', fallbackInstance[COMPONENT_ID].code);
+
+        this._replaceRefInVars(parentInstance, decl, fallbackInstance);
+        decl._replaced = true;
+
+        const fallbackCode = fallbackInstance[COMPONENT_ID].code;
+        this._instances.get(fallbackCode).parent = parentInstance;
+        this._roots.delete(fallbackCode);
+    }
+
+    /**
+     * Start eager creation of a child component in a detached container.
+     * Called by Component.createChild() to kick off the creation pipeline
+     * immediately, without waiting for the parent's render to discover
+     * mount points. The child's init(), render(), and library resolution
+     * run in parallel with other children and with the parent's render.
+     * hydrate() and afterRender() are deferred until the child is attached
+     * to the document.
+     * @param {ComponentReference} ref - Component reference to eagerly create
+     */
+    startEagerCreation(ref) {
+        const code = new ComponentId(ref.componentName, ref.id || '').code;
+        // If the component already exists in the registry (e.g. re-render with
+        // same children), skip eager creation — _mountChild will re-render it.
+        if (this._instances.has(code)) {
+            return;
+        }
+        const container = document.createElement('div');
+        ref._detachedContainer = container;
+        ref._creationPromise = this._eagerCreate(ref, container);
+    }
+
+    /**
+     * Execute the eager creation pipeline for a child component.
+     * Loads the class, fetches the template, and runs init + render + library
+     * resolution into a detached container. On failure, cleans up partial state.
+     * @private
+     * @param {ComponentReference} ref - Component reference
+     * @param {HTMLElement} container - Detached container to render into
+     * @returns {Promise<Component>} The created instance (pending hydration)
+     */
+    async _eagerCreate(ref, container) {
+        const code = new ComponentId(ref.componentName, ref.id || '').code;
+        try {
+            return await this.createFromReference(ref, container, { deferHydration: true });
+        } catch (error) {
+            // Clean up partial instance from registry
+            if (this._instances.has(code)) {
+                this._instances.delete(code);
+                this._roots.delete(code);
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Hydrate a component subtree after attachment to the document.
+     * Walks children first (bottom-up) so that when a parent's hydrate() runs,
+     * all children are already hydrated. Only processes components with
+     * needsHydration=true (i.e., those created with deferHydration).
+     * @private
+     * @param {ComponentId} componentId - Root of the subtree to hydrate
+     */
+    async _hydrateSubtree(componentId) {
+        const entry = this._instances.get(componentId.code);
+        if (!entry) return;
+
+        // Recursively update containers for children whose mount points moved
+        // from the detached tree into the document
+        if (entry.children) {
+            for (const [childCode] of entry.children) {
+                const childEntry = this._instances.get(childCode);
+                if (childEntry) {
+                    await this._hydrateSubtree(ComponentId.fromCode(childCode));
+                }
+            }
+        }
+
+        // Hydrate this component if deferred
+        if (entry.needsHydration) {
+            const instance = entry.instance;
+            try {
+                instance[LIFECYCLE_ACTIVE] = 'hydrate';
+                instance.hydrate();
+                instance[LIFECYCLE_ACTIVE] = 'afterRender';
+                instance.afterRender();
+            } finally {
+                instance[LIFECYCLE_ACTIVE] = null;
+            }
+            entry.needsHydration = false;
+        }
     }
 
     /**
