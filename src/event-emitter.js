@@ -6,7 +6,7 @@
  */
 export class EventEmitter {
     constructor() {
-        /** @type {Map<string, Set<function(...*): void>>} */
+        /** @type {Map<string, Set<function(...*): (void|false)>>} */
         this._handlers = new Map();
     }
 
@@ -14,7 +14,7 @@ export class EventEmitter {
      * Subscribe to an event.
      * Returns an unsubscribe function; call it to remove this handler early.
      * @param {string} eventName - Event name to listen for
-     * @param {function(...*): void} handler - Callback invoked when the event fires
+     * @param {function(...*): (void|false)} handler - Callback invoked when the event fires
      * @returns {function(): void} Unsubscribe function
      */
     on(eventName, handler) {
@@ -46,6 +46,30 @@ export class EventEmitter {
             }
         }
         return errors;
+    }
+
+    /**
+     * Emit a broadcast event, calling all registered handlers with the given arguments.
+     * Like emit(), each handler is called even if a previous one threw — errors are collected.
+     * Additionally tracks whether any handler returned false to signal that propagation
+     * should stop for this component's subtree.
+     * @param {string} eventName - Event name to emit
+     * @param {...*} args - Arguments forwarded to each handler
+     * @returns {{errors: Array.<Error>, stopped: boolean}} Errors and whether propagation was stopped
+     */
+    emitBroadcast(eventName, ...args) {
+        const handlers = this._handlers.get(eventName);
+        if (!handlers) return { errors: [], stopped: false };
+        const errors = [];
+        let stopped = false;
+        for (const handler of handlers) {
+            try {
+                if (handler(...args) === false) stopped = true;
+            } catch (err) {
+                errors.push(err);
+            }
+        }
+        return { errors, stopped };
     }
 
     /**

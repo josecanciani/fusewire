@@ -1,5 +1,6 @@
 import { ComponentId } from './component-id.js';
 import { ComponentReference } from './component-reference.js';
+import { EventEmitter } from './event-emitter.js';
 import { FuseWire } from './fusewire.js';
 import { TemplateStore } from './template-store.js';
 import { InstanceRegistry } from './instance.js';
@@ -118,6 +119,49 @@ export class Reactor {
     detachConsole(consoleObj) {
         const index = this._attachedConsoles.indexOf(consoleObj);
         if (index !== -1) this._attachedConsoles.splice(index, 1);
+    }
+
+    /**
+     * Subscribe to a broadcast event at the reactor level.
+     * Reactor listeners fire before component listeners during broadcast().
+     * Returns an unsubscribe function.
+     * @param {string} eventName - Event name to listen for
+     * @param {function(...*): (void|false)} handler - Callback invoked when the event is broadcast
+     * @returns {function(): void} Unsubscribe function
+     */
+    on(eventName, handler) {
+        if (!this._events) this._events = new EventEmitter();
+        return this._events.on(eventName, handler);
+    }
+
+    /**
+     * Broadcast an event top-down through the entire component tree.
+     * Reactor-level listeners (registered via reactor.on()) fire first,
+     * then the event propagates from root component(s) down to all children.
+     * If a component handler returns false, propagation stops for that subtree.
+     * @param {string} eventName - Event name to broadcast
+     * @param {...*} args - Arguments forwarded to each handler
+     */
+    broadcast(eventName, ...args) {
+        if (this._events) {
+            for (const err of this._events.emit(eventName, ...args)) {
+                this._console.error(
+                    `broadcast('${eventName}') reactor listener threw: ${err.message}`,
+                );
+            }
+        }
+        this._instanceRegistry.broadcastFromRoots(eventName, args);
+    }
+
+    /**
+     * Broadcast an event top-down starting from a specific component and its children.
+     * Used by Component.broadcast() for subtree-scoped propagation.
+     * @param {ComponentId} componentId - Component to broadcast from
+     * @param {string} eventName - Event name to broadcast
+     * @param {...*} args - Arguments forwarded to each handler
+     */
+    broadcastFrom(componentId, eventName, ...args) {
+        this._instanceRegistry.broadcastFrom(componentId, eventName, args);
     }
 
     /**

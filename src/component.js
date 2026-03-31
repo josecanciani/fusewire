@@ -185,7 +185,7 @@ export class Component {
      * Returns an unsubscribe function. All subscriptions are cleared automatically
      * when the component is destroyed by the InstanceRegistry.
      * @param {string} eventName - Event name to listen for
-     * @param {function(...*): void} handler - Callback invoked when the event fires
+     * @param {function(...*): (void|false)} handler - Callback invoked when the event fires
      * @returns {function(): void} Unsubscribe function — call it to remove this handler early
      */
     on(eventName, handler) {
@@ -211,6 +211,26 @@ export class Component {
         for (const err of this[EVENTS].emit(eventName, ...args)) {
             this[CONSOLE].error(`emit('${eventName}') listener threw: ${err.message}`);
         }
+    }
+
+    /**
+     * Broadcast an event top-down through this component and its children.
+     * Propagation is scoped to this component's subtree only — it does not
+     * reach parent or sibling components. Use reactor.broadcast() for
+     * application-wide broadcasts (e.g., theming).
+     * @param {string} eventName - Event name to broadcast
+     * @param {...*} args - Arguments forwarded to each handler
+     */
+    broadcast(eventName, ...args) {
+        if (this[LIFECYCLE_ACTIVE]) {
+            this[CONSOLE].warn(
+                `broadcast('${eventName}') called during ${this[LIFECYCLE_ACTIVE]}() — listeners may not be registered yet`,
+            );
+        }
+        if (!this[REACTOR]) {
+            throw new Error('Component: Cannot broadcast - reactor not attached');
+        }
+        this[REACTOR].broadcastFrom(this[COMPONENT_ID], eventName, ...args);
     }
 
     /**

@@ -9,7 +9,8 @@ import { ComponentId } from '../src/component-id.js';
 import { ComponentNotFoundError } from '../src/errors/error-hierarchy.js';
 import { Idiomorph } from 'idiomorph';
 import { ComponentReference } from '../src/component-reference.js';
-import { COMPONENT_ID, LIFECYCLE_ACTIVE } from '../src/symbols.js';
+import { COMPONENT_ID, LIFECYCLE_ACTIVE, EVENTS, CONSOLE } from '../src/symbols.js';
+import { EventEmitter } from '../src/event-emitter.js';
 import { findChildMountPoints } from '../src/utils/dom-helpers.js';
 
 describe('InstanceRegistry', () => {
@@ -1424,6 +1425,255 @@ describe('InstanceRegistry', () => {
             registry._replaceRefInVars(vars, ref, fakeInstance);
 
             assert.strictEqual(vars.child, otherRef, 'vars unchanged');
+        });
+    });
+
+    describe('broadcastFromRoots()', () => {
+        /**
+         * Build a minimal registry entry with optional EVENTS handlers.
+         * Maintains _roots cache: entries with no parent are added to _roots.
+         * @param {string} code - Component code (e.g. "App#main")
+         * @param {Component|null} parentInstance - Parent component or null for root
+         * @param {Map<string, ComponentId>|null} children - Children map
+         * @returns {{instance: Component, container: HTMLElement, parent: Component|null, children: Map<string, ComponentId>|null}} Entry
+         */
+        function wireEntry(code, parentInstance, children) {
+            const id = ComponentId.fromCode(code);
+            const instance = new Component();
+            instance[COMPONENT_ID] = id;
+            instance[CONSOLE] = { log() {}, warn() {}, error() {} };
+            const entry = { instance, container: document.createElement('div'), parent: parentInstance, children };
+            registry._instances.set(code, entry);
+            if (!parentInstance) registry._roots.add(code);
+            return entry;
+        }
+
+        it('calls handlers on a single root component', () => {
+            const calls = [];
+            const entry = wireEntry('App#main', null, null);
+            entry.instance[EVENTS] = new EventEmitter();
+            entry.instance[EVENTS].on('theme', (v) => calls.push(v));
+
+            registry.broadcastFromRoots('theme', ['dark']);
+
+            assert.deepStrictEqual(calls, ['dark']);
+        });
+
+        it('propagates parent -> child -> grandchild (top-down)', () => {
+            const order = [];
+            const grandchildId = new ComponentId('Grand', 'g1');
+            const childId = new ComponentId('Child', 'c1');
+
+            const parentEntry = wireEntry('App#main', null, new Map([['Child#c1', childId]]));
+            const childEntry = wireEntry('Child#c1', parentEntry.instance, new Map([['Grand#g1', grandchildId]]));
+            const grandEntry = wireEntry('Grand#g1', childEntry.instance, null);
+
+            parentEntry.instance[EVENTS] = new EventEmitter();
+            parentEntry.instance[EVENTS].on('theme', () => order.push('parent'));
+            childEntry.instance[EVENTS] = new EventEmitter();
+            childEntry.instance[EVENTS].on('theme', () => order.push('child'));
+            grandEntry.instance[EVENTS] = new EventEmitter();
+            grandEntry.instance[EVENTS].on('theme', () => order.push('grandchild'));
+
+            registry.broadcastFromRoots('theme', []);
+
+            assert.deepStrictEqual(order, ['parent', 'child', 'grandchild']);
+        });
+
+        it('stops subtree propagation when handler returns false', () => {
+            const calls = [];
+            const childId = new ComponentId('Child', 'c1');
+
+            const parentEntry = wireEntry('App#main', null, new Map([['Child#c1', childId]]));
+            wireEntry('Child#c1', parentEntry.instance, null);
+
+            parentEntry.instance[EVENTS] = new EventEmitter();
+            parentEntry.instance[EVENTS].on('theme', () => { calls.push('parent'); return false; });
+
+            const childInstance = registry._instances.get('Child#c1').instance;
+            childInstance[EVENTS] = new EventEmitter();
+            childInstance[EVENTS].on('theme', () => calls.push('child'));
+
+            registry.broadcastFromRoots('theme', []);
+
+            assert.deepStrictEqual(calls, ['parent'], 'child should not be called');
+        });
+
+        it('false in one subtree does not affect sibling subtrees', () => {
+            const calls = [];
+            const child1Id = new ComponentId('Left', 'l1');
+            const child2Id = new ComponentId('Right', 'r1');
+            const grandId = new ComponentId('Deep', 'd1');
+
+            const rootEntry = wireEntry('App#main', null, new Map([
+                ['Left#l1', child1Id],
+                ['Right#r1', child2Id],
+            ]));
+            const leftEntry = wireEntry('Left#l1', rootEntry.instance, new Map([['Deep#d1', grandId]]));
+            wireEntry('Deep#d1', leftEntry.instance, null);
+            wireEntry('Right#r1', rootEntry.instance, null);
+
+            rootEntry.instance[EVENTS] = new EventEmitter();
+            rootEntry.instance[EVENTS].on('theme', () => calls.push('root'));
+
+            leftEntry.instance[EVENTS] = new EventEmitter();
+            leftEntry.instance[EVENTS].on('theme', () => { calls.push('left'); return false; });
+
+            const deepInstance = registry._instances.get('Deep#d1').instance;
+            deepInstance[EVENTS] = new EventEmitter();
+            deepInstance[EVENTS].on('theme', () => calls.push('deep'));
+
+            const rightInstance = registry._instances.get('Right#r1').instance;
+            rightInstance[EVENTS] = new EventEmitter();
+            rightInstance[EVENTS].on('theme', () => calls.push('right'));
+
+            registry.broadcastFromRoots('theme', []);
+
+            assert.deepStrictEqual(calls, ['root', 'left', 'right']);
+        });
+
+        it('skips components with no EVENTS (no handlers registered)', () => {
+            const calls = [];
+            const childId = new ComponentId('Child', 'c1');
+
+            const parentEntry = wireEntry('App#main', null, new Map([['Child#c1', childId]]));
+            const childEntry = wireEntry('Child#c1', parentEntry.instance, null);
+
+            // Parent has no EVENTS (never called on())
+            childEntry.instance[EVENTS] = new EventEmitter();
+            childEntry.instance[EVENTS].on('theme', () => calls.push('child'));
+
+            registry.broadcastFromRoots('theme', ['dark']);
+
+            assert.deepStrictEqual(calls, ['child']);
+        });
+
+        it('logs errors from handlers and continues propagation', () => {
+            const errors = [];
+            const calls = [];
+            const childId = new ComponentId('Child', 'c1');
+
+            const parentEntry = wireEntry('App#main', null, new Map([['Child#c1', childId]]));
+            parentEntry.instance[CONSOLE] = {
+                log() {},
+                warn() {},
+                error(...args) { errors.push(args); },
+            };
+            parentEntry.instance[EVENTS] = new EventEmitter();
+            parentEntry.instance[EVENTS].on('theme', () => { throw new Error('boom'); });
+
+            const childEntry = wireEntry('Child#c1', parentEntry.instance, null);
+            childEntry.instance[EVENTS] = new EventEmitter();
+            childEntry.instance[EVENTS].on('theme', () => calls.push('child'));
+
+            registry.broadcastFromRoots('theme', []);
+
+            assert.strictEqual(errors.length, 1);
+            assert.ok(errors[0][0].includes('boom'));
+            assert.deepStrictEqual(calls, ['child'], 'child still called after parent error');
+        });
+
+        it('forwards arguments to all handlers', () => {
+            const received = [];
+            const entry = wireEntry('App#main', null, null);
+            entry.instance[EVENTS] = new EventEmitter();
+            entry.instance[EVENTS].on('config', (...args) => received.push(args));
+
+            registry.broadcastFromRoots('config', ['key', 42]);
+
+            assert.deepStrictEqual(received, [['key', 42]]);
+        });
+
+        it('does nothing when no instances exist', () => {
+            // Should not throw
+            registry.broadcastFromRoots('theme', []);
+        });
+
+        it('uses cached _roots set instead of iterating all instances', () => {
+            const calls = [];
+            const childId = new ComponentId('Child', 'c1');
+
+            const rootEntry = wireEntry('App#main', null, new Map([['Child#c1', childId]]));
+            const childEntry = wireEntry('Child#c1', rootEntry.instance, null);
+
+            rootEntry.instance[EVENTS] = new EventEmitter();
+            rootEntry.instance[EVENTS].on('theme', () => calls.push('root'));
+            childEntry.instance[EVENTS] = new EventEmitter();
+            childEntry.instance[EVENTS].on('theme', () => calls.push('child'));
+
+            // Verify _roots only contains the root
+            assert.ok(registry._roots.has('App#main'));
+            assert.ok(!registry._roots.has('Child#c1'), 'child should not be in _roots');
+
+            registry.broadcastFromRoots('theme', []);
+            assert.deepStrictEqual(calls, ['root', 'child']);
+        });
+    });
+
+    describe('broadcastFrom()', () => {
+        /**
+         * Build a minimal registry entry with optional EVENTS handlers.
+         * @param {string} code - Component code (e.g. "App#main")
+         * @param {Component|null} parentInstance - Parent component or null for root
+         * @param {Map<string, ComponentId>|null} children - Children map
+         * @returns {{instance: Component, container: HTMLElement, parent: Component|null, children: Map<string, ComponentId>|null}} Entry
+         */
+        function wireEntry(code, parentInstance, children) {
+            const id = ComponentId.fromCode(code);
+            const instance = new Component();
+            instance[COMPONENT_ID] = id;
+            instance[CONSOLE] = { log() {}, warn() {}, error() {} };
+            const entry = { instance, container: document.createElement('div'), parent: parentInstance, children };
+            registry._instances.set(code, entry);
+            return entry;
+        }
+
+        it('broadcasts from a specific component and its children only', () => {
+            const calls = [];
+            const childId = new ComponentId('Child', 'c1');
+            const grandId = new ComponentId('Grand', 'g1');
+
+            const rootEntry = wireEntry('App#main', null, new Map([['Child#c1', childId]]));
+            const childEntry = wireEntry('Child#c1', rootEntry.instance, new Map([['Grand#g1', grandId]]));
+            const grandEntry = wireEntry('Grand#g1', childEntry.instance, null);
+
+            rootEntry.instance[EVENTS] = new EventEmitter();
+            rootEntry.instance[EVENTS].on('theme', () => calls.push('root'));
+            childEntry.instance[EVENTS] = new EventEmitter();
+            childEntry.instance[EVENTS].on('theme', () => calls.push('child'));
+            grandEntry.instance[EVENTS] = new EventEmitter();
+            grandEntry.instance[EVENTS].on('theme', () => calls.push('grandchild'));
+
+            // Broadcast from Child — should hit Child and Grand, NOT root
+            const childCid = ComponentId.fromCode('Child#c1');
+            registry.broadcastFrom(childCid, 'theme', []);
+
+            assert.deepStrictEqual(calls, ['child', 'grandchild']);
+        });
+
+        it('does nothing for a non-existent component', () => {
+            const cid = new ComponentId('Missing', 'x1');
+            // Should not throw
+            registry.broadcastFrom(cid, 'theme', []);
+        });
+
+        it('respects false return to stop subtree propagation', () => {
+            const calls = [];
+            const childId = new ComponentId('Child', 'c1');
+
+            const rootEntry = wireEntry('App#main', null, new Map([['Child#c1', childId]]));
+            wireEntry('Child#c1', rootEntry.instance, null);
+
+            rootEntry.instance[EVENTS] = new EventEmitter();
+            rootEntry.instance[EVENTS].on('theme', () => { calls.push('root'); return false; });
+
+            const childInstance = registry._instances.get('Child#c1').instance;
+            childInstance[EVENTS] = new EventEmitter();
+            childInstance[EVENTS].on('theme', () => calls.push('child'));
+
+            registry.broadcastFrom(ComponentId.fromCode('App#main'), 'theme', []);
+
+            assert.deepStrictEqual(calls, ['root'], 'child should not be called');
         });
     });
 });

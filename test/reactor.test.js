@@ -887,4 +887,213 @@ describe('Reactor', () => {
             assert.ok(!container.innerHTML.includes('global-value'));
         });
     });
+
+    describe('on()', () => {
+        it('registers a handler that broadcast() calls', () => {
+            const calls = [];
+            const mockRegistry = {
+                _reactor: null,
+                broadcastFromRoots() {},
+            };
+            const reactor = createReactor('test-on-1', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+                console: { log() {}, warn() {}, error() {} },
+            });
+
+            reactor.on('theme', (value) => calls.push(value));
+            reactor.broadcast('theme', 'dark');
+
+            assert.deepStrictEqual(calls, ['dark']);
+        });
+
+        it('returns an unsubscribe function', () => {
+            const calls = [];
+            const mockRegistry = {
+                _reactor: null,
+                broadcastFromRoots() {},
+            };
+            const reactor = createReactor('test-on-2', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+                console: { log() {}, warn() {}, error() {} },
+            });
+
+            const unsub = reactor.on('theme', (value) => calls.push(value));
+            reactor.broadcast('theme', 'dark');
+            unsub();
+            reactor.broadcast('theme', 'light');
+
+            assert.deepStrictEqual(calls, ['dark']);
+        });
+
+        it('supports multiple handlers for the same event', () => {
+            const log = [];
+            const mockRegistry = {
+                _reactor: null,
+                broadcastFromRoots() {},
+            };
+            const reactor = createReactor('test-on-3', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+                console: { log() {}, warn() {}, error() {} },
+            });
+
+            reactor.on('theme', () => log.push('a'));
+            reactor.on('theme', () => log.push('b'));
+            reactor.broadcast('theme', 'dark');
+
+            assert.deepStrictEqual(log, ['a', 'b']);
+        });
+    });
+
+    describe('broadcast()', () => {
+        it('calls reactor-level listeners before component propagation', () => {
+            const order = [];
+            const mockRegistry = {
+                _reactor: null,
+                broadcastFromRoots() { order.push('components'); },
+            };
+            const reactor = createReactor('test-bcast-1', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+                console: { log() {}, warn() {}, error() {} },
+            });
+
+            reactor.on('theme', () => order.push('reactor'));
+            reactor.broadcast('theme', 'dark');
+
+            assert.deepStrictEqual(order, ['reactor', 'components']);
+        });
+
+        it('forwards arguments to reactor listeners and component tree', () => {
+            const reactorArgs = [];
+            const registryArgs = [];
+            const mockRegistry = {
+                _reactor: null,
+                broadcastFromRoots(eventName, args) {
+                    registryArgs.push({ eventName, args });
+                },
+            };
+            const reactor = createReactor('test-bcast-2', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+                console: { log() {}, warn() {}, error() {} },
+            });
+
+            reactor.on('config', (...args) => reactorArgs.push(args));
+            reactor.broadcast('config', 'key', 42);
+
+            assert.deepStrictEqual(reactorArgs, [['key', 42]]);
+            assert.deepStrictEqual(registryArgs, [{ eventName: 'config', args: ['key', 42] }]);
+        });
+
+        it('works with no registered listeners', () => {
+            const registryCalls = [];
+            const mockRegistry = {
+                _reactor: null,
+                broadcastFromRoots(eventName, args) {
+                    registryCalls.push(eventName);
+                },
+            };
+            const reactor = createReactor('test-bcast-3', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+                console: { log() {}, warn() {}, error() {} },
+            });
+
+            // Should not throw and should still propagate to components
+            reactor.broadcast('theme', 'dark');
+            assert.deepStrictEqual(registryCalls, ['theme']);
+        });
+
+        it('logs errors from reactor listeners and continues propagation', () => {
+            const errors = [];
+            const registryCalls = [];
+            const mockRegistry = {
+                _reactor: null,
+                broadcastFromRoots(eventName, args) {
+                    registryCalls.push(eventName);
+                },
+            };
+            const reactor = createReactor('test-bcast-4', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+                console: {
+                    log() {},
+                    warn() {},
+                    error(...args) { errors.push(args); },
+                },
+            });
+
+            reactor.on('theme', () => { throw new Error('boom'); });
+            reactor.broadcast('theme', 'dark');
+
+            assert.strictEqual(errors.length, 1);
+            assert.ok(errors[0][0].includes('boom'));
+            assert.deepStrictEqual(registryCalls, ['theme'], 'propagation continued after error');
+        });
+    });
+
+    describe('broadcastFrom()', () => {
+        it('delegates to instanceRegistry.broadcastFrom()', () => {
+            const registryCalls = [];
+            const mockRegistry = {
+                _reactor: null,
+                broadcastFrom(componentId, eventName, args) {
+                    registryCalls.push({ code: componentId.code, eventName, args });
+                },
+            };
+            const reactor = createReactor('test-bfrom-1', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+                console: { log() {}, warn() {}, error() {} },
+            });
+
+            const cid = new ComponentId('Panel', 'main');
+            reactor.broadcastFrom(cid, 'theme', 'dark');
+
+            assert.strictEqual(registryCalls.length, 1);
+            assert.strictEqual(registryCalls[0].code, 'Panel#main');
+            assert.strictEqual(registryCalls[0].eventName, 'theme');
+            assert.deepStrictEqual(registryCalls[0].args, ['dark']);
+        });
+
+        it('forwards multiple arguments', () => {
+            const registryCalls = [];
+            const mockRegistry = {
+                _reactor: null,
+                broadcastFrom(componentId, eventName, args) {
+                    registryCalls.push({ eventName, args });
+                },
+            };
+            const reactor = createReactor('test-bfrom-2', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+                console: { log() {}, warn() {}, error() {} },
+            });
+
+            reactor.broadcastFrom(new ComponentId('Panel', 'main'), 'config', 'key', 42);
+
+            assert.deepStrictEqual(registryCalls[0].args, ['key', 42]);
+        });
+
+        it('does not fire reactor-level listeners', () => {
+            const reactorCalls = [];
+            const mockRegistry = {
+                _reactor: null,
+                broadcastFrom() {},
+            };
+            const reactor = createReactor('test-bfrom-3', {
+                instanceRegistry: mockRegistry,
+                morphFunction: mockMorph,
+                console: { log() {}, warn() {}, error() {} },
+            });
+
+            reactor.on('theme', () => reactorCalls.push('fired'));
+            reactor.broadcastFrom(new ComponentId('Panel', 'main'), 'theme', 'dark');
+
+            assert.deepStrictEqual(reactorCalls, [], 'reactor listeners should not fire for scoped broadcast');
+        });
+    });
 });

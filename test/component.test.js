@@ -654,4 +654,70 @@ describe('Component', () => {
 			});
 		});
 	});
+
+	describe('broadcast()', () => {
+		it('delegates to reactor.broadcastFrom() with own componentId', () => {
+			const comp = new Component();
+			const cid = new ComponentId('Test', 'u1');
+			comp[COMPONENT_ID] = cid;
+			const broadcastCalls = [];
+			comp[REACTOR] = {
+				broadcastFrom(componentId, eventName, ...args) {
+					broadcastCalls.push({ componentId, eventName, args });
+				},
+			};
+
+			comp.broadcast('theme', 'dark');
+
+			assert.strictEqual(broadcastCalls.length, 1);
+			assert.strictEqual(broadcastCalls[0].componentId, cid);
+			assert.strictEqual(broadcastCalls[0].eventName, 'theme');
+			assert.deepStrictEqual(broadcastCalls[0].args, ['dark']);
+		});
+
+		it('throws when reactor not attached', () => {
+			const comp = new Component();
+			comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
+			assert.throws(
+				() => comp.broadcast('theme'),
+				/Cannot broadcast - reactor not attached/,
+			);
+		});
+
+		it('warns during lifecycle hook but still broadcasts', () => {
+			const comp = new Component();
+			comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
+			const warnings = [];
+			const broadcastCalls = [];
+			comp[CONSOLE] = { log() {}, warn(...args) { warnings.push(args); }, error() {} };
+			comp[REACTOR] = {
+				broadcastFrom(componentId, eventName, ...args) {
+					broadcastCalls.push({ eventName, args });
+				},
+			};
+
+			comp[LIFECYCLE_ACTIVE] = 'init';
+			comp.broadcast('theme', 'dark');
+
+			assert.strictEqual(warnings.length, 1);
+			assert.ok(warnings[0][0].includes('init'), 'warning mentions lifecycle hook');
+			assert.ok(warnings[0][0].includes('theme'), 'warning mentions event name');
+			assert.strictEqual(broadcastCalls.length, 1, 'broadcast still fires');
+		});
+
+		it('forwards multiple arguments', () => {
+			const comp = new Component();
+			comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
+			const broadcastCalls = [];
+			comp[REACTOR] = {
+				broadcastFrom(componentId, eventName, ...args) {
+					broadcastCalls.push({ eventName, args });
+				},
+			};
+
+			comp.broadcast('config', 'key', 'value', 42);
+
+			assert.deepStrictEqual(broadcastCalls[0].args, ['key', 'value', 42]);
+		});
+	});
 });

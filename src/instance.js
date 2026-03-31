@@ -52,6 +52,7 @@ export class InstanceRegistry {
         this._appName = appName;
         this._reactor = null; // Set by Reactor after construction
         this._instances = new Map(); // componentId.code -> { instance, container, parent, children }
+        this._roots = new Set(); // codes of root components (no parent)
         this._componentClasses = new Map(); // componentName -> ComponentConstructor (pre-registered)
     }
 
@@ -117,6 +118,7 @@ export class InstanceRegistry {
         // so updates here are immediately visible through the getters.
         const entry = { instance, container, parent: null, children: null };
         this._instances.set(code, entry);
+        this._roots.add(code);
 
         // Wire framework state (Symbol-keyed, invisible to Object.keys)
         instance[COMPONENT_ID] = componentId;
@@ -228,6 +230,7 @@ export class InstanceRegistry {
 
         // Remove from registry
         this._instances.delete(code);
+        this._roots.delete(code);
     }
 
     /**
@@ -383,8 +386,10 @@ export class InstanceRegistry {
             decl[REACTOR] = this._reactor;
             decl[COMPONENT_ID] = childId;
         }
-        // Set parent on the child's registry entry
-        this._instances.get(childInstance[COMPONENT_ID].code).parent = parentInstance;
+        // Set parent on the child's registry entry and remove from roots
+        const childInstanceCode = childInstance[COMPONENT_ID].code;
+        this._instances.get(childInstanceCode).parent = parentInstance;
+        this._roots.delete(childInstanceCode);
     }
 
     /**
@@ -601,6 +606,62 @@ export class InstanceRegistry {
                 if (idx !== -1) {
                     value[idx] = childInstance;
                     return;
+                }
+            }
+        }
+    }
+
+    /**
+     * Broadcast an event top-down through the component tree starting from root(s).
+     * Called by Reactor.broadcast() after reactor-level listeners have fired.
+     * Uses the cached _roots set for O(1) root lookup.
+     * @param {string} eventName - Event name to broadcast
+     * @param {Array.<*>} args - Arguments forwarded to each handler
+     */
+    broadcastFromRoots(eventName, args) {
+        for (const code of this._roots) {
+            this._broadcastToEntry(this._instances.get(code), eventName, args);
+        }
+    }
+
+    /**
+     * Broadcast an event top-down starting from a specific component and its children.
+     * Called by Component.broadcast() for subtree-scoped broadcasts.
+     * @param {ComponentId} componentId - Component to broadcast from
+     * @param {string} eventName - Event name to broadcast
+     * @param {Array.<*>} args - Arguments forwarded to each handler
+     */
+    broadcastFrom(componentId, eventName, args) {
+        const entry = this._instances.get(componentId.code);
+        if (entry) {
+            this._broadcastToEntry(entry, eventName, args);
+        }
+    }
+
+    /**
+     * Recursively broadcast an event to a single registry entry and its children.
+     * If any handler on the entry returns false, propagation stops for that subtree.
+     * @private
+     * @param {{instance: Component, container: HTMLElement, parent: Component|null, children: Map<string, ComponentId>|null}} entry - Registry entry
+     * @param {string} eventName - Event name to broadcast
+     * @param {Array.<*>} args - Arguments forwarded to each handler
+     */
+    _broadcastToEntry(entry, eventName, args) {
+        const { instance } = entry;
+        let stopped = false;
+        if (instance[EVENTS]) {
+            const result = instance[EVENTS].emitBroadcast(eventName, ...args);
+            for (const err of result.errors) {
+                instance[CONSOLE].error(`broadcast('${eventName}') listener threw: ${err.message}`);
+            }
+            stopped = result.stopped;
+        }
+        if (stopped) return;
+        if (entry.children) {
+            for (const [childCode] of entry.children) {
+                const childEntry = this._instances.get(childCode);
+                if (childEntry) {
+                    this._broadcastToEntry(childEntry, eventName, args);
                 }
             }
         }
