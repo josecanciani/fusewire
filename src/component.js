@@ -214,6 +214,57 @@ export class Component {
     }
 
     /**
+     * Query this component's own DOM for the first element matching a CSS selector,
+     * excluding child component subtrees.
+     * @param {string} selector - CSS selector
+     * @returns {Element|null} The first matching element, or null if none found
+     */
+    querySelector(selector) {
+        return this.componentContainer.querySelector(this._scopeSelector(selector));
+    }
+
+    /**
+     * Query this component's own DOM for all elements matching a CSS selector,
+     * excluding child component subtrees.
+     * @param {string} selector - CSS selector
+     * @returns {Array.<Element>} Array of matching elements
+     */
+    querySelectorAll(selector) {
+        return Array.from(this.componentContainer.querySelectorAll(this._scopeSelector(selector)));
+    }
+
+    /**
+     * Find elements by class name within this component's own DOM,
+     * excluding child component subtrees.
+     * Accepts space-separated class names (same as Element.getElementsByClassName).
+     * @param {string} classNames - One or more class names separated by spaces
+     * @returns {Array.<Element>} Array of matching elements
+     */
+    getElementsByClassName(classNames) {
+        const selector = classNames
+            .trim()
+            .split(/\s+/)
+            .map((c) => `.${CSS.escape(c)}`)
+            .join('');
+        return this.querySelectorAll(selector);
+    }
+
+    /**
+     * Append a child-exclusion pseudo-class to each comma-separated part of a selector
+     * so the browser never matches nodes inside child component mount points.
+     * @param {string} selector - Original CSS selector
+     * @returns {string} Scoped selector with :not() exclusion appended
+     */
+    _scopeSelector(selector) {
+        const escapedCode = this[COMPONENT_ID].code.replace(/["\\]/g, '\\$&');
+        const exclusion = `:not([data-fusewire-parent-id="${escapedCode}"] *)`;
+        return selector
+            .split(',')
+            .map((part) => part.trim() + exclusion)
+            .join(', ');
+    }
+
+    /**
      * Trigger re-render of this component.
      * Ignored during lifecycle hooks (init, update, afterRender) because
      * the framework already renders the component after those hooks return.

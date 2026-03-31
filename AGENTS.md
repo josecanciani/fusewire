@@ -209,6 +209,28 @@ afterRender() {
 
 Do not call `emit()` inside `init()`, `update()`, or `afterRender()` — parent listeners are not registered yet and a warning will be logged.
 
+### Scoped DOM queries
+
+When you need to read or manipulate the DOM directly (e.g., scrolling, measuring, attaching third-party widgets), use the component's scoped query methods instead of `this.componentContainer.querySelector()`. The scoped versions automatically exclude child component subtrees so you only match elements rendered by the current component's template.
+
+```javascript
+// WRONG: may match elements inside child components
+this.componentContainer.querySelector('.console-panel-logs');
+
+// RIGHT: restricted to this component's own DOM
+this.querySelector('.console-panel-logs');
+```
+
+Available methods:
+
+| Method | Returns | Description |
+|---|---|---|
+| `this.querySelector(selector)` | `Element\|null` | First match in own DOM |
+| `this.querySelectorAll(selector)` | `Array.<Element>` | All matches in own DOM |
+| `this.getElementsByClassName(names)` | `Array.<Element>` | Match by space-separated class names |
+
+These methods append a `:not()` exclusion to the CSS selector so the browser never enters child mount points. Comma-separated selectors are supported.
+
 ### afterRender() for post-render DOM work
 
 `afterRender()` is called after the component's DOM has been rendered. Use it for work that needs the DOM to exist, such as attaching third-party widgets (e.g., Highcharts, CodeMirror) that require an existing DOM element for initialization. Use a guard flag to run one-time setup only once. Note: child component mounting is handled automatically by the engine -- `afterRender()` is NOT needed for that.
