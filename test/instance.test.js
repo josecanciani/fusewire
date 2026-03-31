@@ -1882,7 +1882,6 @@ describe('InstanceRegistry', () => {
             instance[LIBRARIES] = new Map([
                 ['GameLib', {
                     promise: Promise.resolve(fakeModule),
-                    exportNames: ['Engine', 'helper'],
                     module: null,
                 }],
             ]);
@@ -1899,30 +1898,13 @@ describe('InstanceRegistry', () => {
             await registry._resolveLibraries(instance);
         });
 
-        it('throws when a requested export is missing', async () => {
-            const fakeModule = { Engine: class {} };
-            const instance = new Component();
-            instance[LIBRARIES] = new Map([
-                ['GameLib', {
-                    promise: Promise.resolve(fakeModule),
-                    exportNames: ['Engine', 'missing'],
-                    module: null,
-                }],
-            ]);
-
-            await assert.rejects(
-                () => registry._resolveLibraries(instance),
-                /Library "GameLib" does not export "missing"/,
-            );
-        });
-
         it('resolves multiple libraries', async () => {
             const mod1 = { A: 1 };
             const mod2 = { B: 2, C: 3 };
             const instance = new Component();
             instance[LIBRARIES] = new Map([
-                ['Lib1', { promise: Promise.resolve(mod1), exportNames: ['A'], module: null }],
-                ['Lib2', { promise: Promise.resolve(mod2), exportNames: ['B', 'C'], module: null }],
+                ['Lib1', { promise: Promise.resolve(mod1), module: null }],
+                ['Lib2', { promise: Promise.resolve(mod2), module: null }],
             ]);
 
             await registry._resolveLibraries(instance);

@@ -40,7 +40,7 @@ async init() {
   this.sidebar.on('select', (id) => this.selectItem(id));
 
   // Load libraries (non-blocking)
-  this.loadLibrary('ChartLib', 'Chart');
+  this.loadLibrary('ChartLib');
 
   // Fetch initial data
   const data = await fetch('/api/data').then(r => r.json());
@@ -250,7 +250,7 @@ class SearchBox extends Component {
 ```js
 class Chart extends Component {
   async init() {
-    this.loadLibrary('ChartLib', 'ChartLibrary');
+    this.loadLibrary('ChartLib');
   }
 
   hydrate() {

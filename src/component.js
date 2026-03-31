@@ -225,29 +225,28 @@ export class Component {
     /**
      * Declare a library dependency to be loaded in parallel with child templates.
      * Non-blocking — the framework starts loading the module immediately.
-     * Access the loaded module later via library() in hydrate().
+     * Access the loaded module later via library() in hydrate(), which returns
+     * the full module object (like dynamic import()).
      * @param {string} name - Library name (resolved as basePath/name.js)
-     * @param {...string} exportNames - Names of exports to validate when the module loads
      */
-    loadLibrary(name, ...exportNames) {
+    loadLibrary(name) {
         if (!this[LIBRARIES]) this[LIBRARIES] = new Map();
         const basePath = this[REACTOR]._basePath;
         const promise = import(`${basePath}/${name}.js`);
-        this[LIBRARIES].set(name, { promise, exportNames, module: null });
+        this[LIBRARIES].set(name, { promise, module: null });
     }
 
     /**
-     * Access a loaded library module. Only available in hydrate() or later —
-     * the framework resolves all library promises between render and hydrate.
+     * Access a loaded library module. Returns the full module object, like
+     * dynamic import(). Only available in hydrate() or later — the framework
+     * resolves all library promises between render and hydrate.
      * @param {string} name - Library name (same as passed to loadLibrary)
-     * @returns {Object.<string, *>} Map of export names to their values
+     * @returns {Object.<string, *>} The full module object (destructure to get exports)
      */
     library(name) {
         const libs = this[LIBRARIES];
         if (!libs || !libs.has(name)) {
-            throw new Error(
-                `Library "${name}" not loaded — call loadLibrary("${name}", ...) in init()`,
-            );
+            throw new Error(`Library "${name}" not loaded — call loadLibrary("${name}") in init()`);
         }
         const entry = libs.get(name);
         if (!entry.module) {

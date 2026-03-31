@@ -801,13 +801,12 @@ describe('Component', () => {
 			// Simulate what loadLibrary() does without triggering a real import()
 			comp[LIBRARIES] = new Map();
 			const promise = Promise.resolve({ Engine: class {} });
-			comp[LIBRARIES].set('MyLib', { promise, exportNames: ['Engine', 'utils'], module: null });
+			comp[LIBRARIES].set('MyLib', { promise, module: null });
 
 			const libs = comp[LIBRARIES];
 			assert.ok(libs instanceof Map);
 			assert.ok(libs.has('MyLib'));
 			const entry = libs.get('MyLib');
-			assert.deepStrictEqual(entry.exportNames, ['Engine', 'utils']);
 			assert.strictEqual(entry.module, null);
 			assert.ok(entry.promise instanceof Promise);
 		});
@@ -815,8 +814,8 @@ describe('Component', () => {
 		it('stores multiple libraries', () => {
 			const comp = new Component();
 			comp[LIBRARIES] = new Map();
-			comp[LIBRARIES].set('Lib1', { promise: Promise.resolve({}), exportNames: ['Foo'], module: null });
-			comp[LIBRARIES].set('Lib2', { promise: Promise.resolve({}), exportNames: ['Bar'], module: null });
+			comp[LIBRARIES].set('Lib1', { promise: Promise.resolve({}), module: null });
+			comp[LIBRARIES].set('Lib2', { promise: Promise.resolve({}), module: null });
 
 			assert.strictEqual(comp[LIBRARIES].size, 2);
 		});
@@ -834,7 +833,7 @@ describe('Component', () => {
 		it('throws when library is not yet resolved', () => {
 			const comp = new Component();
 			comp[LIBRARIES] = new Map([
-				['MyLib', { promise: Promise.resolve({}), exportNames: [], module: null }],
+				['MyLib', { promise: Promise.resolve({}), module: null }],
 			]);
 			assert.throws(
 				() => comp.library('MyLib'),
@@ -842,11 +841,11 @@ describe('Component', () => {
 			);
 		});
 
-		it('returns the resolved module', () => {
+		it('returns the full module object', () => {
 			const comp = new Component();
 			const fakeModule = { Engine: class {}, utils: () => {} };
 			comp[LIBRARIES] = new Map([
-				['MyLib', { promise: Promise.resolve(fakeModule), exportNames: ['Engine', 'utils'], module: fakeModule }],
+				['MyLib', { promise: Promise.resolve(fakeModule), module: fakeModule }],
 			]);
 			const result = comp.library('MyLib');
 			assert.strictEqual(result, fakeModule);

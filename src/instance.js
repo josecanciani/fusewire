@@ -725,22 +725,17 @@ export class InstanceRegistry {
 
     /**
      * Resolve all pending library loads for a component instance.
-     * Awaits each promise started by loadLibrary() during init(), validates
-     * that requested exports exist, and stores the module on the entry so
-     * library() can access it synchronously in hydrate().
+     * Awaits each promise started by loadLibrary() during init() and stores
+     * the full module on the entry so library() can return it synchronously
+     * in hydrate().
      * @private
      * @param {Component} instance - Component instance
      */
     async _resolveLibraries(instance) {
         const libs = instance[LIBRARIES];
         if (!libs) return;
-        for (const [name, entry] of libs) {
+        for (const [, entry] of libs) {
             entry.module = await entry.promise;
-            for (const exportName of entry.exportNames) {
-                if (!(exportName in entry.module)) {
-                    throw new Error(`Library "${name}" does not export "${exportName}"`);
-                }
-            }
         }
     }
 

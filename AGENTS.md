@@ -51,7 +51,7 @@ lib/fusewire/
 ```bash
 npm test
 ```
-- **521 tests:** 508 passing, 13 skipped (JSDOM/idiomorph incompatibility)
+- **520 tests:** 507 passing, 13 skipped (JSDOM/idiomorph incompatibility)
 - Runs in Node.js using JSDOM for DOM emulation
 - **Use for:** Development, CI, quick validation
 - **Limitation:** Cannot test DOM morphing (idiomorph requires real browser)
@@ -72,7 +72,7 @@ npm run test:browser
 npm run test:all
 ```
 - Runs Node tests followed by browser tests
-- **Total:** 512 tests passing (508 Node + 4 Browser)
+- **Total:** 511 tests passing (507 Node + 4 Browser)
 
 **Note:** The 7 skipped Node tests are covered by the 4 browser tests. They're skipped because JSDOM doesn't fully emulate the `Document` constructor that idiomorph checks during morphing operations.
 
@@ -256,12 +256,12 @@ async init() {
 
 ### Loading libraries
 
-Use `loadLibrary()` in `init()` to declare library dependencies. The framework loads the JS file in parallel with child component templates — no blocking, no `await`. Access the loaded module in `hydrate()` via `this.library()`:
+Use `loadLibrary()` in `init()` to declare library dependencies. The framework loads the JS file in parallel with child component templates — no blocking, no `await`. Access the loaded module in `hydrate()` via `this.library()`, which returns the full module object (like dynamic `import()`):
 
 ```javascript
 async init() {
-    // Non-blocking — just registers the dependency and requested exports
-    this.loadLibrary('GameOfLife/Engine', 'Engine', 'createEmptyGrid');
+    // Non-blocking — just registers the dependency
+    this.loadLibrary('GameOfLife/Engine');
 
     this.controls = this.createChild('GameOfLife/Controls', 'controls', {});
 }
@@ -273,7 +273,7 @@ hydrate() {
 }
 ```
 
-The framework validates that the requested exports exist when the module loads. Library files live alongside component files (e.g., `components/GameOfLife/Engine.js`) and are versioned through the same template store mechanism.
+Library files live alongside component files (e.g., `components/GameOfLife/Engine.js`) and are versioned through the same template store mechanism.
 
 ### Lazy child components
 

@@ -224,11 +224,11 @@ runtime.
 Use `loadLibrary()` in `init()` to load a JS module through the framework's
 loader. It is non-blocking — the framework loads the file in parallel with child
 component templates. Access the loaded module in `hydrate()` via
-`this.library()`:
+`this.library()`, which returns the full module object (like dynamic `import()`):
 
 ```javascript
 async init() {
-    this.loadLibrary('GameOfLife/Engine', 'Engine', 'createEmptyGrid');
+    this.loadLibrary('GameOfLife/Engine');
     this.controls = this.createChild('GameOfLife/Controls', 'controls', {});
 }
 
@@ -238,7 +238,6 @@ hydrate() {
 }
 ```
 
-The framework validates that the requested exports exist when the module loads.
 Library files live alongside component files (e.g.,
 `components/GameOfLife/Engine.js`) and are versioned through the same template
 store mechanism.
