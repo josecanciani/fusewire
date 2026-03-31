@@ -1,0 +1,13 @@
+{
+    "$schema": "https://html-validate.org/schemas/config.json",
+    "extends": ["html-validate:recommended"],
+    "root": true,
+    "rules": {
+        "doctype-style": ["error", { "style": "lowercase" }],
+        "void-style": ["error", { "style": "selfclosing" }],
+        "no-inline-style": "off",
+        "prefer-native-element": "off",
+        "require-sri": "off",
+        "tel-non-breaking": "off"
+    }
+}

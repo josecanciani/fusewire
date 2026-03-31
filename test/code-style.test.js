@@ -1,8 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import jsBeautify from 'js-beautify';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const srcDir = join(__dirname, '../src');
@@ -14,15 +15,15 @@ const srcDir = join(__dirname, '../src');
  * that might not respect our project conventions.
  */
 describe('Code Style', () => {
-	function getAllJsFiles(dir) {
+	function getAllFiles(dir, extension) {
 		const files = [];
 		const entries = readdirSync(dir, { withFileTypes: true });
 		
 		for (const entry of entries) {
 			const fullPath = join(dir, entry.name);
 			if (entry.isDirectory()) {
-				files.push(...getAllJsFiles(fullPath));
-			} else if (entry.name.endsWith('.js')) {
+				files.push(...getAllFiles(fullPath, extension));
+			} else if (entry.name.endsWith(extension)) {
 				files.push(fullPath);
 			}
 		}
@@ -30,7 +31,7 @@ describe('Code Style', () => {
 		return files;
 	}
 
-	const sourceFiles = getAllJsFiles(srcDir);
+	const sourceFiles = getAllFiles(srcDir, '.js');
 
 	describe('Indentation', () => {
 		it('uses 4 spaces for indentation (not tabs)', () => {
@@ -94,5 +95,52 @@ describe('Code Style', () => {
 				}
 			}
 		});
+	});
+
+	describe('HTML Formatter Preserves Template Syntax', () => {
+		const configPath = join(__dirname, '../.jsbeautifyrc');
+		const config = existsSync(configPath)
+			? JSON.parse(readFileSync(configPath, 'utf-8')).html
+			: {};
+		const beautifyHtml = jsBeautify.html;
+
+		const templatePatterns = [
+			{ input: '<span>((title))</span>', expected: '((title))' },
+			{ input: '<p>((item.name))</p>', expected: '((item.name))' },
+			{ input: '<button onclick="((this)).click()">Go</button>', expected: '((this)).click()' },
+			{ input: '<input oninput="((this)).update(event)" />', expected: '((this)).update(event)' },
+			{ input: '<p fw-if="visible">text</p>', expected: 'fw-if="visible"' },
+			{ input: '<li fw-each="item in items">((item))</li>', expected: 'fw-each="item in items"' },
+			{ input: '<input value="((count))" />', expected: 'value="((count))"' },
+			{ input: '<div data-id="((id))">((content))</div>', expected: '((content))' },
+		];
+
+		for (const { input, expected } of templatePatterns) {
+			it(`preserves ${expected}`, () => {
+				const output = beautifyHtml(input, config);
+				assert.ok(
+					output.includes(expected),
+					`html-beautify stripped template syntax.\nInput:    ${input}\nOutput:   ${output}\nExpected: ${expected}`,
+				);
+			});
+		}
+
+		const examplesDir = join(__dirname, '../examples');
+		if (existsSync(examplesDir)) {
+			it('preserves ((this)) in all example HTML files', () => {
+				const htmlFiles = getAllFiles(examplesDir, '.html');
+				for (const file of htmlFiles) {
+					const original = readFileSync(file, 'utf-8');
+					const formatted = beautifyHtml(original, config);
+					const originalRefs = original.match(/\(\(this\)\)/g);
+					const formattedRefs = formatted.match(/\(\(this\)\)/g);
+					assert.strictEqual(
+						formattedRefs && formattedRefs.length,
+						originalRefs && originalRefs.length,
+						`html-beautify changed ((this)) count in ${file}`,
+					);
+				}
+			});
+		}
 	});
 });
