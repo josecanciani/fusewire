@@ -40,6 +40,7 @@ export class ComponentReference {
         this.vars = vars;
         this.version = version;
         this._replaced = false;
+        this._bufferedEvents = [];
     }
 
     /**
@@ -73,5 +74,49 @@ export class ComponentReference {
             );
         }
         Object.assign(this.vars, newVars);
+    }
+
+    /**
+     * Buffer an event subscription to be replayed on the real Component once mounted.
+     *
+     * Returns an unsubscribe function that works both before and after the real
+     * instance is created: before creation it marks the entry as removed so replay
+     * skips it; after creation it delegates to the real Component's unsubscribe.
+     *
+     * @param {string} eventName - Event name to listen for
+     * @param {function(...*): (void|false)} handler - Callback invoked when the event fires
+     * @returns {function(): void} Unsubscribe function
+     */
+    on(eventName, handler) {
+        if (this._replaced) {
+            throw new Error(
+                `ComponentReference: on() called on replaced reference "${this.toComponentId().code}". ` +
+                    'Use the Component instance from vars instead.',
+            );
+        }
+        const entry = { eventName, handler, removed: false, realUnsub: null };
+        this._bufferedEvents.push(entry);
+        return () => {
+            if (entry.realUnsub) {
+                entry.realUnsub();
+            } else {
+                entry.removed = true;
+            }
+        };
+    }
+
+    /**
+     * Replay buffered event subscriptions on the real Component instance.
+     * Called by the InstanceRegistry after the real Component is created and
+     * the reference is replaced in the parent's vars.
+     * @param {import('./component.js').Component} component - The real Component instance
+     */
+    _replayBufferedEvents(component) {
+        for (const entry of this._bufferedEvents) {
+            if (!entry.removed) {
+                entry.realUnsub = component.on(entry.eventName, entry.handler);
+            }
+        }
+        this._bufferedEvents = [];
     }
 }

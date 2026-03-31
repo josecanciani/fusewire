@@ -269,10 +269,11 @@ export class Reactor {
             while (this._queue.size > 0) {
                 const [code, { id }] = this._queue.entries().next().value;
                 this._queue.delete(code);
-                await this._instanceRegistry.render(id);
                 const instance = this._instanceRegistry.get(id);
-                instance[LIFECYCLE_ACTIVE] = 'afterRender';
                 try {
+                    instance[LIFECYCLE_ACTIVE] = 'render';
+                    await this._instanceRegistry.render(id);
+                    instance[LIFECYCLE_ACTIVE] = 'afterRender';
                     instance.afterRender();
                 } finally {
                     instance[LIFECYCLE_ACTIVE] = null;

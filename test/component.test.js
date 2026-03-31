@@ -4,7 +4,7 @@ import { JSDOM } from 'jsdom';
 import { Component } from '../src/component.js';
 import { ComponentId } from '../src/component-id.js';
 import { ComponentReference } from '../src/component-reference.js';
-import { COMPONENT_ID, REGISTRY_ENTRY, CONSOLE, REACTOR, LIFECYCLE_ACTIVE, EVENTS } from '../src/symbols.js';
+import { COMPONENT_ID, REGISTRY_ENTRY, CONSOLE, REACTOR, LIFECYCLE_ACTIVE, EVENTS, LIBRARIES } from '../src/symbols.js';
 
 describe('Component', () => {
 	describe('Constructor', () => {
@@ -718,6 +718,86 @@ describe('Component', () => {
 			comp.broadcast('config', 'key', 'value', 42);
 
 			assert.deepStrictEqual(broadcastCalls[0].args, ['key', 'value', 42]);
+		});
+	});
+
+	describe('hydrate()', () => {
+		it('has a default no-op implementation', () => {
+			const comp = new Component();
+			comp.hydrate(); // Should not throw
+		});
+
+		it('can be overridden in subclasses', () => {
+			let called = false;
+			class MyComp extends Component {
+				hydrate() {
+					called = true;
+				}
+			}
+			const comp = new MyComp();
+			comp.hydrate();
+			assert.strictEqual(called, true);
+		});
+	});
+
+	describe('loadLibrary()', () => {
+		it('creates LIBRARIES map and stores entry structure', () => {
+			const comp = new Component();
+			// Verify LIBRARIES is not set initially
+			assert.strictEqual(comp[LIBRARIES], undefined);
+
+			// Simulate what loadLibrary() does without triggering a real import()
+			comp[LIBRARIES] = new Map();
+			const promise = Promise.resolve({ Engine: class {} });
+			comp[LIBRARIES].set('MyLib', { promise, exportNames: ['Engine', 'utils'], module: null });
+
+			const libs = comp[LIBRARIES];
+			assert.ok(libs instanceof Map);
+			assert.ok(libs.has('MyLib'));
+			const entry = libs.get('MyLib');
+			assert.deepStrictEqual(entry.exportNames, ['Engine', 'utils']);
+			assert.strictEqual(entry.module, null);
+			assert.ok(entry.promise instanceof Promise);
+		});
+
+		it('stores multiple libraries', () => {
+			const comp = new Component();
+			comp[LIBRARIES] = new Map();
+			comp[LIBRARIES].set('Lib1', { promise: Promise.resolve({}), exportNames: ['Foo'], module: null });
+			comp[LIBRARIES].set('Lib2', { promise: Promise.resolve({}), exportNames: ['Bar'], module: null });
+
+			assert.strictEqual(comp[LIBRARIES].size, 2);
+		});
+	});
+
+	describe('library()', () => {
+		it('throws when library was not loaded', () => {
+			const comp = new Component();
+			assert.throws(
+				() => comp.library('Missing'),
+				/Library "Missing" not loaded/,
+			);
+		});
+
+		it('throws when library is not yet resolved', () => {
+			const comp = new Component();
+			comp[LIBRARIES] = new Map([
+				['MyLib', { promise: Promise.resolve({}), exportNames: [], module: null }],
+			]);
+			assert.throws(
+				() => comp.library('MyLib'),
+				/Library "MyLib" not yet resolved/,
+			);
+		});
+
+		it('returns the resolved module', () => {
+			const comp = new Component();
+			const fakeModule = { Engine: class {}, utils: () => {} };
+			comp[LIBRARIES] = new Map([
+				['MyLib', { promise: Promise.resolve(fakeModule), exportNames: ['Engine', 'utils'], module: fakeModule }],
+			]);
+			const result = comp.library('MyLib');
+			assert.strictEqual(result, fakeModule);
 		});
 	});
 });

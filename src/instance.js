@@ -11,6 +11,7 @@ import {
     REACTOR,
     LIFECYCLE_ACTIVE,
     EVENTS,
+    LIBRARIES,
 } from './symbols.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
@@ -126,20 +127,25 @@ export class InstanceRegistry {
         instance[REACTOR] = this._reactor;
         instance[CONSOLE] = this._buildConsoleFor(componentId);
 
-        // Call init hook
-        instance[LIFECYCLE_ACTIVE] = 'init';
+        // LIFECYCLE_ACTIVE stays set throughout creation to prevent premature react()
         try {
+            // Call init hook
+            instance[LIFECYCLE_ACTIVE] = 'init';
             await instance.init();
-        } finally {
-            instance[LIFECYCLE_ACTIVE] = null;
-        }
 
-        // Initial render
-        await this.render(componentId);
+            // Initial render
+            instance[LIFECYCLE_ACTIVE] = 'render';
+            await this.render(componentId);
 
-        // Call afterRender hook
-        instance[LIFECYCLE_ACTIVE] = 'afterRender';
-        try {
+            // Resolve library loads (started during init via loadLibrary)
+            await this._resolveLibraries(instance);
+
+            // Call hydrate hook (first render only — one-time post-render setup)
+            instance[LIFECYCLE_ACTIVE] = 'hydrate';
+            instance.hydrate();
+
+            // Call afterRender hook
+            instance[LIFECYCLE_ACTIVE] = 'afterRender';
             instance.afterRender();
         } finally {
             instance[LIFECYCLE_ACTIVE] = null;
@@ -176,20 +182,18 @@ export class InstanceRegistry {
 
         const { instance } = entry;
 
-        // Merge vars without triggering react — we handle rendering below
-        instance[LIFECYCLE_ACTIVE] = 'update';
+        // LIFECYCLE_ACTIVE stays set through update → render → afterRender
         try {
+            // Merge vars without triggering react — we handle rendering below
+            instance[LIFECYCLE_ACTIVE] = 'update';
             instance.update(newVars, false);
-        } finally {
-            instance[LIFECYCLE_ACTIVE] = null;
-        }
 
-        // Re-render
-        await this.render(componentId);
+            // Re-render
+            instance[LIFECYCLE_ACTIVE] = 'render';
+            await this.render(componentId);
 
-        // Call afterRender hook
-        instance[LIFECYCLE_ACTIVE] = 'afterRender';
-        try {
+            // Call afterRender hook
+            instance[LIFECYCLE_ACTIVE] = 'afterRender';
             instance.afterRender();
         } finally {
             instance[LIFECYCLE_ACTIVE] = null;
@@ -373,6 +377,8 @@ export class InstanceRegistry {
             // call update() on it. The old reference is marked as replaced so that any
             // stale usage throws.
             this._replaceRefInVars(parentInstance, decl, childInstance);
+            // Replay buffered .on() calls from the reference onto the real Component
+            decl._replayBufferedEvents(childInstance);
             decl._replaced = true;
         } else {
             // Legacy: Component instance used as declaration
@@ -464,6 +470,27 @@ export class InstanceRegistry {
         for (const code of codes) {
             const componentId = ComponentId.fromCode(code);
             await this.remove(componentId);
+        }
+    }
+
+    /**
+     * Resolve all pending library loads for a component instance.
+     * Awaits each promise started by loadLibrary() during init(), validates
+     * that requested exports exist, and stores the module on the entry so
+     * library() can access it synchronously in hydrate().
+     * @private
+     * @param {Component} instance - Component instance
+     */
+    async _resolveLibraries(instance) {
+        const libs = instance[LIBRARIES];
+        if (!libs) return;
+        for (const [name, entry] of libs) {
+            entry.module = await entry.promise;
+            for (const exportName of entry.exportNames) {
+                if (!(exportName in entry.module)) {
+                    throw new Error(`Library "${name}" does not export "${exportName}"`);
+                }
+            }
         }
     }
 

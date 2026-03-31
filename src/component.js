@@ -7,6 +7,7 @@ import {
     REACTOR,
     LIFECYCLE_ACTIVE,
     EVENTS,
+    LIBRARIES,
 } from './symbols.js';
 
 /** @typedef {string|number|boolean|null} Scalar */
@@ -148,6 +149,16 @@ export class Component {
     }
 
     /**
+     * Hydrate hook - called once after the first render.
+     * The DOM exists, all children are mounted, and all libraries are loaded.
+     * Use for one-time post-render setup: DOM queries, ResizeObserver, third-party widgets.
+     * Must be synchronous.
+     */
+    hydrate() {
+        // Override in subclasses
+    }
+
+    /**
      * Create a lightweight reference to a child component.
      * The InstanceRegistry will create the real Component when it encounters
      * this reference in vars during rendering.
@@ -167,6 +178,42 @@ export class Component {
             vars = idOrVars || {};
         }
         return new ComponentReference(name, id, vars);
+    }
+
+    /**
+     * Declare a library dependency to be loaded in parallel with child templates.
+     * Non-blocking — the framework starts loading the module immediately.
+     * Access the loaded module later via library() in hydrate().
+     * @param {string} name - Library name (resolved as basePath/name.js)
+     * @param {...string} exportNames - Names of exports to validate when the module loads
+     */
+    loadLibrary(name, ...exportNames) {
+        if (!this[LIBRARIES]) this[LIBRARIES] = new Map();
+        const basePath = this[REACTOR]._basePath;
+        const promise = import(`${basePath}/${name}.js`);
+        this[LIBRARIES].set(name, { promise, exportNames, module: null });
+    }
+
+    /**
+     * Access a loaded library module. Only available in hydrate() or later —
+     * the framework resolves all library promises between render and hydrate.
+     * @param {string} name - Library name (same as passed to loadLibrary)
+     * @returns {Object.<string, *>} Map of export names to their values
+     */
+    library(name) {
+        const libs = this[LIBRARIES];
+        if (!libs || !libs.has(name)) {
+            throw new Error(
+                `Library "${name}" not loaded — call loadLibrary("${name}", ...) in init()`,
+            );
+        }
+        const entry = libs.get(name);
+        if (!entry.module) {
+            throw new Error(
+                `Library "${name}" not yet resolved — library() can only be called in hydrate() or later`,
+            );
+        }
+        return entry.module;
     }
 
     /**

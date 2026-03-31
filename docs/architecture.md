@@ -72,18 +72,29 @@ src/
    - Instantiate component class
    - Set initial vars
    - Call init() hook (async)
+   - Children declared in init() start creating in parallel (detached)
 
 2. Render
    - Compile template (once)
    - Generate HTML from vars
    - Morph DOM
    - Inject CSS (once per component name)
+   - Attach pre-created children into mount points
 
-3. Update
+3. Hydrate (first render only)
+   - Call hydrate() hook
+   - Element is in the document with layout
+   - DOM queries, ResizeObserver, third-party widgets
+
+4. AfterRender (every render)
+   - Call afterRender() hook
+   - Per-render DOM work (scrolling, measuring)
+
+5. Update
    - Merge new vars via Component.update(newVars)
-   - Re-render
+   - Re-render (steps 2 + 4, no hydrate)
 
-4. Destroy
+6. Destroy
    - Call destroy() hook
    - Remove from registry
    - Remove DOM element
@@ -106,7 +117,9 @@ Morph DOM (preserve child mount points)
     ↓
 Find child mount points
     ↓
-Recursively render children
+Attach pre-created children (await if still loading)
+    ↓
+Call hydrate() (first render only)
     ↓
 Call afterRender() hook
 ```
@@ -117,15 +130,13 @@ Child components communicate with their parent through a lightweight pub/sub mec
 
 ### Subscribing (parent side)
 
-A parent subscribes to a child's events in `afterRender()`, once the child instance has been mounted:
+A parent subscribes to a child's events using buffered references. The `ComponentReference` returned by `createChild()` buffers `.on()` calls and replays them once the real `Component` instance is mounted:
 
 ```javascript
-afterRender() {
-    if (!this._ready) {
-        this._ready = true;
-        this.sidebarComponent.on('selectDemo', (name) => this.selectDemo(name));
-        this.sidebarComponent.on('back', () => this.back());
-    }
+async init() {
+    this.sidebarComponent = this.createChild('Playground/Sidebar', 'sidebar', { demos: [] });
+    this.sidebarComponent.on('selectDemo', (name) => this.selectDemo(name));
+    this.sidebarComponent.on('back', () => this.back());
 }
 ```
 
@@ -149,7 +160,7 @@ If a handler throws, `emit()` catches the error, logs it via the component conso
 
 ### Lifecycle guard
 
-Calling `emit()` during `init()`, `update()`, or `afterRender()` triggers a console warning — listeners registered by the parent are typically set up in the parent's `afterRender()`, which runs after the child's lifecycle hooks. The emit still proceeds, but the warning signals a likely ordering problem.
+Calling `emit()` during `init()`, `update()`, `hydrate()`, or `afterRender()` triggers a console warning — listeners registered by the parent may not be wired yet (buffered `.on()` calls are replayed after the child's lifecycle completes). The emit still proceeds, but the warning signals a likely ordering problem.
 
 ## Design Decisions
 
@@ -292,9 +303,10 @@ Tested in:
 The following features are planned but not yet implemented in this client-only library:
 
 - Service Worker caching (for templates and state)
-- Deferred component loading
-- Advanced error recovery with retry logic
-- Error bubbling with `onError` hook
+- Parallel child creation with detached rendering (see [parallel-creation.md](parallel-creation.md))
+- Batched template fetching (DataLoader pattern)
+- Error fallback components (`fallback` option on `createChild`)
+- Lazy child loading (`createLazyChild` with placeholder)
 - Navigation/routing support
 - Live push updates via WebSocket
 

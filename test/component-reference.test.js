@@ -2,6 +2,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { ComponentReference } from '../src/component-reference.js';
 import { ComponentId } from '../src/component-id.js';
+import { Component } from '../src/component.js';
+import { COMPONENT_ID, EVENTS } from '../src/symbols.js';
+import { EventEmitter } from '../src/event-emitter.js';
 
 describe('ComponentReference', () => {
     describe('constructor', () => {
@@ -117,6 +120,134 @@ describe('ComponentReference', () => {
         it('defaults to false', () => {
             const ref = new ComponentReference('App');
             assert.strictEqual(ref._replaced, false);
+        });
+    });
+
+    describe('on() — buffered event subscriptions', () => {
+        it('buffers a subscription', () => {
+            const ref = new ComponentReference('Child', 'c1');
+            ref.on('click', () => {});
+            assert.strictEqual(ref._bufferedEvents.length, 1);
+            assert.strictEqual(ref._bufferedEvents[0].eventName, 'click');
+        });
+
+        it('buffers multiple subscriptions', () => {
+            const ref = new ComponentReference('Child', 'c1');
+            ref.on('click', () => {});
+            ref.on('hover', () => {});
+            assert.strictEqual(ref._bufferedEvents.length, 2);
+        });
+
+        it('returns an unsubscribe function', () => {
+            const ref = new ComponentReference('Child', 'c1');
+            const unsub = ref.on('click', () => {});
+            assert.strictEqual(typeof unsub, 'function');
+        });
+
+        it('marks entry as removed when unsubscribed before replay', () => {
+            const ref = new ComponentReference('Child', 'c1');
+            const unsub = ref.on('click', () => {});
+            unsub();
+            assert.strictEqual(ref._bufferedEvents[0].removed, true);
+        });
+
+        it('throws when called on a replaced reference', () => {
+            const ref = new ComponentReference('Child', 'c1');
+            ref._replaced = true;
+            assert.throws(
+                () => ref.on('click', () => {}),
+                /on\(\) called on replaced reference/,
+            );
+        });
+    });
+
+    describe('_replayBufferedEvents()', () => {
+        /**
+         * Create a minimal Component with event emitter wired up
+         * @returns {Component} A component ready to accept .on() calls
+         */
+        function makeComponent() {
+            const comp = new Component();
+            comp[COMPONENT_ID] = new ComponentId('Child', 'c1');
+            comp[EVENTS] = new EventEmitter();
+            return comp;
+        }
+
+        it('replays buffered subscriptions onto the real component', () => {
+            const ref = new ComponentReference('Child', 'c1');
+            const calls = [];
+            ref.on('click', () => calls.push('clicked'));
+
+            const comp = makeComponent();
+            ref._replayBufferedEvents(comp);
+
+            comp.emit('click');
+            assert.deepStrictEqual(calls, ['clicked']);
+        });
+
+        it('skips removed subscriptions', () => {
+            const ref = new ComponentReference('Child', 'c1');
+            const calls = [];
+            const unsub = ref.on('click', () => calls.push('clicked'));
+            unsub();
+
+            const comp = makeComponent();
+            ref._replayBufferedEvents(comp);
+
+            comp.emit('click');
+            assert.deepStrictEqual(calls, []);
+        });
+
+        it('clears buffered events after replay', () => {
+            const ref = new ComponentReference('Child', 'c1');
+            ref.on('click', () => {});
+
+            const comp = makeComponent();
+            ref._replayBufferedEvents(comp);
+
+            assert.strictEqual(ref._bufferedEvents.length, 0);
+        });
+
+        it('unsubscribe works after replay (delegates to real component)', () => {
+            const ref = new ComponentReference('Child', 'c1');
+            const calls = [];
+            const unsub = ref.on('click', () => calls.push('clicked'));
+
+            const comp = makeComponent();
+            ref._replayBufferedEvents(comp);
+
+            comp.emit('click');
+            assert.deepStrictEqual(calls, ['clicked']);
+
+            unsub();
+            comp.emit('click');
+            assert.deepStrictEqual(calls, ['clicked'], 'no second call after unsub');
+        });
+
+        it('replays multiple events in order', () => {
+            const ref = new ComponentReference('Child', 'c1');
+            const calls = [];
+            ref.on('a', () => calls.push('a'));
+            ref.on('b', () => calls.push('b'));
+
+            const comp = makeComponent();
+            ref._replayBufferedEvents(comp);
+
+            comp.emit('a');
+            comp.emit('b');
+            assert.deepStrictEqual(calls, ['a', 'b']);
+        });
+
+        it('passes event arguments through', () => {
+            const ref = new ComponentReference('Child', 'c1');
+            const calls = [];
+            ref.on('select', (name, idx) => calls.push({ name, idx }));
+
+            const comp = makeComponent();
+            ref._replayBufferedEvents(comp);
+
+            comp.emit('select', 'foo', 42);
+            assert.deepStrictEqual(calls, [{ name: 'foo', idx: 42 }]);
         });
     });
 });

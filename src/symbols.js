@@ -30,3 +30,6 @@ export const LIFECYCLE_ACTIVE = Symbol('lifecycleActive');
 
 /** @type {symbol} Event handlers map for pub/sub (Map<string, Set<function>>) — cleared by InstanceRegistry on destroy */
 export const EVENTS = Symbol('events');
+
+/** @type {symbol} Library loading state — Map<string, {promise, exportNames, module}> */
+export const LIBRARIES = Symbol('libraries');

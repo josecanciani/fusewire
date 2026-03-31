@@ -5,7 +5,8 @@ description: >
   Use this skill whenever the user asks to create, design, or review a FuseWire
   component — even if they just say "add a component", "write the JS for X", or
   "how should I structure Y". Covers file layout, vars vs private state,
-  component decomposition, lifecycle hooks, and type hinting for child components.
+  component decomposition, lifecycle hooks, libraries, and type hinting for
+  child components.
 ---
 
 # Writing FuseWire Components
@@ -45,10 +46,16 @@ export class Line extends Component {
     level = '';
     /** @type {string} */
     message = '';
-    /** @type {string|number} */
-    badge = '';
+    /** @type {number} */
+    badge = 0;
 }
 ```
+
+> **Prefer single-typed, non-nullable vars.** Each var should ideally have one
+> data type (e.g., always `string`, never `string|number`). Avoid union types
+> like `string|null` or `number|undefined` — initialize with sensible defaults
+> (`''`, `0`, `[]`) instead. This keeps templates simple (no null checks) and
+> makes the component's contract clearer.
 
 **Private state** uses native `#private` class fields — these are internal
 counters, caches, DOM references, etc. They never appear in the template and the
@@ -82,19 +89,46 @@ bookkeeping for the component's own logic, it's private.
 
 ## Lifecycle hooks
 
+The framework runs these hooks in order during component creation:
+
+```
+init()  →  render()  →  hydrate()  →  afterRender()
+```
+
+> **Note:** `createLazyChild()` is planned but not yet implemented. Until it
+> ships, use `createChild()` for all children.
+
 **`async init()`** — runs once after the framework is wired up (you have access
-to `this.console`, `this.createChild()`, etc.) and before the first render. Use
-it for setup: creating child references, attaching services, initialising
-private state.
+to `this.console`, `this.createChild()`, `this.loadLibrary()`, etc.) and before
+the first render. Use it for:
+- Creating child references (`createChild`)
+- Loading libraries (`loadLibrary`)
+- Subscribing to child events (buffered on the reference)
+- Setting initial state
+
+**`hydrate()`** — runs once after the first render. The DOM exists,
+all children are mounted, and all libraries are loaded. Use it for one-time
+post-render setup:
+- DOM work: `querySelector`, `ResizeObserver`, focus management
+- Library instantiation: `this.library()` to access loaded modules
+- Third-party widget mounting (CodeMirror, Highcharts, etc.)
+
+```javascript
+hydrate() {
+    const gridEl = this.querySelector('.grid');
+    this.#resizeObserver = new ResizeObserver((entries) => this.#handleResize(entries));
+    this.#resizeObserver.observe(gridEl);
+}
+```
 
 **`afterRender()`** — runs synchronously after every render (initial and
-re-renders). Use it for DOM-dependent work: scrolling, mounting third-party
-widgets, subscribing to child events. Must stay synchronous.
+re-renders). Use it only for per-render DOM work: scrolling, measuring, updating
+third-party widgets. Must stay synchronous.
 
 **`destroy()`** — cleanup when the component is removed.
 
-Never call `this.react()` inside `init()` or `afterRender()` — the framework
-renders automatically after those hooks return.
+Never call `this.react()` inside `init()`, `hydrate()`, or `afterRender()` — the
+framework renders automatically after those hooks return.
 
 ---
 
@@ -119,8 +153,10 @@ loadData(items) {
 }
 ```
 
-Do not reach into the DOM directly to update UI — change the data, let the
-template handle the rest.
+`react()` is always safe to call from event handlers, timers, and async
+callbacks. The framework batches re-renders via the reactor queue. Do not reach
+into the DOM directly to update UI — change the data, let the template handle
+the rest.
 
 ---
 
@@ -143,15 +179,16 @@ async init() {
 The template places the child via `((logs))` (or the specific var name). The
 engine auto-mounts it — no manual wiring needed.
 
-To interact with a child after it's mounted, use `afterRender()` (by then the
-framework has replaced the reference with the real instance):
+### Subscribing to child events (buffered references)
+
+The `ComponentReference` returned by `createChild()` buffers `.on()` calls and
+replays them when the real instance mounts. Subscribe directly in `init()`:
 
 ```javascript
-afterRender() {
-    if (!this.#ready) {
-        this.#ready = true;
-        this.sidebar.on('selectItem', (id) => this.select(id));
-    }
+async init() {
+    this.sidebar = this.createChild('Playground/Sidebar', 'sidebar', { demos: [] });
+    this.sidebar.on('selectItem', (id) => this.select(id));
+    this.sidebar.on('back', () => this.back());
 }
 ```
 
@@ -185,6 +222,177 @@ runtime.
 
 ---
 
+## Loading libraries
+
+Use `loadLibrary()` in `init()` to load a JS module through the framework's
+loader. It is non-blocking — the framework loads the file in parallel with child
+component templates. Access the loaded module in `hydrate()` via
+`this.library()`:
+
+```javascript
+async init() {
+    this.loadLibrary('GameOfLife/Engine', 'Engine', 'createEmptyGrid');
+    this.controls = this.createChild('GameOfLife/Controls', 'controls', {});
+}
+
+hydrate() {
+    const { Engine, createEmptyGrid } = this.library('GameOfLife/Engine');
+    this.#engine = new Engine();
+}
+```
+
+The framework validates that the requested exports exist when the module loads.
+Library files live alongside component files (e.g.,
+`components/GameOfLife/Engine.js`) and are versioned through the same template
+store mechanism.
+
+If a library exports a stateful class that needs pub/sub, extend `Library`:
+
+```javascript
+import { Library } from '/js/library.js';
+
+export class Engine extends Library {
+    // Gets on(), emit(), init(), destroy() from Library
+    // No react(), no template, no DOM
+}
+
+// Also export plain functions from the same file
+export function createEmptyGrid(rows, cols) { ... }
+```
+
+---
+
+## Child-to-parent events (pub/sub)
+
+Children communicate with parents by emitting events. The parent subscribes —
+either in `init()` (on the reference, buffered until mount) or in `hydrate()`
+(on the live instance). The child never holds a reference to the parent.
+
+**Child emits:**
+
+```javascript
+back() {
+    this.emit('back');
+}
+
+selectItem(id) {
+    this.emit('selectItem', id);
+}
+```
+
+**Parent subscribes in `init()`** (preferred — buffered on the reference):
+
+```javascript
+async init() {
+    this.sidebar = this.createChild('Playground/Sidebar', 'sidebar', { demos: [] });
+    this.sidebar.on('selectItem', (id) => this.select(id));
+    this.sidebar.on('back', () => this.back());
+}
+```
+
+`on()` returns an unsubscribe function. Subscriptions are cleared automatically
+when the child is destroyed — no manual cleanup needed.
+
+Do not call `emit()` inside `init()`, `hydrate()`, or `afterRender()` — parent
+listeners may not be registered yet and a warning will be logged.
+
+---
+
+## Top-down events (broadcast)
+
+Broadcast pushes an event down through the component tree. Handlers receive the
+event arguments and can return `false` to stop propagation into their subtree
+(siblings are unaffected).
+
+### Global broadcast (reactor → all components)
+
+Use `reactor.broadcast()` for app-wide signals like theming or locale changes.
+Reactor-level listeners fire first, then the event walks every root and its
+subtree.
+
+```javascript
+// In the root component — relay a child event as a global broadcast
+this.header.on('changeTheme', (theme) => {
+    document.documentElement.setAttribute('data-bs-theme', theme);
+    this[REACTOR].broadcast('theme', theme);
+});
+```
+
+### Scoped broadcast (component → subtree)
+
+Use `this.broadcast()` inside a component to send an event only to its own
+subtree.
+
+```javascript
+// Only reaches this component and its descendants
+this.broadcast('reset', defaultValues);
+```
+
+### Listening for broadcasts
+
+Any component can listen with `this.on()` — the same method used for pub/sub.
+Broadcast events are delivered through the component's event emitter.
+
+```javascript
+async init() {
+    this.on('theme', (theme) => this.#applyTheme(theme));
+}
+```
+
+### Theming pattern
+
+A complete example: a Header component toggles the theme, the root component
+relays it as a global broadcast, and any component that needs custom behavior
+(e.g., swapping a CodeMirror theme) listens for it.
+
+```javascript
+// Header.js — emits the user's choice
+toggleTheme() {
+    this.theme = this.theme === 'light' ? 'dark' : 'light';
+    this.react();
+    this.emit('changeTheme', this.theme);
+}
+
+// Home.js (root) — sets the Bootstrap attribute and broadcasts
+this.header.on('changeTheme', (theme) => {
+    document.documentElement.setAttribute('data-bs-theme', theme);
+    this[REACTOR].broadcast('theme', theme);
+});
+
+// Editor.js — listens and swaps CodeMirror theme
+async init() {
+    this.on('theme', (theme) => this.#applyTheme(theme));
+}
+```
+
+Most components don't need to listen — Bootstrap CSS variables adapt
+automatically when `data-bs-theme` changes. Only listen when you need
+programmatic behavior (e.g., reconfiguring a third-party widget).
+
+---
+
+## Lazy child components
+
+> **Planned.** `createLazyChild()` is not yet implemented. Until it ships, use
+> `createChild()` (children load eagerly).
+
+Use `createLazyChild()` for children that should load in the background without
+blocking the parent's render:
+
+```javascript
+async init() {
+    this.chart = this.createLazyChild('Analytics/HeavyChart', 'chart', {
+        placeholder: 'Common/Skeleton',  // optional — defaults to built-in placeholder
+    });
+}
+```
+
+The parent renders immediately with a placeholder. When the real child's JS and
+template load, the framework swaps the placeholder for the real component. Works
+consistently in both CSR and SSR.
+
+---
+
 ## Scoped DOM queries
 
 When a component needs direct DOM access (scrolling, measuring, third-party
@@ -210,16 +418,22 @@ Under the hood these append a `:not([data-fusewire-parent-id="..."] *)`
 exclusion so the browser's selector engine skips child mount points natively.
 Comma-separated selectors are supported.
 
-Typical usage in `afterRender()`:
+Use `hydrate()` for one-time DOM setup and `afterRender()` for per-render work:
+
+```javascript
+hydrate() {
+    const gridEl = this.querySelector('.grid');
+    this.#resizeObserver = new ResizeObserver((entries) => this.#handleResize(entries));
+    this.#resizeObserver.observe(gridEl);
+}
+```
+
+Per-render DOM work (runs after every render):
 
 ```javascript
 afterRender() {
-    if (!this.#ready) {
-        this.#ready = true;
-        const logsEl = this.querySelector('.logs');
-        // logsEl is guaranteed to be from THIS component, not a child
-        logsEl.scrollTop = logsEl.scrollHeight;
-    }
+    const lastLog = this.querySelector('.console-panel-logs').lastElementChild;
+    if (lastLog) lastLog.scrollIntoView({ block: 'end', behavior: 'instant' });
 }
 ```
 
