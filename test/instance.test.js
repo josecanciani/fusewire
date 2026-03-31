@@ -10,6 +10,7 @@ import { ComponentNotFoundError } from '../src/errors/error-hierarchy.js';
 import { Idiomorph } from 'idiomorph';
 import { ComponentReference } from '../src/component-reference.js';
 import { COMPONENT_ID, LIFECYCLE_ACTIVE } from '../src/symbols.js';
+import { findChildMountPoints } from '../src/utils/dom-helpers.js';
 
 describe('InstanceRegistry', () => {
     let dom;
@@ -1091,6 +1092,66 @@ describe('InstanceRegistry', () => {
 
             assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c1')), false);
             assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c2')), false);
+        });
+
+        it('detaches orphaned child containers before morphing so new content renders', async () => {
+            // Regression: when a parent removes a child and re-renders, idiomorph
+            // would soft-match the orphaned mount-point <div> with unrelated new
+            // content. The beforeNodeMorphed callback returned false for mount points,
+            // silently dropping the new content. The fix detaches orphaned containers
+            // before the renderer runs.
+            class ChildComp extends Component {}
+            registry.registerComponent('ChildComponent', ChildComp);
+            templateStore.set('TestComponent', {
+                htmlCode: '<div>((child))</div>',
+                cssCode: '',
+                version: 'v1',
+            });
+            templateStore.set('ChildComponent', {
+                htmlCode: '<span>Child</span>',
+                cssCode: '',
+                version: 'v1',
+            });
+
+            const componentId = new ComponentId('TestComponent', 'parent1');
+            const childRef = new ComponentReference('ChildComponent', 'child1', {});
+
+            const parent = await registry.create(
+                componentId,
+                TestComponent,
+                { child: childRef },
+                container,
+            );
+
+            const childId = new ComponentId('ChildComponent', 'child1');
+            assert.strictEqual(registry.has(childId), true, 'child should exist after creation');
+            const childContainer = registry.getContainer(childId);
+            assert.ok(childContainer.parentNode, 'child container should be in the DOM');
+
+            // Intercept the renderer to verify the child mount point is detached
+            // before morphing, and use innerHTML to avoid JSDOM/idiomorph issues.
+            let childPresentDuringRender = true;
+            const origRender = registry._renderer.render.bind(registry._renderer);
+            registry._renderer.render = function (cont, compiled, vars, compId, constants) {
+                childPresentDuringRender = !!cont.querySelector(
+                    '[data-fusewire-id="ChildComponent#child1"]',
+                );
+                // Fall back to innerHTML to complete the render in JSDOM
+                const html = compiled.render(vars, compId, constants || {});
+                cont.innerHTML = html;
+                return findChildMountPoints(cont, compId);
+            };
+
+            // Remove child and re-render
+            parent.child = null;
+            await registry.render(componentId);
+
+            assert.strictEqual(
+                childPresentDuringRender,
+                false,
+                'orphaned child container should be detached before renderer runs',
+            );
+            assert.strictEqual(registry.has(childId), false, 'child should be removed from registry');
         });
     });
 

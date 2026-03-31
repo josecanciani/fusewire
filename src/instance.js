@@ -288,6 +288,21 @@ export class InstanceRegistry {
         // Snapshot current child declarations from vars before rendering
         const currentChildren = this._collectChildComponents(instance);
 
+        // Detach mount-point containers of orphaned children before morphing.
+        // Without this, idiomorph may soft-match an orphaned mount-point <div>
+        // with unrelated new content and skip the morph (the beforeNodeMorphed
+        // callback returns false for data-fusewire-id nodes), silently dropping
+        // the new content that should have replaced it.
+        const previousChildren = entry.children || new Map();
+        for (const [childCode] of previousChildren) {
+            if (!currentChildren.has(childCode)) {
+                const childEntry = this._instances.get(childCode);
+                if (childEntry && childEntry.container.parentNode) {
+                    childEntry.container.remove();
+                }
+            }
+        }
+
         // Build template constants
         const constants = { version: componentId.version };
 
@@ -308,8 +323,7 @@ export class InstanceRegistry {
             await this._mountChild(mountPoint, instance);
         }
 
-        // Remove orphaned children (present in previous vars but not current)
-        const previousChildren = entry.children || new Map();
+        // Remove orphaned children (component cleanup — containers already detached above)
         for (const [childCode, childId] of previousChildren) {
             if (!currentChildren.has(childCode) && this.has(childId)) {
                 await this.remove(childId);
