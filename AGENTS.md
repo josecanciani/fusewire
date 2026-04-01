@@ -36,58 +36,57 @@ lib/fusewire/
 
 | Command                 | Description                        |
 |-------------------------|------------------------------------|
-| `npm test`              | Run Node tests (fast)              |
-| `npm run test:browser`  | Run Playwright browser tests       |
-| `npm run test:all`      | Run both Node and browser tests    |
-| `npm run lint`          | Lint source files with oxlint      |
-| `npm run format`        | Format source files with oxfmt     |
-| `npm run format:check`  | Check formatting without writing   |
-| `npm run jsdoc-check`   | Validate JSDoc documentation       |
-| `npm run typecheck`     | Type-check JS files with TypeScript |
+| `npm test`              | Fast suite: Lint, format check, and standard Node unit tests |
+| `npm run test:node`     | Run standard Node unit tests directly (`*.test.js`) |
+| `npm run test:browser`  | Run Playwright browser tests (slow) |
+| `npm run test:performance` | Run performance-focused tests (`*.performance-test.js`) (slow) |
+| `npm run test:all`      | Run all tests (fast + slow tests)  |
+| `npm run lint`          | Comprehensive linting (oxlint, jsdoc, typecheck, html) |
+| `npm run format`        | Format codebase files in-place     |
+| `npm run format:check`  | Check formatter compliance         |
 
 ## Testing Strategy
 
-### 1. Node Tests (Fast - Run Always)
+In regular development flow, you should just use `npm test`. This will handle the fast tests, including all linters, formatting checks, and quick unit tests. 
+
+When your change is ready and you are finishing your work, end with a `npm run test:all` to also run the slow tests (like `test:browser` for Playwright tests, and `test:performance` for performance-focused tests).
+
+You should **not** use the slow test scripts directly (`test:browser` or `test:performance`) unless you are actively developing and testing something that specifically requires them.
+
+### 1. Fast Tests (`npm test`)
 ```bash
 npm test
 ```
-- **520 tests:** 507 passing, 13 skipped (JSDOM/idiomorph incompatibility)
-- Runs in Node.js using JSDOM for DOM emulation
-- **Use for:** Development, CI, quick validation
-- **Limitation:** Cannot test DOM morphing (idiomorph requires real browser)
+- **Use for:** Regular development flow
+- Aggregates linting, formatting checks, and Node tests (using JSDOM)
+- Test files must end in `.test.js`
+- **Limitation:** Cannot test DOM morphing (requires real browser)
 
-### 2. Browser Tests (Slow - Run Selectively)
-```bash
-npm run test:browser
-```
-- **4 tests:** Validates DOM morphing in real browser (Chromium via Playwright)
-- **Run when:**
-  - Making changes to morphing logic (renderer.js, instance.js update flow)
-  - Before committing to ensure morphing works correctly
-  - Testing browser-specific behavior
-- **Skip when:** Working on non-morphing code (component.js, template-compiler.js, etc.)
+### 2. Slow Tests (`npm run test:browser` / `npm run test:performance`)
+- **Browser (`test:browser`):** Validates DOM morphing in real browser (Chromium via Playwright). Run when making changes to morphing logic (`renderer.js`).
+- **Performance (`test:performance`):** Evaluates framework overhead. Files must use the `.performance-test.js` extension so they aren't executed during the fast step. 
 
-### Run Both
+### 3. Run All (`npm run test:all`)
 ```bash
 npm run test:all
 ```
-- Runs Node tests followed by browser tests
-- **Total:** 511 tests passing (507 Node + 4 Browser)
+- Runs `test`, then `test:browser`, then `test:performance`
+- **Use for:** Final validation before committing. 
 
-**Note:** The 7 skipped Node tests are covered by the 4 browser tests. They're skipped because JSDOM doesn't fully emulate the `Document` constructor that idiomorph checks during morphing operations.
+**Note on Node tests:** JSDOM doesn't fully emulate the `Document` constructor required for morphing, so overlapping Playwright tests assert those behaviors.
 
 ## Verification
 
-Before considering a change complete, run:
+Before considering a change complete, verify it using the appropriate test profile.
 
+During development:
 ```bash
-npm run lint && npm run format:check && npm run jsdoc-check && npm run typecheck && npm test
+npm test
 ```
 
-Before committing or when changing morphing logic:
-
+Before committing your work or when making core framework updates:
 ```bash
-npm run lint && npm run format:check && npm run jsdoc-check && npm run typecheck && npm run test:all
+npm run test:all
 ```
 
 ## Git
