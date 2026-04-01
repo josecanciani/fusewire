@@ -46,8 +46,9 @@ export class Game extends Component {
     }
 
     hydrate() {
-        /** @type {typeof import('./Engine.js').Engine} */
-        const { Engine } = this.library('GameOfLife/Engine');
+        const Engine = /** @type {typeof import('./Engine.js').Engine} */ (
+            this.library('GameOfLife/Engine').Engine
+        );
         this.#engine = new Engine((grid, engineStats, done) => {
             this.stats.update(engineStats);
             this.#syncCells(grid, done);

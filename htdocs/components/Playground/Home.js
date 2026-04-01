@@ -54,8 +54,9 @@ export class Home extends Component {
     }
 
     hydrate() {
-        /** @type {typeof import('../Lib/Resize.js').startHorizontalResize} */
-        const { startHorizontalResize } = this.library('Lib/Resize');
+        const startHorizontalResize = /** @type {typeof import('../Lib/Resize.js').startHorizontalResize} */ (
+            this.library('Lib/Resize').startHorizontalResize
+        );
         this.#startHorizontalResize = startHorizontalResize;
     }
 
