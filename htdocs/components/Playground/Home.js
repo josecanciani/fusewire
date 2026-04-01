@@ -1,5 +1,4 @@
 import { Component } from '/js/component.js';
-import { ComponentReference } from '/js/component-reference.js';
 import { ComponentId } from '/js/component-id.js';
 import { REACTOR } from '/js/symbols.js';
 
@@ -12,7 +11,7 @@ export class Home extends Component {
     noResults = false;
     /** @type {string|null} */
     selectedDemo = null;
-    /** @type {Component|ComponentReference|null} */
+    /** @type {Component|import('/js/component-reference.js').ComponentReference|null} */
     demoComponent = null;
     /** @type {import('../Console/Panel.js').Panel} */
     consoleComponent = null;
@@ -54,9 +53,10 @@ export class Home extends Component {
     }
 
     hydrate() {
-        const startHorizontalResize = /** @type {typeof import('../Lib/Resize.js').startHorizontalResize} */ (
-            this.library('Lib/Resize').startHorizontalResize
-        );
+        const startHorizontalResize =
+            /** @type {typeof import('../Lib/Resize.js').startHorizontalResize} */ (
+                this.library('Lib/Resize').startHorizontalResize
+            );
         this.#startHorizontalResize = startHorizontalResize;
     }
 

@@ -9,7 +9,7 @@ const CELL_STEP = CELL_SIZE + GAP;
  * @returns {Array.<Array.<boolean>>} Empty grid
  */
 function createEmptyGrid(rows, cols) {
-    return Array.from({ length: rows }, () => new Array(cols).fill(false));
+    return Array.from({ length: rows }, () => Array.from({ length: cols }).fill(false));
 }
 
 /**
