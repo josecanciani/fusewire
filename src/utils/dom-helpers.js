@@ -51,7 +51,8 @@ export function createMountPoint(componentId, parentComponentId) {
  * @returns {boolean} True if element is a mount point
  */
 export function isMountPoint(element) {
-    return element.hasAttribute('data-fusewire-id');
+    const id = element.getAttribute('data-fusewire-id');
+    return id !== null && id !== '';
 }
 
 /**

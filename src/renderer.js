@@ -1,4 +1,4 @@
-import { findChildMountPoints } from './utils/dom-helpers.js';
+import { findChildMountPoints, isMountPoint } from './utils/dom-helpers.js';
 import { toCssName } from './component-id.js';
 
 /** @typedef {import('./template-compiler.js').CompiledTemplate} CompiledTemplate */
@@ -51,8 +51,7 @@ export class Renderer {
                     beforeNodeMorphed: (oldNode) => {
                         if (
                             oldNode.nodeType === 1 &&
-                            (oldNode.hasAttribute('data-fusewire-id') ||
-                                oldNode.hasAttribute('data-fusewire-each'))
+                            (isMountPoint(oldNode) || oldNode.hasAttribute('data-fusewire-each'))
                         ) {
                             return false;
                         }
