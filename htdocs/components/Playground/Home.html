@@ -1,0 +1,46 @@
+<div class="d-flex flex-column vh-100">
+    ((headerComponent))
+    <section fw-if="!selectedDemo" class="container py-5 flex-grow-1 overflow-auto">
+        <h1 class="mb-2">FuseWire Demos</h1>
+        <p class="text-body-secondary">Pick a demo to explore</p>
+        <div class="mt-3">((tagFilterComponent))</div>
+        <div class="row g-3 mt-3">
+            <div fw-each="demo in filteredDemos" class="col-sm-6 col-md-4">
+                <div
+                     class="card h-100 shadow-sm ((demo.activeClass))"
+                     role="button"
+                     onclick="((this)).selectDemo('((demo.name))')">
+                    <div class="card-body">
+                        <h5 class="card-title">((demo.title))</h5>
+                        <p class="card-text text-body-secondary">((demo.description))</p>
+                        <div class="card-tags">
+                            <span
+                                  fw-each="tag in demo.tags"
+                                  class="badge rounded-pill text-bg-secondary">((tag))</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <p fw-if="noResults" class="text-body-secondary mt-4">
+            No demos match the selected tag combination.
+        </p>
+    </section>
+    <section fw-if="selectedDemo" class="d-flex flex-grow-1 overflow-hidden">
+        ((sidebarComponent))
+        <div class="ide-body">
+            ((editorComponent))
+            <div class="resize-handle" onmousedown="((this)).startResize(event)"></div>
+            <div class="right-pane d-flex flex-column panel">
+                <div class="flex-grow-1 d-flex flex-column panel">
+                    <div class="panel-header">Output</div>
+                    <div class="flex-grow-1 overflow-auto p-2 panel">((demoComponent))</div>
+                </div>
+                <div class="console-bar border-top d-flex flex-column">
+                    <div class="panel-header">Console</div>
+                    <div class="flex-grow-1 overflow-auto panel">((consoleComponent))</div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>

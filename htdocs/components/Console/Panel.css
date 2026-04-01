@@ -1,0 +1,21 @@
+.console-panel-logs {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    font-size: 12px;
+}
+
+.console-panel-logs > :nth-child(odd) {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.Console_Line {
+    .log-warn {
+        color: #d19a66;
+    }
+    .log-error {
+        color: #e06c75;
+    }
+    .log-debug {
+        color: var(--bs-secondary-color);
+    }
+}

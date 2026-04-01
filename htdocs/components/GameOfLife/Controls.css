@@ -1,0 +1,41 @@
+/* fw-external-classes: btn-outline-info, btn-info */
+
+.controls-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 8px 12px;
+    background: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 6px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.controls-buttons {
+    display: flex;
+    gap: 6px;
+}
+
+.controls-speed {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 120px;
+}
+
+.speed-label {
+    font-size: 0.8rem;
+    white-space: nowrap;
+    color: var(--bs-secondary-color);
+}
+
+.speed-range {
+    width: 100px;
+}
+
+.controls-bar[data-disabled='true'] {
+    pointer-events: none;
+    opacity: 0.5;
+}

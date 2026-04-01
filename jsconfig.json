@@ -6,11 +6,21 @@
         "target": "ESNext",
         "module": "ESNext",
         "moduleResolution": "bundler",
-        "lib": ["ESNext", "DOM"],
+        "lib": [
+            "ESNext",
+            "DOM"
+        ],
         "paths": {
-            "/js/*": ["./src/*"]
+            "/js/*": [
+                "./src/*"
+            ]
         }
     },
-    "include": ["src/**/*.js", "examples/**/*.js"],
-    "exclude": ["src/lib/**"]
+    "include": [
+        "src/**/*.js",
+        "htdocs/**/*.js"
+    ],
+    "exclude": [
+        "src/lib/**"
+    ]
 }

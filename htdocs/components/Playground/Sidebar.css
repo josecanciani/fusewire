@@ -1,0 +1,25 @@
+.sidebar {
+    width: 180px;
+    min-width: 180px;
+    flex-shrink: 0;
+}
+
+.sidebar-header {
+    padding: 0.5rem 1rem;
+    border-bottom: var(--bs-border-width) solid var(--bs-border-color);
+    font-weight: 600;
+    font-size: 0.875em;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+    flex-shrink: 0;
+}
+
+.sidebar-demos {
+    max-height: 40%;
+}
+
+.list-group-item-file {
+    font-size: 0.8em;
+    padding: 0.25rem 1rem;
+    font-family: monospace;
+}

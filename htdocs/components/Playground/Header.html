@@ -1,0 +1,45 @@
+<header class="header-bar d-flex align-items-center px-3">
+    <span class="header-logo fw-bold">FuseWire</span>
+    <div class="flex-grow-1"></div>
+    <button
+            class="btn header-menu-btn"
+            type="button"
+            data-bs-toggle="offcanvas"
+            data-bs-target="#settingsPanel"
+            aria-label="Settings">
+        <svg
+             xmlns="http://www.w3.org/2000/svg"
+             width="20"
+             height="20"
+             fill="currentColor"
+             viewBox="0 0 16 16">
+            <path
+                  fill-rule="evenodd"
+                  d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5" />
+        </svg>
+    </button>
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="settingsPanel">
+        <div class="offcanvas-header border-bottom">
+            <h5 class="offcanvas-title">Settings</h5>
+            <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="offcanvas"
+                    aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <div class="d-flex align-items-center justify-content-between">
+                <label class="form-label mb-0">Theme</label>
+                <div class="form-check form-switch mb-0">
+                    <input
+                           class="form-check-input"
+                           type="checkbox"
+                           role="switch"
+                           id="themeSwitch"
+                           onclick="((this)).toggleTheme()" />
+                    <label class="form-check-label" for="themeSwitch">Dark mode</label>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>

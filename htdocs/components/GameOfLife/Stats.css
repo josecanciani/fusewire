@@ -1,0 +1,19 @@
+.stats-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+    box-sizing: border-box;
+}
+
+.stats-row {
+    display: flex;
+    gap: 12px;
+}
+
+.stats-row > span {
+    white-space: nowrap;
+}

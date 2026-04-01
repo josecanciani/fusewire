@@ -1,0 +1,8 @@
+<div class="tag-filter d-flex gap-2 flex-wrap">
+    <button
+            fw-each="tag in tags"
+            class="btn btn-sm btn-outline-secondary rounded-pill ((tag.activeClass))"
+            onclick="((this)).toggleTag('((tag.name))')">
+        ((tag.name))
+    </button>
+</div>

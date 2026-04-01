@@ -14,7 +14,7 @@ const globalClasses = new Set(pkg.fusewire?.globalClasses ?? []);
 
 // Component directories to scan. Each entry is a root from which .html/.css
 // pairs are discovered recursively.
-const componentDirs = [join(__dirname, '../../examples/client-only/components')];
+const componentDirs = [join(__dirname, '../../htdocs/components')];
 
 /**
  * Extract static CSS class tokens from an HTML string.

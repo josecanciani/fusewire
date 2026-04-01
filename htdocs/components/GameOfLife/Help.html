@@ -1,0 +1,33 @@
+<div class="help-content">
+    <h4>Conway's Game of Life</h4>
+    <p>
+        A classic cellular automaton &mdash;
+        <a
+           href="https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life"
+           target="_blank"
+           rel="noopener">read more on Wikipedia</a>.
+    </p>
+
+    <h5>Why components?</h5>
+    <p>
+        Every cell in the grid is an individual <strong>FuseWire component</strong> &mdash; either
+        <code>Alive</code> or <code>Dead</code>. When a cell flips state the framework destroys the
+        old component and creates a new one. The grid could run much faster with plain HTML
+        elements, but the point of this demo is to show how fast the FuseWire engine can create,
+        destroy, and render components.
+    </p>
+
+    <h5>Stats</h5>
+    <dl>
+        <dt>Components</dt>
+        <dd>Cell components currently mounted in the grid.</dd>
+
+        <dt>Created / Destroyed</dt>
+        <dd>
+            Cumulative count since the last reset. Every state flip is one destroy + one create.
+        </dd>
+
+        <dt>Created/s (max)</dt>
+        <dd>Components created in the last second, with the peak value since reset.</dd>
+    </dl>
+</div>

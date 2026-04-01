@@ -1,0 +1,26 @@
+/* fw-external-classes: offcanvas, offcanvas-end, offcanvas-header, offcanvas-title, offcanvas-body, btn-close, form-check, form-switch, form-check-input, form-check-label, form-label */
+
+.header-bar {
+    height: 42px;
+    min-height: 42px;
+    flex-shrink: 0;
+    border-bottom: var(--bs-border-width) solid var(--bs-border-color);
+    background-color: var(--bs-body-bg);
+}
+
+.header-logo {
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    color: var(--bs-body-color);
+}
+
+.header-menu-btn {
+    padding: 0.25rem;
+    line-height: 1;
+    color: var(--bs-body-color);
+    border: none;
+}
+
+.header-menu-btn:hover {
+    color: var(--bs-emphasis-color);
+}

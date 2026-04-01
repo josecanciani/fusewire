@@ -1,0 +1,58 @@
+/* fw-external-classes: badge, rounded-pill, text-bg-secondary */
+
+.card-tags {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+.card-tags .badge {
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.ide-body {
+    flex: 1 1 0%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+}
+
+.right-pane {
+    flex: 0 0 35%;
+    min-width: 200px;
+}
+
+.resize-handle {
+    width: 5px;
+    cursor: col-resize;
+    background-color: var(--bs-border-color);
+    flex-shrink: 0;
+    transition: background-color 0.15s;
+}
+
+.resize-handle:hover,
+.resize-handle.dragging {
+    background-color: #528bff;
+}
+
+.panel {
+    min-height: 0;
+    min-width: 0;
+}
+
+.panel-header {
+    padding: 0.25rem 1rem;
+    border-bottom: var(--bs-border-width) solid var(--bs-border-color);
+    background-color: var(--bs-tertiary-bg);
+    font-weight: 600;
+    font-size: 0.875em;
+    flex-shrink: 0;
+}
+
+.console-bar {
+    height: 150px;
+    min-height: 150px;
+    background-color: var(--bs-body-bg);
+}

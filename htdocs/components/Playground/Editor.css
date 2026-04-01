@@ -1,0 +1,80 @@
+/* fw-external-classes: cm-editor */
+
+.editor-pane {
+    flex: 1 1 0%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.tab-bar {
+    background-color: var(--bs-secondary-bg);
+    min-height: 34px;
+    overflow-x: auto;
+}
+
+.editor-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8em;
+    border-right: var(--bs-border-width) solid var(--bs-border-color);
+    cursor: pointer;
+    background-color: var(--bs-secondary-bg);
+    color: var(--bs-secondary-color);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.editor-tab:hover {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+}
+
+.editor-tab.active {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border-bottom: 2px solid #528bff;
+}
+
+.tab-label {
+    font-family: monospace;
+}
+
+.tab-close {
+    background: none;
+    border: none;
+    padding: 0 0.1rem;
+    font-size: 1em;
+    line-height: 1;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.5;
+}
+
+.tab-close:hover {
+    opacity: 1;
+}
+
+.run-btn {
+    font-size: 0.8em;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.fw-editor-area {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.cm-editor {
+    height: 100%;
+    font-size: 12px;
+}
+
+.cm-editor .cm-scroller {
+    overflow: auto;
+}

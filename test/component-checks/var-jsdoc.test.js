@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Component directories to scan. Each entry is a root from which .js files
 // are discovered recursively.
-const componentDirs = [join(__dirname, '../../examples/client-only/components')];
+const componentDirs = [join(__dirname, '../../htdocs/components')];
 
 // Valid scalar types for component vars (from component.js typedefs).
 // Component subclass names and unions/arrays of these are also accepted.

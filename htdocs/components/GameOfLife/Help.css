@@ -1,0 +1,36 @@
+.help-content {
+    padding: 16px 20px;
+    background: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 6px;
+    color: var(--bs-body-color);
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.help-content h4 {
+    margin-top: 0;
+}
+
+.help-content h5 {
+    margin-top: 1.2em;
+    margin-bottom: 0.4em;
+}
+
+.help-content ul {
+    padding-left: 1.4em;
+}
+
+.help-content dl {
+    margin-bottom: 0;
+}
+
+.help-content dt {
+    font-weight: 600;
+    margin-top: 0.6em;
+}
+
+.help-content dd {
+    margin-left: 1em;
+    margin-bottom: 0.2em;
+}

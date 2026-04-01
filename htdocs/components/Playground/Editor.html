@@ -1,0 +1,22 @@
+<div class="editor-pane border-end">
+    <div class="tab-bar d-flex align-items-center border-bottom flex-shrink-0">
+        <div
+             fw-each="tab in openTabs"
+             class="editor-tab ((tab.activeClass))"
+             role="button"
+             onclick="((this)).switchTab('((tab.id))')">
+            <span class="tab-label">((tab.label))</span>
+            <button
+                    class="tab-close"
+                    onclick="
+                    event.stopPropagation();
+                    ((this)).closeTab('((tab.id))');
+                ">
+                ×
+            </button>
+        </div>
+        <div class="flex-grow-1"></div>
+        <button class="btn btn-sm btn-primary run-btn me-2" onclick="((this)).runDemo()">Run</button>
+    </div>
+    <div class="fw-editor-area"></div>
+</div>

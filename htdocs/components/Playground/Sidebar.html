@@ -1,0 +1,21 @@
+<nav class="sidebar d-flex flex-column border-end bg-body-tertiary">
+    <div class="sidebar-header">Demos</div>
+    <div class="list-group list-group-flush border-bottom sidebar-demos overflow-auto">
+        <a
+           fw-each="demo in demos"
+           class="list-group-item list-group-item-action ((demo.activeClass))"
+           role="button"
+           onclick="((this)).selectDemo('((demo.name))')">((demo.title))</a>
+    </div>
+    <div class="sidebar-header">Files</div>
+    <div class="list-group list-group-flush flex-grow-1 overflow-auto">
+        <a
+           fw-each="file in demoFiles"
+           class="list-group-item list-group-item-action list-group-item-file ((file.activeClass))"
+           role="button"
+           onclick="((this)).openFile('((file.id))')">((file.label))</a>
+    </div>
+    <div class="p-2 border-top">
+        <button class="btn btn-sm btn-outline-secondary w-100" onclick="((this)).back()">Back</button>
+    </div>
+</nav>

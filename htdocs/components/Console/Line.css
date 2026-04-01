@@ -1,0 +1,35 @@
+/* fw-dynamic-classes: log-warn, log-error, log-debug */
+
+.console-line {
+    padding: 1px 0.5rem;
+}
+
+.console-line-badge:empty,
+.console-line-time:empty,
+.console-line-source:empty {
+    display: none;
+}
+
+.console-line-badge {
+    display: inline-block;
+    background: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 2em;
+    font-size: 0.8em;
+    min-width: 1.6em;
+    text-align: center;
+    padding: 0 0.3em;
+    margin-right: 0.4em;
+    vertical-align: middle;
+    color: var(--bs-body-color);
+}
+
+.console-line-time {
+    color: var(--bs-secondary-color);
+    margin-right: 0.6em;
+}
+
+.console-line-source {
+    color: #61afef;
+    margin-right: 0.6em;
+}
