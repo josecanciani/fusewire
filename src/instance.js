@@ -306,10 +306,10 @@ export class InstanceRegistry {
         }
 
         // Snapshot current child declarations from vars before rendering
-        const currentChildren = this._collectChildComponents(instance);
+        const { children: currentChildren, declarations } = this._collectChildComponents(instance);
 
         // Detach mount-point containers of orphaned children before morphing.
-        // Without this, idiomorph may soft-match an orphaned mount-point <div>
+        // Without this, idiomorph may soft-match an orphaned mount-point element
         // with unrelated new content and skip the morph (the beforeNodeMorphed
         // callback returns false for data-fusewire-id nodes), silently dropping
         // the new content that should have replaced it.
@@ -340,7 +340,7 @@ export class InstanceRegistry {
 
         // Auto-mount child components found in mount points
         for (const mountPoint of mountPoints) {
-            await this._mountChild(mountPoint, instance);
+            await this._mountChild(mountPoint, instance, declarations);
         }
 
         // Remove orphaned children (component cleanup — containers already detached above)
@@ -363,24 +363,29 @@ export class InstanceRegistry {
      * @private
      * @param {HTMLElement} mountPoint - Mount point element with data-fusewire-id
      * @param {Component} parentInstance - Parent component instance
+     * @param {Map<string, Component|ComponentReference>} declarations - Pre-built declaration index for O(1) lookup
      * @returns {Promise<void>}
      */
-    async _mountChild(mountPoint, parentInstance) {
+    async _mountChild(mountPoint, parentInstance, declarations) {
         const childCode = mountPoint.getAttribute('data-fusewire-id');
         const childId = ComponentId.fromCode(childCode);
 
         // Check for an eagerly-created child (reference with _creationPromise)
-        const decl = this._findChildDeclaration(parentInstance, childId);
+        const decl = declarations.get(childCode) || null;
         if (decl instanceof ComponentReference && decl._creationPromise) {
             return await this._attachEagerChild(mountPoint, parentInstance, decl, childId);
         }
 
         if (this.has(childId)) {
-            // Child already exists — update container reference (morphing may replace elements)
+            // Child already exists — update container reference if morphing replaced the element.
+            // If the container is the same DOM node (preserved by morph), skip the re-render:
+            // the child's DOM is already in place and the child manages its own updates via react().
             const entry = this._instances.get(childId.code);
-            entry.container = mountPoint;
-            mountPoint.classList.add(toCssName(childId.name));
-            await this.render(childId);
+            if (entry.container !== mountPoint) {
+                entry.container = mountPoint;
+                mountPoint.classList.add(toCssName(childId.name));
+                await this.render(childId);
+            }
             return;
         }
 
@@ -556,6 +561,7 @@ export class InstanceRegistry {
 
         // Update mount point attribute to match fallback's code
         mountPoint.setAttribute('data-fusewire-id', fallbackInstance[COMPONENT_ID].code);
+        mountPoint.id = fallbackInstance[COMPONENT_ID].code;
 
         this._replaceRefInVars(parentInstance, decl, fallbackInstance);
         decl._replaced = true;
@@ -808,31 +814,36 @@ export class InstanceRegistry {
     /**
      * Collect component declarations from an instance's own properties (top-level values and array items).
      * Recognises both ComponentReference and legacy Component instances.
+     * Returns two maps: one for component identity (code -> ComponentId) and one
+     * for fast declaration lookup (code -> Component|ComponentReference).
      * @private
      * @param {Component} instance - Component instance
-     * @returns {Map<string, ComponentId>} Map of component code to ComponentId
+     * @returns {{children: Map<string, ComponentId>, declarations: Map<string, Component|ComponentReference>}} Maps keyed by component code
      */
     _collectChildComponents(instance) {
         const children = new Map();
+        const declarations = new Map();
         for (const key of Object.keys(instance)) {
             const value = instance[key];
-            this._collectIfComponent(/** @type {VarValue} */ (value), children);
+            this._collectIfComponent(/** @type {VarValue} */ (value), children, declarations);
             if (Array.isArray(value)) {
                 for (const item of value) {
-                    this._collectIfComponent(item, children);
+                    this._collectIfComponent(item, children, declarations);
                 }
             }
         }
-        return children;
+        return { children, declarations };
     }
 
     /**
      * If value is a component declaration, add its identity to the children map
+     * and store the declaration itself in the declarations map for O(1) lookup.
      * @private
      * @param {VarValue} value - Value to check
-     * @param {Map<string, ComponentId>} children - Map to add to
+     * @param {Map<string, ComponentId>} children - Map to add identity to
+     * @param {Map<string, Component|ComponentReference>} declarations - Map to add declaration to
      */
-    _collectIfComponent(value, children) {
+    _collectIfComponent(value, children, declarations) {
         if (!this._isComponentDecl(value)) return;
         let name;
         let id;
@@ -846,6 +857,7 @@ export class InstanceRegistry {
         }
         const componentId = new ComponentId(name, id);
         children.set(componentId.code, componentId);
+        declarations.set(componentId.code, /** @type {Component|ComponentReference} */ (value));
     }
 
     /**
