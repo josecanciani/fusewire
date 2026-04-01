@@ -17,9 +17,9 @@ global.HTMLDivElement = dom.window.HTMLDivElement;
 
 describe('DOM Helpers', () => {
 	describe('createMountPoint', () => {
-		it('creates div element', () => {
-			const div = createMountPoint('UserList#main');
-			assert.strictEqual(div.tagName, 'DIV');
+		it('creates fw-mount element', () => {
+			const el = createMountPoint('UserList#main');
+			assert.strictEqual(el.tagName, 'FW-MOUNT');
 		});
 
 		it('sets data-fusewire-id attribute from string', () => {

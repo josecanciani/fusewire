@@ -4,7 +4,7 @@
 
 When a component re-renders, FuseWire produces new HTML from the template and uses idiomorph to morph the DOM. Two situations cause unnecessary work:
 
-1. **Child component subtrees.** Idiomorph walks into every child mount point and diffs its content against the empty `<div>` in the new HTML, even though the child manages its own DOM.
+1. **Child component subtrees.** Idiomorph walks into every child mount point and diffs its content against the empty `<fw-mount>` in the new HTML, even though the child manages its own DOM.
 
 2. **Large component lists.** A component array with hundreds of entries (e.g., a console log) forces idiomorph to diff the entire list on every update, even when only one item was appended.
 
@@ -18,7 +18,7 @@ This is fully automatic -- every component with children benefits with no code c
 
 ### Reconciliation containers (automatic for component arrays)
 
-When a template variable resolves to an array of `ComponentReference` values, the compiled HTML wraps the mount points in a `<div data-fusewire-each="varName">` container. On re-render, instead of morphing the list, the framework:
+When a template variable resolves to an array of `ComponentReference` values, the compiled HTML wraps the mount points in a `<fw-each data-fusewire-each="varName">` container. On re-render, instead of morphing the list, the framework:
 
 - Appends mount points for newly added components.
 - Removes mount points for components no longer present.

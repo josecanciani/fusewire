@@ -131,7 +131,7 @@ function renderMountPoint(decl, parentId) {
         id = decl.componentId || '';
     }
     const childId = new ComponentId(name, id);
-    return `<div data-fusewire-id="${childId.code}" data-fusewire-parent-id="${parentId.code}"></div>`;
+    return `<fw-mount id="${childId.code}" data-fusewire-id="${childId.code}" data-fusewire-parent-id="${parentId.code}"></fw-mount>`;
 }
 
 /**
@@ -183,7 +183,7 @@ function interpolateText(text, vars, componentId, constants) {
                     ),
                 )
                 .join('');
-            return `<div data-fusewire-each="${escapeHtml(path)}">${mountPoints}</div>`;
+            return `<fw-each id="${componentId.code}:${escapeHtml(path)}" data-fusewire-each="${escapeHtml(path)}">${mountPoints}</fw-each>`;
         }
 
         // Handle regular values (escape HTML)

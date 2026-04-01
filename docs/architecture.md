@@ -28,7 +28,7 @@ Templates are plain HTML with FuseWire directives:
 - **Variable interpolation**: `((variableName))` or `((object.property))`
 - **Conditionals**: `<div fw-if="condition">...</div>`
 - **Loops**: `<li fw-each="item in items">...</li>`
-- **Component mount points**: Child components render as `<div data-fusewire-id="..."></div>`
+- **Component mount points**: Child components render as `<fw-mount id="..." data-fusewire-id="..."></fw-mount>`
 
 Templates are compiled once into render functions for performance.
 

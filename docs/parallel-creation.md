@@ -65,7 +65,7 @@ Total time: `max(parent.render, max(A.init, B.init))`. Children initialize concu
 
 Children render into a detached DOM element before being placed in the document. This decouples child creation from mount point discovery:
 
-1. `createChild()` creates a detached `<div>` container for the child.
+1. `createChild()` creates a detached container element for the child.
 2. The child's `init()` and `render()` run against this detached container. Idiomorph works on DOM trees regardless of document attachment.
 3. When the parent renders and mount points are found, the child's rendered DOM is moved into the mount point element.
 4. `hydrate()` runs after attachment — the element is now in the document with correct layout. DOM queries, `ResizeObserver`, `getBoundingClientRect`, and third-party widgets work correctly.

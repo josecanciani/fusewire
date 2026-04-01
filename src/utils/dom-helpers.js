@@ -24,24 +24,25 @@ export function findChildMountPoints(container, parentComponentId) {
  * Create a mount point element for a component
  * @param {ComponentId|string} componentId - ComponentId instance or code string
  * @param {ComponentId|string} [parentComponentId] - Optional parent ComponentId instance or code string
- * @returns {HTMLDivElement} The mount point div element
+ * @returns {HTMLElement} The mount point element
  */
 export function createMountPoint(componentId, parentComponentId) {
-    const div = document.createElement('div');
+    const el = document.createElement('fw-mount');
 
     // Accept either ComponentId instance or string
     const code = typeof componentId === 'string' ? componentId : componentId.code;
 
-    div.setAttribute('data-fusewire-id', code);
+    el.setAttribute('data-fusewire-id', code);
+    el.id = code;
 
     // Set parent ID if provided
     if (parentComponentId) {
         const parentCode =
             typeof parentComponentId === 'string' ? parentComponentId : parentComponentId.code;
-        div.setAttribute('data-fusewire-parent-id', parentCode);
+        el.setAttribute('data-fusewire-parent-id', parentCode);
     }
 
-    return div;
+    return el;
 }
 
 /**

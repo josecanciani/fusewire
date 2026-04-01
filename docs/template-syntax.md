@@ -190,9 +190,9 @@ Rendered HTML:
 ```html
 <div class="dashboard">
   <aside>
-    <div data-fusewire-id="Sidebar#main">
+    <fw-mount id="Sidebar#main" data-fusewire-id="Sidebar#main">
       <!-- Sidebar component content -->
-    </div>
+    </fw-mount>
   </aside>
   <main>...</main>
 </div>
@@ -223,8 +223,10 @@ Template:
 Rendered:
 ```html
 <div class="user-list">
-  <div data-fusewire-id="UserCard#user1">...</div>
-  <div data-fusewire-id="UserCard#user2">...</div>
+  <fw-each data-fusewire-each="users">
+    <fw-mount id="UserCard#user1" data-fusewire-id="UserCard#user1">...</fw-mount>
+    <fw-mount id="UserCard#user2" data-fusewire-id="UserCard#user2">...</fw-mount>
+  </fw-each>
 </div>
 ```
 

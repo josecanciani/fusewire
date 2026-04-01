@@ -18,6 +18,7 @@ export class Renderer {
         this.morphFunction = morphFunction;
         this._appName = appName;
         this._injectedCSS = new Set(); // Track which components have CSS injected
+        this._injectMountPointCSS();
     }
 
     /**
@@ -111,6 +112,23 @@ export class Renderer {
     }
 
     /**
+     * Inject global CSS for custom mount point elements (once per document).
+     * Uses display:contents so the elements generate no box of their own —
+     * the child component's root element dictates layout.
+     * @private
+     */
+    _injectMountPointCSS() {
+        const styleId = 'fusewire-mount-point-css';
+        if (typeof document === 'undefined' || document.getElementById(styleId)) {
+            return;
+        }
+        const styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        styleEl.textContent = 'fw-mount, fw-each { display: contents; }';
+        document.head.appendChild(styleEl);
+    }
+
+    /**
      * Extract expected mount points from reconciliation containers in an HTML string
      * @private
      * @param {string} htmlString - Rendered HTML string
@@ -173,8 +191,9 @@ export class Renderer {
             for (const { id, parentId } of expected) {
                 let element = existing.get(id);
                 if (!element) {
-                    element = document.createElement('div');
+                    element = document.createElement('fw-mount');
                     element.setAttribute('data-fusewire-id', id);
+                    element.id = id;
                     if (parentId) {
                         element.setAttribute('data-fusewire-parent-id', parentId);
                     }
