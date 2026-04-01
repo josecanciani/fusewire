@@ -191,16 +191,20 @@ async init() {
 
 ### Type hinting children
 
-`createChild` returns `ComponentReference`, but by the time you read a child
-property it's already the real instance. To get IDE autocomplete on child-specific
-vars and methods, annotate the field with a JSDoc type-only import (zero runtime
-cost) and cast at the assignment:
+`createChild` and `createLazyChild` return `Component | ComponentReference`, but by the time you read a child property it's already the real instance. To get IDE autocomplete and pass type checking (especially when the child class adds new properties like `duration` or `items`), annotate the field with a JSDoc type-only import and cast at the assignment.
+
+> [!TIP]
+> Always type child properties (including arrays) with the **specific, final component class** (e.g., `Line`, `Lazy`) rather than the generic `Component` or `ComponentReference`. This ensures correct type checking for child-specific features and provides full IDE autocomplete.
+
+> [!IMPORTANT]
+> **Parentheses are mandatory** for the cast. If you omit them, `tsc` will fail with error `TS2322: Type 'Component | ComponentReference' is not assignable to type 'MyComponent'`, because the cast is not correctly applied to the entire expression.
 
 ```javascript
 /** @type {import('./Console/Line.js').Line} */
 lineChild = null;
 
 async init() {
+    // Parentheses around the call are required!
     this.lineChild = /** @type {import('./Console/Line.js').Line} */ (
         this.createChild('Console/Line', '1', { message: 'hello' })
     );
@@ -214,8 +218,7 @@ For arrays of the same child type:
 logs = [];
 ```
 
-The `import()` in JSDoc is purely a type annotation — no module is loaded at
-runtime.
+The `import()` in JSDoc is purely a type annotation — no module is loaded at runtime.
 
 ---
 
