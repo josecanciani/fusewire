@@ -97,21 +97,43 @@ function findMatchingClose(html, tagName, startIndex) {
 /**
  * Escape HTML special characters
  * @param {string} str - String to escape
+ * @param {boolean} isAttribute - Whether the string is being used in an HTML attribute context
  * @returns {string} Escaped string safe for HTML output
  */
-function escapeHtml(str) {
-    const div = typeof document !== 'undefined' ? document.createElement('div') : null;
-    if (div) {
-        div.textContent = str;
-        return div.innerHTML;
-    }
-    // Fallback for Node environment
-    return String(str)
+function escapeHtml(str, isAttribute = false) {
+    let escaped = String(str)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+
+    if (isAttribute) {
+        // Escape characters that can break out of unquoted attributes
+        // Space, Tab, Newline, Form Feed, Carriage Return, =
+        escaped = escaped.replace(/[ \t\n\f\r=]/g, (match) => {
+            return `&#x${match.charCodeAt(0).toString(16)};`;
+        });
+    }
+
+    return escaped;
+}
+
+/**
+ * Sanitize a URL to prevent javascript: URIs
+ * @param {string} url - URL to sanitize
+ * @returns {string} Sanitized URL
+ */
+function sanitizeUrl(url) {
+    const trimmed = String(url).trim().toLowerCase();
+    if (
+        trimmed.startsWith('javascript:') ||
+        trimmed.startsWith('data:') ||
+        trimmed.startsWith('vbscript:')
+    ) {
+        return 'about:blank';
+    }
+    return url;
 }
 
 /**
@@ -135,7 +157,7 @@ function renderMountPoint(decl, parentId) {
 }
 
 /**
- * Interpolate variables in a text string
+ * Interpolate variables in a text string with context-aware sanitization
  * @param {string} text - Text with ((...)) placeholders
  * @param {ComponentVars} vars - Variable data
  * @param {ComponentId} componentId - Component instance ID
@@ -143,44 +165,108 @@ function renderMountPoint(decl, parentId) {
  * @returns {string} Interpolated text
  */
 function interpolateText(text, vars, componentId, constants) {
-    return text.replace(/\(\(([^)]+)\)\)/g, (match, path) => {
-        path = path.trim();
+    let result = '';
+    let lastIndex = 0;
+    let inTag = false;
+    let inAttributeValue = false;
+    let currentAttributeName = '';
+    let quoteChar = '';
+
+    const regex = /\(\(([^)]+)\)\)/g;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+        // Process text before the match to track context
+        const beforeMatch = text.substring(lastIndex, match.index);
+        for (let i = 0; i < beforeMatch.length; i++) {
+            const char = beforeMatch[i];
+            if (char === '<' && !inAttributeValue) {
+                inTag = true;
+                currentAttributeName = '';
+            } else if (char === '>' && !inAttributeValue) {
+                inTag = false;
+            } else if (inTag) {
+                if (!inAttributeValue) {
+                    if (char === '"' || char === "'") {
+                        inAttributeValue = true;
+                        quoteChar = char;
+                    } else if (char === '=') {
+                        // Attribute name is what was collected before '='
+                    } else if (/[a-zA-Z-]/.test(char)) {
+                        currentAttributeName += char;
+                    } else if (/\s/.test(char)) {
+                        currentAttributeName = '';
+                    }
+                } else if (char === quoteChar) {
+                    inAttributeValue = false;
+                    quoteChar = '';
+                    currentAttributeName = '';
+                }
+            }
+        }
+
+        const path = match[1].trim();
+        let value;
 
         // Special case: ((this)) - placeholder for component instance reference
         if (path === 'this') {
-            // Replace # with _ to make it a valid JS identifier
             const safeCode = componentId.code.replace(/#/g, '_');
-            return `__FUSEWIRE_COMPONENT_${safeCode}__`;
+            value = `__FUSEWIRE_COMPONENT_${safeCode}__`;
+        } else if (path === 'componentId') {
+            value = escapeHtml(componentId.code, inTag);
+        } else if (path === 'componentName') {
+            value = escapeHtml(componentId.name, inTag);
+        } else if (path === 'componentVersion') {
+            value = escapeHtml(constants.version || '', inTag);
+        } else {
+            const rawValue = getPropertyValue(vars, path);
+            if (rawValue === undefined || rawValue === null) {
+                value = '';
+            } else if (isComponent(rawValue)) {
+                value = renderMountPoint(/** @type {Component|Child} */ (rawValue), componentId);
+            } else if (Array.isArray(rawValue) && rawValue.length > 0 && isComponent(rawValue[0])) {
+                const mountPoints = rawValue
+                    .map((comp) =>
+                        renderMountPoint(/** @type {Component|Child} */ (comp), componentId),
+                    )
+                    .join('');
+                value = `<fw-each id="${componentId.code}:${escapeHtml(path, inTag)}" data-fusewire-each="${escapeHtml(path, inTag)}">${mountPoints}</fw-each>`;
+            } else {
+                let strValue = String(rawValue);
+
+                // Context-aware sanitization
+                const dangerousAttrs = [
+                    'href',
+                    'src',
+                    'action',
+                    'formaction',
+                    'data',
+                    'background',
+                    'on',
+                ];
+                const isDangerousAttr = dangerousAttrs.some(
+                    (attr) =>
+                        currentAttributeName.toLowerCase() === attr ||
+                        (attr === 'on' && currentAttributeName.toLowerCase().startsWith('on')),
+                );
+
+                if (inTag && isDangerousAttr) {
+                    strValue = sanitizeUrl(strValue);
+                }
+
+                // If inTag is true but inAttributeValue is false, we are likely in an unquoted attribute
+                // (or just started an attribute name, but placeholders shouldn't be there usually)
+                // We use isAttribute=true for all tag contexts for maximum safety.
+                value = escapeHtml(strValue, inTag);
+            }
         }
 
-        // Template constants (not part of mutable vars)
-        if (path === 'componentId') return escapeHtml(componentId.code);
-        if (path === 'componentName') return escapeHtml(componentId.name);
-        if (path === 'componentVersion') return escapeHtml(constants.version || '');
+        result += beforeMatch + value;
+        lastIndex = regex.lastIndex;
+    }
 
-        const value = getPropertyValue(vars, path);
-
-        // Handle undefined/null
-        if (value === undefined || value === null) {
-            return '';
-        }
-
-        // Handle Component instances - render as empty mount point
-        if (isComponent(value)) {
-            return renderMountPoint(/** @type {Component|Child} */ (value), componentId);
-        }
-
-        // Handle arrays of components - wrap in reconciliation container
-        if (Array.isArray(value) && value.length > 0 && isComponent(value[0])) {
-            const mountPoints = value
-                .map((comp) => renderMountPoint(/** @type {Component|Child} */ (comp), componentId))
-                .join('');
-            return `<fw-each id="${componentId.code}:${escapeHtml(path)}" data-fusewire-each="${escapeHtml(path)}">${mountPoints}</fw-each>`;
-        }
-
-        // Handle regular values (escape HTML)
-        return escapeHtml(String(value));
-    });
+    result += text.substring(lastIndex);
+    return result;
 }
 
 /**
@@ -275,14 +361,10 @@ function processLoops(html, vars, componentId, constants) {
             itemContent = processConditionals(itemContent, scopedVars);
             itemContent = processLoops(itemContent, scopedVars, componentId, constants);
 
-            // Interpolate variables in content and element attributes
-            itemContent = interpolateText(itemContent, scopedVars, componentId, constants);
-            const itemAttrs = attrs
-                ? interpolateText(attrs, scopedVars, componentId, constants)
-                : '';
-
-            const openTag = itemAttrs ? `<${tag} ${itemAttrs}>` : `<${tag}>`;
-            return `${openTag}${itemContent}${closeTag}`;
+            // Interpolate variables in full element context (tag + content)
+            const itemAttrs = attrs ? ` ${attrs}` : '';
+            const fullElement = `<${tag}${itemAttrs}>${itemContent}${closeTag}`;
+            return interpolateText(fullElement, scopedVars, componentId, constants);
         });
 
         const replacement = results.join('');
