@@ -366,16 +366,19 @@ export class Component {
      * Trigger re-render of this component.
      * Ignored during lifecycle hooks (init, update, afterRender) because
      * the framework already renders the component after those hooks return.
+     * Returns a promise that resolves when the render queue has drained,
+     * enabling callers to chain post-render work via `.then()`.
      * @param {string} mode - Render mode ('CSR' for client-side only)
+     * @returns {Promise<void>} Resolves when the render queue drains (or immediately if ignored)
      */
     react(mode = 'CSR') {
         if (this[LIFECYCLE_ACTIVE]) {
             this[CONSOLE].warn(
                 `react() called during ${this[LIFECYCLE_ACTIVE]}() — ignored (the framework renders automatically after lifecycle hooks)`,
             );
-            return;
+            return this[REACTOR]._drainPromise;
         }
-        this[REACTOR].react(this[COMPONENT_ID], mode);
+        return this[REACTOR].react(this[COMPONENT_ID], mode);
     }
 }
 

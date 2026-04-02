@@ -61,8 +61,8 @@ export class Editor extends Component {
             this.activeTabId = null;
         }
 
-        this.react();
         this.emit('activeFileChanged', this.activeTabId);
+        this.react();
     }
 
     /**
@@ -116,8 +116,8 @@ export class Editor extends Component {
         } else {
             this.#destroyEditorView();
             this.activeTabId = null;
-            this.react();
             this.emit('activeFileChanged', null);
+            this.react();
         }
     }
 
@@ -184,8 +184,8 @@ export class Editor extends Component {
             t.activeClass = t.id === id ? 'active' : '';
         });
         this.activeTabId = id;
-        this.react();
         this.emit('activeFileChanged', id);
+        this.react();
     }
 
     #saveEditorContent() {

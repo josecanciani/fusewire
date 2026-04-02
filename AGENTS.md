@@ -231,6 +231,40 @@ async init() {
 
 Do not call `emit()` inside `init()`, `update()`, `hydrate()`, or `afterRender()` — parent listeners may not be registered yet and a warning will be logged.
 
+#### Emit before react
+
+When a method updates state and needs to both notify listeners and re-render, **emit the event before calling `react()`**:
+
+```javascript
+// GOOD: emit first, then react
+selectItem(id) {
+    this.activeItemId = id;
+    this.emit('selectionChanged', id);
+    this.react();
+}
+
+// BAD: react first — triggers the lifecycle warning and misses batching
+selectItem(id) {
+    this.activeItemId = id;
+    this.react();
+    this.emit('selectionChanged', id);
+}
+```
+
+This ordering has two benefits:
+
+1. **Avoids lifecycle warnings.** `react()` synchronously enters the render queue and sets the component's lifecycle state. Any `emit()` call after `react()` in the same tick sees that state and logs a spurious "emit called during render" warning.
+2. **Better render batching.** When listeners receive the event before the emitting component's render starts, they can synchronously enqueue their own `react()` calls. The reactor's render queue deduplicates and processes all pending renders in a single drain cycle, reducing the total number of render passes across the tree.
+
+If you need to emit an event *after* the DOM has been updated (e.g., to notify a parent about a measured element size), use `.then()`:
+
+```javascript
+selectItem(id) {
+    this.activeItemId = id;
+    this.react().then(() => this.emit('selectionChanged', id));
+}
+```
+
 ### Top-down events (broadcast)
 
 Broadcast pushes an event down through the component tree — the opposite direction of pub/sub. Handlers can return `false` to stop propagation into their subtree (siblings are unaffected).
