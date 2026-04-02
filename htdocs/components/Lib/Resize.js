@@ -1,4 +1,10 @@
 /**
+ * @typedef {Object} ResizeOptions
+ * @property {number} [minWidth]
+ * @property {number} [minGap]
+ */
+
+/**
  * Start a horizontal resize drag on a flex pane.
  *
  * Call from a mousedown handler on a resize handle sitting between two flex
@@ -10,9 +16,7 @@
  *
  * @param {MouseEvent} event - The mousedown event on the resize handle
  * @param {HTMLElement} target - The element whose flex-basis will be resized
- * @param {object} [options] - Resize constraints
- * @param {number} [options.minWidth] - Minimum target width in pixels (default 200)
- * @param {number} [options.minGap] - Minimum remaining space for sibling content (default 300)
+ * @param {ResizeOptions} [options] - Resize constraints
  * @returns {{ width: number, cancel: function(): void }} Resize controller
  */
 export function startHorizontalResize(event, target, { minWidth = 200, minGap = 300 } = {}) {

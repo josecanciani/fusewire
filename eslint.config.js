@@ -5,12 +5,13 @@ export default [
         ignores: ['src/lib/**'],
     },
     {
-        files: ['src/**/*.js'],
+        files: ['src/**/*.js', 'htdocs/**/*.js'],
         plugins: { jsdoc },
         settings: {
             jsdoc: {
                 preferredTypes: {
                     object: false,
+                    any: 'Use a more specific type (e.g., string, number, Component) or a union type instead of "any".',
                 },
             },
         },
@@ -34,11 +35,14 @@ export default [
                         // DOM globals (browser built-ins, not project types)
                         'HTMLElement',
                         'HTMLDivElement',
+                        'HTMLInputElement',
                         'Element',
                         'Node',
                         'Document',
                         'Window',
                         'Event',
+                        'MouseEvent',
+                        'ResizeObserver',
                         'Console',
                     ],
                 },
@@ -56,6 +60,7 @@ export default [
                     contexts: ['FunctionDeclaration', 'MethodDefinition'],
                 },
             ],
+
         },
     },
 ];

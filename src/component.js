@@ -17,7 +17,7 @@ import {
  */
 
 /** @typedef {string|number|boolean|null} Scalar */
-/** @typedef {{[key: string]: Scalar}} ScalarObject */
+/** @typedef {{[key: string]: Scalar|Array.<Scalar>|Object}} ScalarObject */
 /** @typedef {Scalar|ScalarObject|Component|Child} VarValue */
 /** @typedef {{[key: string]: (VarValue|Array<VarValue>)}} ComponentVars */
 /** @typedef {{new(): Component, componentName: string}} ComponentConstructor */

@@ -2,10 +2,19 @@ import { Component } from '/js/component.js';
 import { ComponentId } from '/js/component-id.js';
 import { REACTOR } from '/js/symbols.js';
 
+/**
+ * @typedef {Object} Demo
+ * @property {string} name - Component name
+ * @property {string[]} [tags] - Filtering tags
+ * @property {Object.<string, *>} [vars] - Initial vars for the demo
+ * @property {string[]} [components] - Additional components to include
+ * @property {string} [activeClass] - UI active state
+ */
+
 export class Home extends Component {
-    /** @type {Array.<object>} */
+    /** @type {Array.<Demo>} */
     demos = [];
-    /** @type {Array.<object>} */
+    /** @type {Array.<Demo>} */
     filteredDemos = [];
     /** @type {boolean} */
     noResults = false;
@@ -233,7 +242,7 @@ export class Home extends Component {
 
     /**
      * Fetch HTML, CSS and JS source for every component in a demo.
-     * @param {object} demo - Demo descriptor with name and optional components list
+     * @param {Demo} demo - Demo descriptor with name and optional components list
      * @returns {Promise.<Array.<{id: string, label: string, ext: string, content: string}>>} File descriptors
      */
     async #fetchDemoFiles(demo) {
