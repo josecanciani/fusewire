@@ -1,5 +1,5 @@
 import { ComponentId } from './component-id.js';
-import { ComponentReference } from './component-reference.js';
+import { Child } from './component.js';
 import { EventEmitter } from './event-emitter.js';
 import { FuseWire } from './fusewire.js';
 import { TemplateStore } from './template-store.js';
@@ -211,7 +211,7 @@ export class Reactor {
             container.appendChild(renderContainer);
         }
 
-        const ref = new ComponentReference(componentName, id, vars);
+        const ref = new Child(componentName, id, vars);
 
         // Create instance via registry (resolves class, init, render, afterRender)
         const instance = await this._instanceRegistry.createFromReference(ref, renderContainer);

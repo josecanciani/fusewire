@@ -8,7 +8,7 @@ import { Component } from '../src/component.js';
 import { ComponentId } from '../src/component-id.js';
 import { ComponentNotFoundError } from '../src/errors/error-hierarchy.js';
 import { Idiomorph } from 'idiomorph';
-import { ComponentReference } from '../src/component-reference.js';
+import { Child } from '../src/component.js';
 import { COMPONENT_ID, LIFECYCLE_ACTIVE, EVENTS, CONSOLE, LIBRARIES } from '../src/symbols.js';
 import { EventEmitter } from '../src/event-emitter.js';
 import { findChildMountPoints } from '../src/utils/dom-helpers.js';
@@ -806,7 +806,7 @@ describe('InstanceRegistry', () => {
                 version: 'v1'
             });
 
-            const ref = new ComponentReference('TestComponent', 'test1', {});
+            const ref = new Child('TestComponent', 'test1', {});
             const instance = await registry.createFromReference(ref, container);
 
             assert.ok(instance instanceof TestComponent);
@@ -824,7 +824,7 @@ describe('InstanceRegistry', () => {
     });
 
     describe('createFromReference()', () => {
-        it('creates instance from ComponentReference', async () => {
+        it('creates instance from Child', async () => {
             registry.registerComponent('TestComponent', TestComponent);
             templateStore.set('TestComponent', {
                 htmlCode: '<div>((message))</div>',
@@ -832,7 +832,7 @@ describe('InstanceRegistry', () => {
                 version: 'v1'
             });
 
-            const ref = new ComponentReference('TestComponent', 'test1', { message: 'Hello' });
+            const ref = new Child('TestComponent', 'test1', { message: 'Hello' });
             const instance = await registry.createFromReference(ref, container);
 
             assert.ok(instance instanceof TestComponent);
@@ -849,7 +849,7 @@ describe('InstanceRegistry', () => {
                 version: 'v1'
             });
 
-            const ref = new ComponentReference('TestComponent', 'test1', {});
+            const ref = new Child('TestComponent', 'test1', {});
             const instance = await registry.createFromReference(ref, container);
 
             assert.strictEqual(instance._initCalled, true);
@@ -857,7 +857,7 @@ describe('InstanceRegistry', () => {
         });
 
         it('throws if component class not found', async () => {
-            const ref = new ComponentReference('Unknown', 'test1', {});
+            const ref = new Child('Unknown', 'test1', {});
 
             await assert.rejects(
                 async () => await registry.createFromReference(ref, container),
@@ -866,10 +866,10 @@ describe('InstanceRegistry', () => {
         });
     });
 
-    describe('Auto-mounting with ComponentReference', () => {
+    describe('Auto-mounting with Child', () => {
         class ChildComponent extends Component {}
 
-        it('auto-mounts child from ComponentReference in vars', async () => {
+        it('auto-mounts child from Child in vars', async () => {
             registry.registerComponent('ChildComponent', ChildComponent);
             templateStore.set('TestComponent', {
                 htmlCode: '<div>((child))</div>',
@@ -883,7 +883,7 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childRef = new ComponentReference('ChildComponent', 'child1', {});
+            const childRef = new Child('ChildComponent', 'child1', {});
 
             await registry.create(
                 componentId,
@@ -897,7 +897,7 @@ describe('InstanceRegistry', () => {
             assert.ok(container.innerHTML.includes('Child Content'));
         });
 
-        it('auto-mounts array of ComponentReference children', async () => {
+        it('auto-mounts array of Child children', async () => {
             registry.registerComponent('ChildComponent', ChildComponent);
             templateStore.set('TestComponent', {
                 htmlCode: '<div>((cards))</div>',
@@ -912,8 +912,8 @@ describe('InstanceRegistry', () => {
 
             const componentId = new ComponentId('TestComponent', 'test1');
             const cards = [
-                new ComponentReference('ChildComponent', 'c1', {}),
-                new ComponentReference('ChildComponent', 'c2', {}),
+                new Child('ChildComponent', 'c1', {}),
+                new Child('ChildComponent', 'c2', {}),
             ];
 
             await registry.create(
@@ -927,7 +927,7 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c2')), true);
         });
 
-        it('passes vars from ComponentReference to child instance', async () => {
+        it('passes vars from Child to child instance', async () => {
             registry.registerComponent('ChildComponent', ChildComponent);
             templateStore.set('TestComponent', {
                 htmlCode: '<div>((child))</div>',
@@ -941,7 +941,7 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childRef = new ComponentReference('ChildComponent', 'child1', { label: 'Hello' });
+            const childRef = new Child('ChildComponent', 'child1', { label: 'Hello' });
 
             await registry.create(
                 componentId,
@@ -955,7 +955,7 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(childInstance.label, 'Hello');
         });
 
-        it('replaces ComponentReference with Component instance in parent vars (top-level)', async () => {
+        it('replaces Child with Component instance in parent vars (top-level)', async () => {
             registry.registerComponent('ChildComponent', ChildComponent);
             templateStore.set('TestComponent', {
                 htmlCode: '<div>((child))</div>',
@@ -969,7 +969,7 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childRef = new ComponentReference('ChildComponent', 'child1', { label: 'Hi' });
+            const childRef = new Child('ChildComponent', 'child1', { label: 'Hi' });
             const parentVars = { child: childRef };
 
             await registry.create(componentId, TestComponent, parentVars, container);
@@ -979,7 +979,7 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(childRef._replaced, true, 'original ref should be marked as replaced');
         });
 
-        it('replaces ComponentReference with Component instance in parent vars (array)', async () => {
+        it('replaces Child with Component instance in parent vars (array)', async () => {
             registry.registerComponent('ChildComponent', ChildComponent);
             templateStore.set('TestComponent', {
                 htmlCode: '<div>((items))</div>',
@@ -993,8 +993,8 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const ref1 = new ComponentReference('ChildComponent', 'i1', {});
-            const ref2 = new ComponentReference('ChildComponent', 'i2', {});
+            const ref1 = new Child('ChildComponent', 'i1', {});
+            const ref2 = new Child('ChildComponent', 'i2', {});
             const items = [ref1, ref2];
 
             await registry.create(componentId, TestComponent, { items }, container);
@@ -1020,7 +1020,7 @@ describe('InstanceRegistry', () => {
             });
 
             const componentId = new ComponentId('TestComponent', 'test1');
-            const childRef = new ComponentReference('ChildComponent', 'child1', { msg: 'a' });
+            const childRef = new Child('ChildComponent', 'child1', { msg: 'a' });
 
             await registry.create(componentId, TestComponent, { child: childRef }, container);
 
@@ -1033,7 +1033,7 @@ describe('InstanceRegistry', () => {
 
     describe('_replaceRefInVars()', () => {
         it('replaces top-level reference by identity', () => {
-            const ref = new ComponentReference('X', 'x1', {});
+            const ref = new Child('X', 'x1', {});
             const vars = { child: ref, other: 'text' };
             const fakeInstance = new Component();
 
@@ -1044,8 +1044,8 @@ describe('InstanceRegistry', () => {
         });
 
         it('replaces reference inside an array by identity', () => {
-            const ref1 = new ComponentReference('X', 'x1', {});
-            const ref2 = new ComponentReference('X', 'x2', {});
+            const ref1 = new Child('X', 'x1', {});
+            const ref2 = new Child('X', 'x2', {});
             const fakeInstance = new Component();
             const vars = { items: [ref1, ref2] };
 
@@ -1056,8 +1056,8 @@ describe('InstanceRegistry', () => {
         });
 
         it('does nothing when reference is not found', () => {
-            const ref = new ComponentReference('X', 'x1', {});
-            const otherRef = new ComponentReference('Y', 'y1', {});
+            const ref = new Child('X', 'x1', {});
+            const otherRef = new Child('Y', 'y1', {});
             const vars = { child: otherRef };
             const fakeInstance = new Component();
 
@@ -1555,7 +1555,7 @@ describe('InstanceRegistry', () => {
     describe('Eager child creation (startEagerCreation / _attachEagerChild)', () => {
         it('creates child in detached container with deferred hydration', async () => {
             class Parent extends Component {
-                /** @type {ComponentReference|Component} */
+                /** @type {Child|Component} */
                 child = null;
                 async init() {
                     this.child = this.createChild('Child', 'main', { msg: 'hi' });
@@ -1589,9 +1589,9 @@ describe('InstanceRegistry', () => {
         it('children created in init run in parallel', async () => {
             const order = [];
             class Parent extends Component {
-                /** @type {ComponentReference|Component} */
+                /** @type {Child|Component} */
                 a = null;
-                /** @type {ComponentReference|Component} */
+                /** @type {Child|Component} */
                 b = null;
                 async init() {
                     this.a = this.createChild('ChildA', 'a', {});
@@ -1628,7 +1628,7 @@ describe('InstanceRegistry', () => {
         it('deferred hydration: hydrate runs after DOM attachment (bottom-up)', async () => {
             const order = [];
             class GrandParent extends Component {
-                /** @type {ComponentReference|Component} */
+                /** @type {Child|Component} */
                 mid = null;
                 async init() {
                     this.mid = this.createChild('Mid', 'mid', {});
@@ -1636,7 +1636,7 @@ describe('InstanceRegistry', () => {
                 hydrate() { order.push('GP.hydrate'); }
             }
             class Mid extends Component {
-                /** @type {ComponentReference|Component} */
+                /** @type {Child|Component} */
                 leaf = null;
                 async init() {
                     this.leaf = this.createChild('Leaf', 'leaf', {});
@@ -1663,7 +1663,7 @@ describe('InstanceRegistry', () => {
 
         it('transfers DOM from detached container to mount point', async () => {
             class Parent extends Component {
-                /** @type {ComponentReference|Component} */
+                /** @type {Child|Component} */
                 child = null;
                 async init() {
                     this.child = this.createChild('Child', 'main', {});
@@ -1687,7 +1687,7 @@ describe('InstanceRegistry', () => {
 
         it('skips eager creation when component already exists in registry (re-render)', async () => {
             class Parent extends Component {
-                /** @type {Array<ComponentReference|Component>} */
+                /** @type {Array<Child|Component>} */
                 cells = [];
                 async init() {
                     this.cells = [
@@ -1723,7 +1723,7 @@ describe('InstanceRegistry', () => {
     describe('Error fallbacks (_createFallback)', () => {
         it('renders fallback component when child creation fails', async () => {
             class Parent extends Component {
-                /** @type {ComponentReference|Component} */
+                /** @type {Child|Component} */
                 child = null;
                 async init() {
                     this.child = this.createChild('Broken', 'main', {}, { fallback: 'Fallback' });
@@ -1762,7 +1762,7 @@ describe('InstanceRegistry', () => {
 
         it('propagates error when no fallback is specified', async () => {
             class Parent extends Component {
-                /** @type {ComponentReference|Component} */
+                /** @type {Child|Component} */
                 child = null;
                 async init() {
                     this.child = this.createChild('Broken', 'main', {});
@@ -1786,9 +1786,9 @@ describe('InstanceRegistry', () => {
     });
 
     describe('createChild with options', () => {
-        it('passes options to ComponentReference', async () => {
+        it('passes options to Child', async () => {
             class Parent extends Component {
-                /** @type {ComponentReference|Component} */
+                /** @type {Child|Component} */
                 child = null;
                 async init() {
                     this.child = this.createChild('Child', 'main', {}, { fallback: 'ErrorCard' });

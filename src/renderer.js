@@ -107,7 +107,16 @@ export class Renderer {
     _scopeCSS(css, cssName) {
         if (!css || !css.trim()) return '';
 
-        return `.${this._appName} {\n  .${cssName} {\n    ${css.trim()}\n  }\n}`;
+        let keyframes = '';
+        const scopedCss = css.replace(
+            /@keyframes\s+[^{]+\s*\{\s*(?:[^{}]*\{[^{}]*\}\s*)*\}/g,
+            (match) => {
+                keyframes += match + '\n\n';
+                return '';
+            },
+        );
+
+        return `.${this._appName} {\n  .${cssName} {\n    ${scopedCss.trim()}\n  }\n}\n\n${keyframes.trim()}`;
     }
 
     /**

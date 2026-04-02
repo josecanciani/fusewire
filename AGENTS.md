@@ -216,7 +216,7 @@ selectDemo(name) {
 }
 ```
 
-**Parent subscribes in `init()`** using buffered references. The `ComponentReference` returned by `createChild()` buffers `.on()` calls and replays them once the real `Component` instance is mounted. This means you can subscribe to child events immediately — no need to wait for mounting or use guard flags:
+**Parent subscribes in `init()`** using buffered references. The `Child` returned by `createChild()` buffers `.on()` calls and replays them once the real `Component` instance is mounted. This means you can subscribe to child events immediately — no need to wait for mounting or use guard flags:
 
 ```javascript
 async init() {

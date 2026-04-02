@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import { JSDOM } from 'jsdom';
 import { Component } from '../src/component.js';
 import { ComponentId } from '../src/component-id.js';
-import { ComponentReference } from '../src/component-reference.js';
+import { Child } from '../src/component.js';
 import { COMPONENT_ID, REGISTRY_ENTRY, CONSOLE, REACTOR, LIFECYCLE_ACTIVE, EVENTS, LIBRARIES } from '../src/symbols.js';
 
 describe('Component', () => {
@@ -323,8 +323,9 @@ describe('Component', () => {
 	});
 
 	describe('createChild()', () => {
-		it('returns a ComponentReference with correct componentName, id, and vars', () => {
+		it('returns a Child with correct componentName, id, and vars', () => {
 			const comp = new Component();
+                        comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => {} } };
 			const ref = comp.createChild('Sidebar', 'main', { collapsed: false });
 
 			assert.strictEqual(ref.componentName, 'Sidebar');
@@ -332,8 +333,9 @@ describe('Component', () => {
 			assert.deepStrictEqual(ref.vars, { collapsed: false });
 		});
 
-		it('returns a ComponentReference with empty id when id is omitted', () => {
+		it('returns a Child with empty id when id is omitted', () => {
 			const comp = new Component();
+                        comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => {} } };
 			const ref = comp.createChild('Sidebar', { collapsed: true });
 
 			assert.strictEqual(ref.componentName, 'Sidebar');
@@ -341,8 +343,9 @@ describe('Component', () => {
 			assert.deepStrictEqual(ref.vars, { collapsed: true });
 		});
 
-		it('returns a ComponentReference with empty id and empty vars when only name is given', () => {
+		it('returns a Child with empty id and empty vars when only name is given', () => {
 			const comp = new Component();
+                        comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => {} } };
 			const ref = comp.createChild('Sidebar');
 
 			assert.strictEqual(ref.componentName, 'Sidebar');
@@ -350,15 +353,17 @@ describe('Component', () => {
 			assert.deepStrictEqual(ref.vars, {});
 		});
 
-		it('returns an instance of ComponentReference', () => {
+		it('returns an instance of Child', () => {
 			const comp = new Component();
+                        comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => {} } };
 			const ref = comp.createChild('Sidebar', 'main', { collapsed: false });
 
-			assert.ok(ref instanceof ComponentReference);
+			assert.ok(ref instanceof Child);
 		});
 
-		it('passes options to ComponentReference', () => {
+		it('passes options to Child', () => {
 			const comp = new Component();
+                        comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => {} } };
 			const ref = comp.createChild('Sidebar', 'main', {}, { fallback: 'ErrorCard' });
 
 			assert.strictEqual(ref._options.fallback, 'ErrorCard');
@@ -366,6 +371,7 @@ describe('Component', () => {
 
 		it('passes options when id is omitted', () => {
 			const comp = new Component();
+                        comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => {} } };
 			const ref = comp.createChild('Sidebar', { page: 1 }, { fallback: 'ErrorCard' });
 
 			assert.strictEqual(ref.id, '');
@@ -375,42 +381,19 @@ describe('Component', () => {
 	});
 
 	describe('createLazyChild()', () => {
-		it('returns a ComponentReference with lazy option set', () => {
-			const comp = new Component();
-			const ref = comp.createLazyChild('HeavyChart', 'chart', {});
+	        it('returns a FuseWire/Lazy Child with correct vars', () => {
+	                const comp = new Component();
+                        comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => {} } };
+	                const lazyChild = comp.createChild('HeavyChart', 'chart');
+	                const placeholderChild = comp.createChild('Skeleton', 'chart');
+	                const ref = comp.createLazyChild(lazyChild, placeholderChild);
 
-			assert.ok(ref instanceof ComponentReference);
-			assert.strictEqual(ref._options.lazy, true);
-		});
-
-		it('sets placeholder option', () => {
-			const comp = new Component();
-			const ref = comp.createLazyChild('HeavyChart', 'chart', {}, { placeholder: 'Skeleton' });
-
-			assert.strictEqual(ref._options.lazy, true);
-			assert.strictEqual(ref._options.placeholder, 'Skeleton');
-		});
-
-		it('passes fallback option', () => {
-			const comp = new Component();
-			const ref = comp.createLazyChild('HeavyChart', 'chart', {}, { fallback: 'ErrorCard' });
-
-			assert.strictEqual(ref._options.lazy, true);
-			assert.strictEqual(ref._options.fallback, 'ErrorCard');
-		});
-
-		it('works with omitted id', () => {
-			const comp = new Component();
-			const ref = comp.createLazyChild('HeavyChart', { data: [] });
-
-			assert.strictEqual(ref.componentName, 'HeavyChart');
-			assert.strictEqual(ref.id, '');
-			assert.deepStrictEqual(ref.vars, { data: [] });
-			assert.strictEqual(ref._options.lazy, true);
-		});
-	});
-
-	describe('Event pub/sub', () => {
+	                assert.ok(ref instanceof Child);
+	                assert.strictEqual(ref.componentName, 'FuseWire/Lazy');
+	                assert.strictEqual(ref.vars.lazyChild, lazyChild);
+	                assert.strictEqual(ref.vars.placeholderChild, placeholderChild);
+	        });
+	});	describe('Event pub/sub', () => {
 		it('on() registers a handler that emit() calls', () => {
 			const comp = new Component();
 			const calls = [];

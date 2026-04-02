@@ -1,5 +1,5 @@
 import { ComponentId } from './component-id.js';
-import { ComponentReference } from './component-reference.js';
+import { Child } from './component.js';
 import { Component } from './component.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
@@ -38,12 +38,12 @@ function getPropertyValue(data, path) {
 }
 
 /**
- * Check if a value is a Component instance or ComponentReference
+ * Check if a value is a Component instance or Child
  * @param {VarValue|Array<VarValue>} value - Value to check
  * @returns {boolean} True if value represents a component
  */
 function isComponent(value) {
-    return value instanceof ComponentReference || value instanceof Component;
+    return value instanceof Child || value instanceof Component;
 }
 
 /**
@@ -116,14 +116,14 @@ function escapeHtml(str) {
 
 /**
  * Render a component declaration as an empty mount point
- * @param {Component|ComponentReference} decl - Component instance or ComponentReference
+ * @param {Component|Child} decl - Component instance or Child
  * @param {ComponentId} parentId - Parent component ID
  * @returns {string} Mount point HTML
  */
 function renderMountPoint(decl, parentId) {
     let name;
     let id;
-    if (decl instanceof ComponentReference) {
+    if (decl instanceof Child) {
         name = decl.componentName;
         id = decl.id || '';
     } else {
@@ -167,21 +167,13 @@ function interpolateText(text, vars, componentId, constants) {
 
         // Handle Component instances - render as empty mount point
         if (isComponent(value)) {
-            return renderMountPoint(
-                /** @type {Component|ComponentReference} */ (value),
-                componentId,
-            );
+            return renderMountPoint(/** @type {Component|Child} */ (value), componentId);
         }
 
         // Handle arrays of components - wrap in reconciliation container
         if (Array.isArray(value) && value.length > 0 && isComponent(value[0])) {
             const mountPoints = value
-                .map((comp) =>
-                    renderMountPoint(
-                        /** @type {Component|ComponentReference} */ (comp),
-                        componentId,
-                    ),
-                )
+                .map((comp) => renderMountPoint(/** @type {Component|Child} */ (comp), componentId))
                 .join('');
             return `<fw-each id="${componentId.code}:${escapeHtml(path)}" data-fusewire-each="${escapeHtml(path)}">${mountPoints}</fw-each>`;
         }

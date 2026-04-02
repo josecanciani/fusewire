@@ -18,7 +18,7 @@ This is fully automatic -- every component with children benefits with no code c
 
 ### Reconciliation containers (automatic for component arrays)
 
-When a template variable resolves to an array of `ComponentReference` values, the compiled HTML wraps the mount points in a `<fw-each data-fusewire-each="varName">` container. On re-render, instead of morphing the list, the framework:
+When a template variable resolves to an array of `Child` values, the compiled HTML wraps the mount points in a `<fw-each data-fusewire-each="varName">` container. On re-render, instead of morphing the list, the framework:
 
 - Appends mount points for newly added components.
 - Removes mount points for components no longer present.
@@ -28,7 +28,7 @@ The existing child lifecycle (mount, re-render, orphan cleanup) runs as usual af
 
 ## Developer Guide
 
-### Use ComponentReference arrays for large lists
+### Use Child arrays for large lists
 
 To benefit from reconciliation, model repeated content as child components instead of `fw-each` over plain data:
 
@@ -68,11 +68,11 @@ Appending one item reconciles one mount point instead of diffing N elements.
 | Pattern | Use when |
 |---|---|
 | `fw-each` with plain data | Small, bounded lists (< 20 items) with simple HTML per item |
-| `ComponentReference` array | Large or unbounded lists, complex per-item rendering, items with independent state |
+| `Child` array | Large or unbounded lists, complex per-item rendering, items with independent state |
 
 ### Interaction with fw-each
 
-`fw-each` continues to work as before for plain data arrays. Reconciliation containers only apply to arrays of `ComponentReference` values rendered via `((variable))` interpolation. Mixed-content `fw-each` loops still use standard morphing but benefit from morph exclusion (idiomorph skips into child mount points within the loop).
+`fw-each` continues to work as before for plain data arrays. Reconciliation containers only apply to arrays of `Child` values rendered via `((variable))` interpolation. Mixed-content `fw-each` loops still use standard morphing but benefit from morph exclusion (idiomorph skips into child mount points within the loop).
 
 ## Performance
 

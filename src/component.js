@@ -1,4 +1,4 @@
-import { ComponentReference } from './component-reference.js';
+import { ComponentId } from './component-id.js';
 import { EventEmitter } from './event-emitter.js';
 import {
     COMPONENT_ID,
@@ -10,9 +10,15 @@ import {
     LIBRARIES,
 } from './symbols.js';
 
+/**
+ * @typedef {{
+ *   fallback?: string
+ * }} ChildOptions
+ */
+
 /** @typedef {string|number|boolean|null} Scalar */
 /** @typedef {{[key: string]: Scalar}} ScalarObject */
-/** @typedef {Scalar|ScalarObject|Component|ComponentReference} VarValue */
+/** @typedef {Scalar|ScalarObject|Component|Child} VarValue */
 /** @typedef {{[key: string]: (VarValue|Array<VarValue>)}} ComponentVars */
 /** @typedef {{new(): Component, componentName: string}} ComponentConstructor */
 
@@ -113,7 +119,7 @@ export class Component {
      *
      * Merges newVars directly onto the instance's own properties — the same
      * properties declared as class fields. Works the same way on both
-     * Component and ComponentReference — call `ref.update({ badge: '2' })`
+     * Component and Child — call `ref.update({ badge: '2' })`
      * regardless of whether the child has been created yet.
      *
      * The server-side flow (InstanceRegistry) calls `update(newVars, false)`
@@ -166,10 +172,10 @@ export class Component {
      * children. The child is attached to the document when the parent renders
      * and discovers the mount point.
      * @param {string} name - Component name (e.g., 'Counter', 'Basics/Counter')
-     * @param {string|ComponentVars} idOrVars - Instance id, or vars if id is omitted
-     * @param {ComponentVars|import('./component-reference.js').ComponentReferenceOptions} [maybeVarsOrOptions] - Vars when id is provided, or options when id is omitted
-     * @param {import('./component-reference.js').ComponentReferenceOptions} [maybeOptions] - Options when id and vars are provided
-     * @returns {Component|ComponentReference} Reference that the framework replaces with the real instance after mounting
+     * @param {string|ComponentVars} [idOrVars] - Instance id, or vars if id is omitted
+     * @param {ComponentVars|import('./component.js').ChildOptions} [maybeVarsOrOptions] - Vars when id is provided, or options when id is omitted
+     * @param {import('./component.js').ChildOptions} [maybeOptions] - Options when id and vars are provided
+     * @returns {Component|Child} Reference that the framework replaces with the real instance after mounting
      */
     createChild(name, idOrVars, maybeVarsOrOptions, maybeOptions) {
         let id;
@@ -184,10 +190,8 @@ export class Component {
             vars = idOrVars || {};
             options = maybeVarsOrOptions;
         }
-        const ref = new ComponentReference(name, id, vars, null, options);
-        if (this[REACTOR]) {
-            this[REACTOR]._instanceRegistry.startEagerCreation(ref);
-        }
+        const ref = new Child(name, id, vars, null, options);
+        this[REACTOR]._instanceRegistry.startEagerCreation(ref);
         return ref;
     }
 
@@ -196,30 +200,12 @@ export class Component {
      * The parent renders immediately with a placeholder component. When the
      * real child is ready, the framework swaps the placeholder for the real
      * component and triggers a re-render of the parent.
-     * @param {string} name - Component name (e.g., 'Analytics/HeavyChart')
-     * @param {string|ComponentVars} idOrVars - Instance id, or vars if id is omitted
-     * @param {ComponentVars|import('./component-reference.js').ComponentReferenceOptions} [maybeVarsOrOptions] - Vars when id is provided, or options when id is omitted
-     * @param {import('./component-reference.js').ComponentReferenceOptions} [maybeOptions] - Options when id and vars are provided
-     * @returns {Component|ComponentReference} Reference that the framework replaces with the real instance after mounting
+     * @param {Component|Child} lazyChild - The child reference to load lazily
+     * @param {Component|Child} placeholderChild - Placeholder to show while loading
+     * @returns {Component|Child} Reference that the framework replaces with the real instance after mounting
      */
-    createLazyChild(name, idOrVars, maybeVarsOrOptions, maybeOptions) {
-        let id;
-        let vars;
-        let options;
-        if (typeof idOrVars === 'string') {
-            id = idOrVars;
-            vars = maybeVarsOrOptions || {};
-            options = maybeOptions || {};
-        } else {
-            id = '';
-            vars = idOrVars || {};
-            options = maybeVarsOrOptions || {};
-        }
-        const ref = new ComponentReference(name, id, vars, null, { ...options, lazy: true });
-        if (this[REACTOR]) {
-            this[REACTOR]._instanceRegistry.startEagerCreation(ref);
-        }
-        return ref;
+    createLazyChild(lazyChild, placeholderChild) {
+        return this.createChild('FuseWire/Lazy', '', { lazyChild, placeholderChild });
     }
 
     /**
@@ -389,9 +375,166 @@ export class Component {
             );
             return;
         }
-        if (!this[REACTOR]) {
-            throw new Error('Component: Cannot react - reactor not attached');
-        }
         this[REACTOR].react(this[COMPONENT_ID], mode);
+    }
+}
+
+/**
+ * Child - A lightweight declaration of a child component.
+ *
+ * This is NOT a Component instance. It carries only the data needed for
+ * the InstanceRegistry to create the real Component: name, id, vars, and
+ * an optional version for cache validation.
+ *
+ * Developers create references via Component.createChild() inside component
+ * code. The InstanceRegistry recognises these in vars and auto-mounts the
+ * real Component at render time.
+ *
+ * After the real Component is created, the framework replaces this reference
+ * in the parent's vars with the Component instance. From that point on, the
+ * parent interacts directly with the Component. This reference should not be
+ * used after replacement — doing so is a bug in the calling code.
+ *
+ * @example
+ * // Inside a component method:
+ * this.sidebar = this.createChild('Sidebar', 'main', { collapsed: false });
+ * this.react();
+ */
+export class Child {
+    /**
+     * Create a new Child
+     * @param {string} componentName - Component name for template/class resolution
+     * @param {string} id - Instance identifier (may be empty)
+     * @param {ComponentVars} vars - Initial variables for the component
+     * @param {string|null} version - Template version hash, or null for latest
+     * @param {ChildOptions} options - Creation options (fallback)
+     */
+    constructor(componentName, id = '', vars = {}, version = null, options = {}) {
+        if (!componentName || typeof componentName !== 'string') {
+            throw new Error('Child: componentName must be a non-empty string');
+        }
+        this.componentName = componentName;
+        this.id = id;
+        this.vars = vars;
+        this.version = version;
+        this._options = options;
+        this._replaced = false;
+        this._bufferedEvents = [];
+        this._creationPromise = null;
+        this._detachedContainer = null;
+        this._creationError = null;
+    }
+
+    /**
+     * Build a ComponentId from this reference
+     * @returns {ComponentId} The corresponding ComponentId
+     */
+    toComponentId() {
+        return new ComponentId(this.componentName, this.id);
+    }
+
+    /**
+     * Update vars via shallow merge (Object.assign semantics).
+     *
+     * This method exists so that parent code can call `ref.update({ key: value })`
+     * regardless of whether the child Component has been created yet. Before
+     * creation, this merges into the reference's vars — those vars will be used
+     * when the Component is eventually instantiated. After creation, the framework
+     * replaces this reference with the real Component in the parent's vars, so
+     * subsequent update() calls reach Component.update() instead.
+     *
+     * If this reference has already been replaced by the real Component, calling
+     * update() is a bug — the caller is holding a stale reference.
+     *
+     * @param {ComponentVars} newVars - Vars to merge into the reference
+     */
+    update(newVars) {
+        if (this._replaced) {
+            throw new Error(
+                `Child: update() called on replaced reference "${this.toComponentId().code}". ` +
+                    'Use the Component instance from vars instead.',
+            );
+        }
+        Object.assign(this.vars, newVars);
+    }
+
+    /**
+     * Buffer an event subscription to be replayed on the real Component once mounted.
+     *
+     * Returns an unsubscribe function that works both before and after the real
+     * instance is created: before creation it marks the entry as removed so replay
+     * skips it; after creation it delegates to the real Component's unsubscribe.
+     *
+     * @param {string} eventName - Event name to listen for
+     * @param {function(...*): (void|false)} handler - Callback invoked when the event fires
+     * @returns {function(): void} Unsubscribe function
+     */
+    on(eventName, handler) {
+        if (this._replaced) {
+            throw new Error(
+                `Child: on() called on replaced reference "${this.toComponentId().code}". ` +
+                    'Use the Component instance from vars instead.',
+            );
+        }
+        const entry = { eventName, handler, removed: false, realUnsub: null };
+        this._bufferedEvents.push(entry);
+        return () => {
+            if (entry.realUnsub) {
+                entry.realUnsub();
+            } else {
+                entry.removed = true;
+            }
+        };
+    }
+
+    /**
+     * Replay buffered event subscriptions on the real Component instance.
+     * Called by the InstanceRegistry after the real Component is created and
+     * the reference is replaced in the parent's vars.
+     * @param {import('./component.js').Component} component - The fully loaded component instance
+     */
+    _replayBufferedEvents(component) {
+        for (const entry of this._bufferedEvents) {
+            if (!entry.removed) {
+                entry.realUnsub = component.on(entry.eventName, entry.handler);
+            }
+        }
+        this._bufferedEvents = [];
+    }
+
+    /**
+     * Returns a promise that resolves to the fully created Component instance
+     * once its background creation pipeline (loading, init, and rendering) is complete.
+     * Use this when you need to safely interact with a child component instance.
+     * @returns {Promise<import('./component.js').Component|null>} The created component instance or null
+     */
+    whenReady() {
+        return this._creationPromise || Promise.resolve(null);
+    }
+}
+
+export class Lazy extends Component {
+    static componentName = 'FuseWire/Lazy';
+
+    /** @type {Child} */
+    child;
+
+    /** @type {Child} */
+    lazyChild;
+
+    /** @type {Child} */
+    placeholderChild;
+
+    async init() {
+        this.child = this.placeholderChild;
+        this.lazyChild
+            .whenReady()
+            .then(() => {
+                this.update({ child: this.lazyChild });
+            })
+            .catch((err) => {
+                this.lazyChild._creationError = err;
+                this.update({ child: this.lazyChild });
+            });
     }
 }

@@ -1,0 +1,40 @@
+/* fw-external-classes: card, border-0, shadow-sm, card-body, p-4, text-center, mb-3, text-success, card-title, h4, card-text, text-secondary, mb-4 */
+.lazy-widget {
+    background: var(--bs-body-bg);
+    border-radius: 12px;
+    animation: fw-fade-in 0.5s ease-out;
+}
+
+.success-icon {
+    animation: fw-bounce 1s ease;
+}
+
+@keyframes fw-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fw-bounce {
+    0%,
+    20%,
+    50%,
+    80%,
+    100% {
+        transform: translateY(0);
+    }
+
+    40% {
+        transform: translateY(-10px);
+    }
+
+    60% {
+        transform: translateY(-5px);
+    }
+}

@@ -6,7 +6,7 @@ import { Renderer } from '../src/renderer.js';
 import { TemplateStore } from '../src/template-store.js';
 import { Component } from '../src/component.js';
 import { ComponentId } from '../src/component-id.js';
-import { ComponentReference } from '../src/component-reference.js';
+import { Child } from '../src/component.js';
 import { Idiomorph } from 'idiomorph';
 import { COMPONENT_ID } from '../src/symbols.js';
 
@@ -147,7 +147,7 @@ describe('InstanceRegistry Mounting Thoroughness', () => {
             });
 
             const parentId = new ComponentId('TestComponent', 'parent1');
-            const childRef = new ComponentReference('ChildComponent', 'child1', {});
+            const childRef = new Child('ChildComponent', 'child1', {});
 
             const parent = await registry.create(parentId, TestComponent, { child: childRef }, container);
             const childId = new ComponentId('ChildComponent', 'child1');

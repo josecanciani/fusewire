@@ -1,6 +1,6 @@
 import { ComponentNotFoundError } from './errors/error-hierarchy.js';
 import { ComponentId, toCssName } from './component-id.js';
-import { ComponentReference } from './component-reference.js';
+import { Child, Lazy } from './component.js';
 import { Component } from './component.js';
 import { LogMessage } from './log-message.js';
 import { compileTemplate } from './template-compiler.js';
@@ -42,7 +42,7 @@ function collectVars(instance) {
  * - Call lifecycle hooks (init, update, destroy)
  * - Coordinate rendering with Renderer
  * - Manage component tree (parent/child relationships)
- * - Resolve ComponentReference declarations to real Component instances
+ * - Resolve Child declarations to real Component instances
  * - Wire framework state via Symbol keys: COMPONENT_ID, REGISTRY_ENTRY, CONSOLE, REACTOR
  * - Apply initial vars onto instance (overriding class field defaults)
  */
@@ -55,6 +55,17 @@ export class InstanceRegistry {
         this._instances = new Map(); // componentId.code -> { instance, container, parent, children }
         this._roots = new Set(); // codes of root components (no parent)
         this._componentClasses = new Map(); // componentName -> ComponentConstructor (pre-registered)
+
+        this.registerComponent('FuseWire/Lazy', Lazy);
+        this._templateStore.set('FuseWire/Lazy', {
+            version: 'builtin',
+            htmlCode: '((child))',
+            cssCode: '',
+        });
+        this._templateStore.setCompiled(
+            'FuseWire/Lazy',
+            compileTemplate('((child))', '', this._appName),
+        );
     }
 
     /**
@@ -72,8 +83,8 @@ export class InstanceRegistry {
     }
 
     /**
-     * Create a component from a ComponentReference (resolves the class by name)
-     * @param {ComponentReference} ref - Component reference to resolve
+     * Create a component from a Child (resolves the class by name)
+     * @param {Child} ref - Component reference to resolve
      * @param {HTMLElement} container - DOM container
      * @param {{deferHydration?: boolean}} options - Creation options
      * @returns {Promise<Component>} The created instance
@@ -162,6 +173,11 @@ export class InstanceRegistry {
             }
         } finally {
             instance[LIFECYCLE_ACTIVE] = null;
+        }
+
+        if (!deferHydration) {
+            // Component is fully mounted and ready
+            instance.emit('fw-ready', instance);
         }
 
         return instance;
@@ -363,7 +379,7 @@ export class InstanceRegistry {
      * @private
      * @param {HTMLElement} mountPoint - Mount point element with data-fusewire-id
      * @param {Component} parentInstance - Parent component instance
-     * @param {Map<string, Component|ComponentReference>} declarations - Pre-built declaration index for O(1) lookup
+     * @param {Map<string, Component|Child>} declarations - Pre-built declaration index for O(1) lookup
      * @returns {Promise<void>}
      */
     async _mountChild(mountPoint, parentInstance, declarations) {
@@ -372,7 +388,7 @@ export class InstanceRegistry {
 
         // Check for an eagerly-created child (reference with _creationPromise)
         const decl = declarations.get(childCode) || null;
-        if (decl instanceof ComponentReference && decl._creationPromise) {
+        if (decl instanceof Child && decl._creationPromise) {
             return await this._attachEagerChild(mountPoint, parentInstance, decl, childId);
         }
 
@@ -400,7 +416,7 @@ export class InstanceRegistry {
         const parentDeferred = parentEntry.needsHydration;
 
         let childInstance;
-        if (decl instanceof ComponentReference) {
+        if (decl instanceof Child) {
             childInstance = await this.createFromReference(decl, mountPoint, {
                 deferHydration: parentDeferred,
             });
@@ -433,32 +449,13 @@ export class InstanceRegistry {
      * @private
      * @param {HTMLElement} mountPoint - Mount point element in parent's DOM
      * @param {Component} parentInstance - Parent component instance
-     * @param {ComponentReference} decl - The child reference with _creationPromise
+     * @param {Child} decl - The child reference with _creationPromise
      * @param {ComponentId} childId - Child component identity
      * @returns {Promise<void>}
      */
     async _attachEagerChild(mountPoint, parentInstance, decl, childId) {
         const parentEntry = this._instances.get(parentInstance[COMPONENT_ID].code);
         const parentDeferred = parentEntry.needsHydration;
-
-        // For lazy children, check if the creation has already completed.
-        // If not, mount a placeholder and swap when ready.
-        if (decl._options.lazy && !this.has(childId)) {
-            // If a previous attempt stored an error, create the fallback now
-            if (decl._creationError) {
-                if (decl._options.fallback) {
-                    return await this._createFallback(
-                        mountPoint,
-                        parentInstance,
-                        decl,
-                        childId,
-                        decl._creationError,
-                    );
-                }
-                throw decl._creationError;
-            }
-            return await this._mountLazyChild(mountPoint, parentInstance, decl, childId);
-        }
 
         let childInstance;
         try {
@@ -497,63 +494,17 @@ export class InstanceRegistry {
     }
 
     /**
-     * Mount a lazy child with a placeholder while the real component loads.
-     * Renders placeholder HTML directly into the mount point (no full
-     * Component instance). When the real child's creation promise resolves,
-     * queues a parent re-render so _mountChild picks up the completed child.
-     * @private
-     * @param {HTMLElement} mountPoint - Mount point element
-     * @param {Component} parentInstance - Parent component instance
-     * @param {ComponentReference} decl - The lazy child's reference
-     * @param {ComponentId} childId - Child component identity
-     */
-    async _mountLazyChild(mountPoint, parentInstance, decl, childId) {
-        const placeholderName = decl._options.placeholder;
-        if (placeholderName) {
-            // Render placeholder template as static HTML
-            await this._ensureTemplate(placeholderName);
-            const template = this._templateStore.get(placeholderName);
-            let compiled = this._templateStore.getCompiled(placeholderName);
-            if (!compiled) {
-                compiled = compileTemplate(template.htmlCode, template.cssCode, this._appName);
-                this._templateStore.setCompiled(placeholderName, compiled);
-            }
-            mountPoint.innerHTML = compiled.render({}, childId, {});
-            this._renderer._injectCSS(placeholderName, compiled.css);
-        }
-
-        // When the real child is ready, queue a parent re-render to swap it in
-        decl._creationPromise.then(
-            () => {
-                // The parent re-renders, _mountChild sees the child is now in
-                // the registry (this.has(childId) is true), and takes the
-                // _attachEagerChild path which transfers the DOM.
-                parentInstance.react();
-            },
-            (error) => {
-                if (decl._options.fallback) {
-                    // Store the error so the fallback path can handle it on re-render
-                    decl._creationError = error;
-                    parentInstance.react();
-                }
-                // If no fallback, the error is silently swallowed for lazy children
-                // since the parent already rendered successfully
-            },
-        );
-    }
-
-    /**
      * Create a fallback component when child creation fails.
      * The fallback renders in the failed child's mount point with error context.
      * @private
      * @param {HTMLElement} mountPoint - Mount point element
      * @param {Component} parentInstance - Parent component instance
-     * @param {ComponentReference} decl - The failed child's reference
+     * @param {Child} decl - The failed child's reference
      * @param {ComponentId} childId - The failed child's identity
      * @param {Error} error - The creation error
      */
     async _createFallback(mountPoint, parentInstance, decl, childId, error) {
-        const fallbackRef = new ComponentReference(decl._options.fallback, childId.id, {
+        const fallbackRef = new Child(decl._options.fallback, childId.id, {
             errorMessage: error.message,
             failedComponent: decl.componentName,
         });
@@ -579,7 +530,7 @@ export class InstanceRegistry {
      * run in parallel with other children and with the parent's render.
      * hydrate() and afterRender() are deferred until the child is attached
      * to the document.
-     * @param {ComponentReference} ref - Component reference to eagerly create
+     * @param {Child} ref - Component reference to eagerly create
      */
     startEagerCreation(ref) {
         const code = new ComponentId(ref.componentName, ref.id || '').code;
@@ -598,7 +549,7 @@ export class InstanceRegistry {
      * Loads the class, fetches the template, and runs init + render + library
      * resolution into a detached container. On failure, cleans up partial state.
      * @private
-     * @param {ComponentReference} ref - Component reference
+     * @param {Child} ref - Component reference
      * @param {HTMLElement} container - Detached container to render into
      * @returns {Promise<Component>} The created instance (pending hydration)
      */
@@ -645,12 +596,16 @@ export class InstanceRegistry {
             try {
                 instance[LIFECYCLE_ACTIVE] = 'hydrate';
                 instance.hydrate();
+
                 instance[LIFECYCLE_ACTIVE] = 'afterRender';
                 instance.afterRender();
             } finally {
                 instance[LIFECYCLE_ACTIVE] = null;
             }
             entry.needsHydration = false;
+
+            // Component is fully mounted and ready
+            instance.emit('fw-ready', instance);
         }
     }
 
@@ -659,18 +614,18 @@ export class InstanceRegistry {
      * @private
      * @param {Component} instance - Parent component instance
      * @param {ComponentId} childId - Child component ID to match
-     * @returns {Component|ComponentReference|null} Matching declaration or null
+     * @returns {Component|Child|null} Matching declaration or null
      */
     _findChildDeclaration(instance, childId) {
         for (const key of Object.keys(instance)) {
             const value = instance[key];
             if (this._matchesChildId(value, childId)) {
-                return /** @type {Component|ComponentReference} */ (value);
+                return /** @type {Component|Child} */ (value);
             }
             if (Array.isArray(value)) {
                 for (const item of value) {
                     if (this._matchesChildId(item, childId)) {
-                        return /** @type {Component|ComponentReference} */ (item);
+                        return /** @type {Component|Child} */ (item);
                     }
                 }
             }
@@ -686,7 +641,7 @@ export class InstanceRegistry {
      * @returns {boolean} True if value matches
      */
     _matchesChildId(value, childId) {
-        if (value instanceof ComponentReference) {
+        if (value instanceof Child) {
             return value.componentName === childId.name && (value.id || '') === childId.id;
         }
         // Legacy: Component instance
@@ -813,12 +768,12 @@ export class InstanceRegistry {
 
     /**
      * Collect component declarations from an instance's own properties (top-level values and array items).
-     * Recognises both ComponentReference and legacy Component instances.
+     * Recognises both Child and legacy Component instances.
      * Returns two maps: one for component identity (code -> ComponentId) and one
-     * for fast declaration lookup (code -> Component|ComponentReference).
+     * for fast declaration lookup (code -> Component|Child).
      * @private
      * @param {Component} instance - Component instance
-     * @returns {{children: Map<string, ComponentId>, declarations: Map<string, Component|ComponentReference>}} Maps keyed by component code
+     * @returns {{children: Map<string, ComponentId>, declarations: Map<string, Component|Child>}} Maps keyed by component code
      */
     _collectChildComponents(instance) {
         const children = new Map();
@@ -841,13 +796,13 @@ export class InstanceRegistry {
      * @private
      * @param {VarValue} value - Value to check
      * @param {Map<string, ComponentId>} children - Map to add identity to
-     * @param {Map<string, Component|ComponentReference>} declarations - Map to add declaration to
+     * @param {Map<string, Component|Child>} declarations - Map to add declaration to
      */
     _collectIfComponent(value, children, declarations) {
         if (!this._isComponentDecl(value)) return;
         let name;
         let id;
-        if (value instanceof ComponentReference) {
+        if (value instanceof Child) {
             name = value.componentName;
             id = value.id || '';
         } else {
@@ -857,25 +812,25 @@ export class InstanceRegistry {
         }
         const componentId = new ComponentId(name, id);
         children.set(componentId.code, componentId);
-        declarations.set(componentId.code, /** @type {Component|ComponentReference} */ (value));
+        declarations.set(componentId.code, /** @type {Component|Child} */ (value));
     }
 
     /**
-     * Check if a value is a component declaration (ComponentReference or Component instance)
+     * Check if a value is a component declaration (Child or Component instance)
      * @private
      * @param {VarValue|Array<VarValue>} value - Value to check
      * @returns {boolean} True if value is a component declaration
      */
     _isComponentDecl(value) {
-        return value instanceof ComponentReference || value instanceof Component;
+        return value instanceof Child || value instanceof Component;
     }
 
     /**
-     * Replace a ComponentReference with the real Component instance in the parent's
+     * Replace a Child with the real Component instance in the parent's
      * own properties. Searches string-keyed properties and array items by identity (===).
      * @private
      * @param {Component} parentInstance - Parent component instance
-     * @param {ComponentReference} ref - The reference to replace
+     * @param {Child} ref - The reference to replace
      * @param {Component} childInstance - The real Component instance
      */
     _replaceRefInVars(parentInstance, ref, childInstance) {

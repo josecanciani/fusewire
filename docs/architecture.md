@@ -130,7 +130,7 @@ Child components communicate with their parent through a lightweight pub/sub mec
 
 ### Subscribing (parent side)
 
-A parent subscribes to a child's events using buffered references. The `ComponentReference` returned by `createChild()` buffers `.on()` calls and replays them once the real `Component` instance is mounted:
+A parent subscribes to a child's events using buffered references. The `Child` returned by `createChild()` buffers `.on()` calls and replays them once the real `Component` instance is mounted:
 
 ```javascript
 async init() {
@@ -206,9 +206,9 @@ The `init()` hook is async, allowing components to:
 
 ### Polymorphic update()
 
-Both `Component` and `ComponentReference` expose an `update(newVars)` method. This lets parent code call `child.update({ badge: '2' })` regardless of whether the child has been instantiated:
+Both `Component` and `Child` expose an `update(newVars)` method. This lets parent code call `child.update({ badge: '2' })` regardless of whether the child has been instantiated:
 
-- **Before mount**: The child is still a `ComponentReference`. `update()` shallow-merges vars locally; they will be used when the Component is created.
+- **Before mount**: The child is still a `Child`. `update()` shallow-merges vars locally; they will be used when the Component is created.
 - **After mount**: The framework replaces the reference in the parent's vars with the real `Component` instance. The same `update()` call now reaches `Component.update()`, which merges vars and triggers a re-render.
 
 Subclasses can override `update()` for custom logic (validation, derived state) and must call `super.update(newVars, react)`.
@@ -260,7 +260,7 @@ Idiomorph minimizes DOM operations by:
 - Preserving unchanged subtrees
 - Reusing existing elements
 
-Child component mount points are excluded from morphing via the `beforeNodeMorphed` callback -- idiomorph matches them by attributes but never descends into their rendered content. Arrays of `ComponentReference` values are wrapped in reconciliation containers that bypass morphing entirely in favor of key-based append/remove. See [Render Optimization](render-optimization.md) for details.
+Child component mount points are excluded from morphing via the `beforeNodeMorphed` callback -- idiomorph matches them by attributes but never descends into their rendered content. Arrays of `Child` values are wrapped in reconciliation containers that bypass morphing entirely in favor of key-based append/remove. See [Render Optimization](render-optimization.md) for details.
 
 ### CSS Injection Deduplication
 CSS is injected once per component name (not per instance), preventing style duplication.

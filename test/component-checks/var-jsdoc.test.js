@@ -18,7 +18,7 @@ const SCALAR_TYPES = new Set(['string', 'number', 'boolean', 'null']);
 const FRAMEWORK_TYPES = new Set([
     ...SCALAR_TYPES,
     'Component',
-    'ComponentReference',
+    'Child',
 ]);
 
 // Types that are too generic — these should be replaced with specific types.
@@ -157,7 +157,7 @@ function extractTypeTokens(typeExpr) {
 
 /**
  * Check if a type expression is valid for a component var.
- * Valid types: scalars, Component, ComponentReference, custom component class names,
+ * Valid types: scalars, Component, Child, custom component class names,
  * ScalarObject, object, Arrays of these, and unions of these.
  * Forbidden: generic Object, Function, Any, *.
  * @param {string} typeExpr - JSDoc type expression
@@ -287,7 +287,7 @@ describe('Var JSDoc Validation', () => {
                                 `${className} has public class fields without @type JSDoc:\n` +
                                 violations.map((v) => `  ${v}`).join('\n') +
                                 '\n\nFix: add /** @type {X} */ before each field declaration.\n' +
-                                'Valid types: string, number, boolean, null, Component, ComponentReference,\n' +
+                                'Valid types: string, number, boolean, null, Component, Child,\n' +
                                 'specific component class names, ScalarObject, Array.<Type>, or unions of these.',
                         );
                     }

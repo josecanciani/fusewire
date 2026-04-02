@@ -63,7 +63,7 @@ framework ignores them. Declare them in the class body with a default value:
 
 ```javascript
 export class Panel extends Component {
-    /** @type {Array.<Component|ComponentReference>} */
+    /** @type {Array.<Component|Child>} */
     logs = [];
 
     #lastKey = '';
@@ -160,7 +160,7 @@ the rest.
 ## Child components
 
 Declare children with `createChild(name, id, vars)`. This returns a
-`ComponentReference` — a lightweight placeholder the framework replaces with
+`Child` — a lightweight placeholder the framework replaces with
 the real instance once the parent renders and the child mounts.
 
 ```javascript
@@ -178,7 +178,7 @@ engine auto-mounts it — no manual wiring needed.
 
 ### Subscribing to child events (buffered references)
 
-The `ComponentReference` returned by `createChild()` buffers `.on()` calls and
+The `Child` returned by `createChild()` buffers `.on()` calls and
 replays them when the real instance mounts. Subscribe directly in `init()`:
 
 ```javascript
@@ -191,13 +191,13 @@ async init() {
 
 ### Type hinting children
 
-`createChild` and `createLazyChild` return `Component | ComponentReference`, but by the time you read a child property it's already the real instance. To get IDE autocomplete and pass type checking (especially when the child class adds new properties like `duration` or `items`), annotate the field with a JSDoc type-only import and cast at the assignment.
+`createChild` and `createLazyChild` return `Component | Child`, but by the time you read a child property it's already the real instance. To get IDE autocomplete and pass type checking (especially when the child class adds new properties like `duration` or `items`), annotate the field with a JSDoc type-only import and cast at the assignment.
 
 > [!TIP]
-> Always type child properties (including arrays) with the **specific, final component class** (e.g., `Line`, `Lazy`) rather than the generic `Component` or `ComponentReference`. This ensures correct type checking for child-specific features and provides full IDE autocomplete.
+> Always type child properties (including arrays) with the **specific, final component class** (e.g., `Line`, `Lazy`) rather than the generic `Component` or `Child`. This ensures correct type checking for child-specific features and provides full IDE autocomplete.
 
 > [!IMPORTANT]
-> **Parentheses are mandatory** for the cast. If you omit them, `tsc` will fail with error `TS2322: Type 'Component | ComponentReference' is not assignable to type 'MyComponent'`, because the cast is not correctly applied to the entire expression.
+> **Parentheses are mandatory** for the cast. If you omit them, `tsc` will fail with error `TS2322: Type 'Component | Child' is not assignable to type 'MyComponent'`, because the cast is not correctly applied to the entire expression.
 
 ```javascript
 /** @type {import('./Console/Line.js').Line} */
@@ -373,18 +373,25 @@ programmatic behavior (e.g., reconfiguring a third-party widget).
 ## Lazy child components
 
 Use `createLazyChild()` for children that should load in the background without
-blocking the parent's render:
+blocking the parent's render. It requires two child declarations: the lazy component and its placeholder:
 
 ```javascript
 async init() {
-    this.chart = this.createLazyChild('Analytics/HeavyChart', 'chart', {
-        placeholder: 'Common/Skeleton',  // optional — defaults to built-in placeholder
+    this.chart = this.createLazyChild(
+        this.createChild('Analytics/HeavyChart', 'chart'),
+        this.createChild('Common/Skeleton', 'chart') // mandatory placeholder
+    );
+    
+    // You can interact with the child once it's fully created and hydrated
+    this.chart.on('fw-ready', (instance) => {
+        console.log('Heavy chart is visible and fully mounted!', instance);
     });
 }
 ```
 
-The parent renders immediately with a placeholder. When the real child's JS and
-template load, the framework swaps the placeholder for the real component. Works
+The parent renders immediately with the placeholder. When the real child's JS and
+template load, the framework swaps the placeholder for the real component and 
+fires `fw-ready` on the fully hydrated component instance. Works
 consistently in both CSR and SSR.
 
 ---

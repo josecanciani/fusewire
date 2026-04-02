@@ -6,7 +6,7 @@ import { Renderer } from '../src/renderer.js';
 import { TemplateStore } from '../src/template-store.js';
 import { Component } from '../src/component.js';
 import { ComponentId } from '../src/component-id.js';
-import { ComponentReference } from '../src/component-reference.js';
+import { Child } from '../src/component.js';
 import { Idiomorph } from 'idiomorph';
 import { COMPONENT_ID } from '../src/symbols.js';
 
@@ -80,9 +80,9 @@ describe('Render Optimizations', () => {
             assert.strictEqual(result.declarations.get('ChildComponent#c1'), child);
         });
 
-        it('returns declarations Map for ComponentReference vars', () => {
+        it('returns declarations Map for Child vars', () => {
             const instance = new Component();
-            const ref = new ComponentReference('ChildComponent', 'c1', {});
+            const ref = new Child('ChildComponent', 'c1', {});
             instance.child = ref;
 
             const result = registry._collectChildComponents(instance);

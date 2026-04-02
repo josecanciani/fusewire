@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import { JSDOM } from 'jsdom';
 import { ComponentId } from '../src/component-id.js';
 import { compileTemplate } from '../src/template-compiler.js';
-import { ComponentReference } from '../src/component-reference.js';
+import { Child } from '../src/component.js';
 
 // Set up JSDOM global document
 const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
@@ -321,7 +321,7 @@ describe('Template Compiler', () => {
         it('renders component as mount point', () => {
             const template = compileTemplate('<div>((child))</div>');
             const componentId = new ComponentId('Parent', 'main');
-            const child = new ComponentReference('ChildComponent', 'child1');
+            const child = new Child('ChildComponent', 'child1');
             const result = template.render({ child }, componentId);
 
             assert.ok(result.includes('data-fusewire-id="ChildComponent#child1"'));
@@ -332,8 +332,8 @@ describe('Template Compiler', () => {
             const template = compileTemplate('<div>((cards))</div>');
             const componentId = new ComponentId('CardList', 'main');
             const cards = [
-                new ComponentReference('Card', 'card1'),
-                new ComponentReference('Card', 'card2'),
+                new Child('Card', 'card1'),
+                new Child('Card', 'card2'),
             ];
             const result = template.render({ cards }, componentId);
 
@@ -347,9 +347,9 @@ describe('Template Compiler', () => {
             const template = compileTemplate('<div>((items))</div>');
             const componentId = new ComponentId('List', 'main');
             const items = [
-                new ComponentReference('Item', 'a'),
-                new ComponentReference('Item', 'b'),
-                new ComponentReference('Item', 'c'),
+                new Child('Item', 'a'),
+                new Child('Item', 'b'),
+                new Child('Item', 'c'),
             ];
             const result = template.render({ items }, componentId);
 
@@ -368,7 +368,7 @@ describe('Template Compiler', () => {
         it('single component does not get reconciliation container', () => {
             const template = compileTemplate('<div>((child))</div>');
             const componentId = new ComponentId('Parent', 'main');
-            const child = new ComponentReference('Child', 'one');
+            const child = new Child('Child', 'one');
             const result = template.render({ child }, componentId);
 
             assert.ok(!result.includes('data-fusewire-each'));

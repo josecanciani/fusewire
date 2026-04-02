@@ -218,13 +218,13 @@ Some children are expensive to load (large JS, complex templates) but not critic
 
 ### Design: placeholder components
 
-`createLazyChild()` works like `createChild()` but renders a placeholder while the real child loads:
+`createLazyChild()` takes two Child declarations: the slow one and a placeholder that renders immediately.
 
 ```javascript
-this.chart = this.createLazyChild('Analytics/HeavyChart', 'chart', {}, {
-    placeholder: 'Common/Skeleton',
-    fallback: 'Common/ErrorCard',
-});
+this.chart = this.createLazyChild(
+    this.createChild('Analytics/HeavyChart', 'chart', {}, { fallback: 'Common/ErrorCard' }),
+    this.createChild('Common/Skeleton', 'chart')
+);
 ```
 
 Three states for a child:
@@ -237,12 +237,15 @@ Three states for a child:
 
 ### Behavior
 
-1. `createLazyChild()` returns a `ComponentReference` (same as `createChild()`).
-2. During the parent's render, the mount point shows the placeholder component.
-3. The real child's creation runs in the background (parallel, detached).
-4. When the real child is ready, the framework swaps the placeholder for the real component — the mount point's DOM is replaced.
-5. `hydrate()` and `afterRender()` run on the real child after swap.
-6. If creation fails and `fallback` is set, the fallback replaces the placeholder.
+How does FuseWire know when to wait for a child component and when to skip waiting? It relies on a very intentional separation between **creating** a child and **mounting** it.
+
+1. **Eager Creation (Background):** When `createLazyChild()` is called, it immediately creates a `FuseWire/Lazy` component, which in turn calls `createChild()` for both the `lazyChild` and the `placeholderChild`. This starts downloading the templates, executing the JS, and running `init()` in a detached background container for *both* children in parallel.
+2. **Lazy Mounting (Template-Driven):** The framework's render pipeline **does not block just because a child was created**. It *only* blocks if that child is actually encountered in the rendered HTML template.
+3. **Rendering the Placeholder:** The `FuseWire/Lazy` component's initial template is just `((child))`, and its `init()` method sets `this.child = this.placeholderChild;`. When the Renderer processes this template, it injects a mount point specifically for the placeholder. It *never* encounters a mount point for the `lazyChild`. Because `lazyChild` is missing from the active DOM structure, the registry skips it during the mount phase and never awaits its creation promise. The slow component keeps loading in the background, completely disconnected from the parent's render cycle!
+4. **The Swap:** Once the slow `lazyChild` resolves in the background, `FuseWire/Lazy` triggers a re-render with `this.update({ child: this.lazyChild })`. Now the template evaluates to `lazyChild`. The renderer injects the `lazyChild`'s mount point into the DOM. Since `lazyChild` is already 100% loaded and resolved, the mount happens instantly via a DOM node transfer, replacing the placeholder. The framework then emits `fw-ready`.
+5. `hydrate()` and `afterRender()` run on the real child after the swap.
+
+By deliberately keeping the slow component out of the template until it's ready, we trick the framework into letting it load in the background without holding up the rest of the application.
 
 ### Placeholder vs fallback
 
@@ -251,11 +254,11 @@ Both are regular components rendered in the child's mount point. The difference 
 - **Placeholder** — shown while loading, replaced when the real child is ready. Temporary.
 - **Fallback** — shown when creation fails. Permanent (unless the parent retries).
 
-`placeholder` defaults to a built-in skeleton component if not specified. `fallback` defaults to none (errors propagate).
+The placeholder is explicitly passed as the second argument to `createLazyChild()`. The `fallback` is configured via the options of the lazy child.
 
 ### Unified pattern with createChild
 
-`createChild()` and `createLazyChild()` share the same options:
+The `fallback` option works identically for both eager and lazy children:
 
 ```javascript
 // Eager: parent waits for child before completing render
@@ -264,13 +267,13 @@ this.critical = this.createChild('Dashboard', 'main', {}, {
 });
 
 // Lazy: parent renders immediately, child loads in background
-this.chart = this.createLazyChild('Analytics/Chart', 'chart', {}, {
-    placeholder: 'Common/Skeleton',
-    fallback: 'Common/ErrorCard',
-});
+this.chart = this.createLazyChild(
+    this.createChild('Analytics/Chart', 'chart', {}, { fallback: 'Common/ErrorCard' }),
+    this.createChild('Common/Skeleton', 'chart')
+);
 ```
 
-The `fallback` option works identically in both cases. The only difference is timing: `createChild` blocks the parent's render until the child is ready (or fails), while `createLazyChild` lets the parent render immediately with a placeholder.
+The only difference is timing: `createChild` blocks the parent's render until the child is ready (or fails), while `createLazyChild` lets the parent render immediately with a placeholder.
 
 ## Edge Cases
 

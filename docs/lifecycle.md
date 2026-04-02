@@ -80,7 +80,7 @@ update(newVars, react = true) {
 - Always call `super.update(newVars, react)` to apply the merge
 - Save any "before" values *before* calling `super.update()` if you need to compare
 - Default `react=true` triggers a re-render; the server-side flow passes `false`
-- Works polymorphically with `ComponentReference.update()` — parent code can call `child.update(...)` regardless of whether the child has been instantiated
+- Works polymorphically with `Child.update()` — parent code can call `child.update(...)` regardless of whether the child has been instantiated
 
 ---
 
@@ -168,6 +168,33 @@ destroy() {
 - Clear timers/intervals
 - Called automatically by framework when component removed
 - Event subscriptions (`on()` handlers) are cleared automatically after `destroy()` runs — no manual cleanup needed
+
+---
+
+### `fw-ready` Event
+
+**When:** Emitted by the framework immediately after `afterRender()` on the first render (after `hydrate()`).  
+**Type:** Event  
+**Purpose:** Notify parent components that this child component is fully initialized, rendered, and attached to the document.
+
+```js
+async init() {
+  this.chart = this.createLazyChild(
+      this.createChild('Analytics/HeavyChart', 'chart'),
+      this.createChild('Common/Skeleton', 'chart')
+  );
+  
+  // This listener is buffered and will be attached to the real HeavyChart 
+  // once it's fully created and swapped in.
+  this.chart.on('fw-ready', (chartInstance) => {
+    console.log('Chart is now ready to be interacted with!', chartInstance);
+  });
+}
+```
+
+**Guidelines:**
+- Useful for interacting with lazy loaded children (`createLazyChild`), since their background creation is disconnected from the parent's render cycle.
+- Fired exactly once per component instance by the framework.
 
 ---
 

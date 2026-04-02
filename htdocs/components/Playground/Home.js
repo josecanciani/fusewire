@@ -11,7 +11,7 @@ export class Home extends Component {
     noResults = false;
     /** @type {string|null} */
     selectedDemo = null;
-    /** @type {Component|import('/js/component-reference.js').ComponentReference|null} */
+    /** @type {Component|import('/js/component.js').Child|null} */
     demoComponent = null;
     /** @type {import('../Console/Panel.js').Panel} */
     consoleComponent = null;
