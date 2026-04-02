@@ -9,6 +9,7 @@ import { REACTOR } from '/js/symbols.js';
  * @property {Object.<string, *>} [vars] - Initial vars for the demo
  * @property {string[]} [components] - Additional components to include
  * @property {string} [activeClass] - UI active state
+ * @property {string} [defaultFile] - The ID of the file to open by default (e.g., 'Counter/js')
  */
 
 export class Home extends Component {
@@ -93,10 +94,12 @@ export class Home extends Component {
         if (this.selectedDemo === name) return;
 
         const files = await this.#fetchDemoFiles(demo);
-        const demoFiles = files.map((f, i) => ({
+        const defaultFileId = demo.defaultFile || files[0]?.id;
+
+        const demoFiles = files.map((f) => ({
             id: f.id,
             label: f.label,
-            activeClass: i === 0 ? 'active' : '',
+            activeClass: f.id === defaultFileId ? 'active' : '',
         }));
 
         this.demos.forEach((d) => {
@@ -107,7 +110,7 @@ export class Home extends Component {
 
         if (this.sidebarComponent) {
             this.sidebarComponent.update({ demos: this.demos, demoFiles });
-            this.editorComponent.loadFiles(files);
+            this.editorComponent.loadFiles(files, defaultFileId);
         } else {
             this.sidebarComponent = /** @type {import('./Sidebar.js').Sidebar} */ (
                 this.createChild('Playground/Sidebar', 'sidebar', {
@@ -124,6 +127,7 @@ export class Home extends Component {
             this.editorComponent = /** @type {import('./Editor.js').Editor} */ (
                 this.createChild('Playground/Editor', 'editor', {
                     initialFiles: files,
+                    initialFileId: defaultFileId,
                 })
             );
             this.editorComponent.on('runDemo', () => {

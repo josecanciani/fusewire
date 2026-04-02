@@ -17,6 +17,8 @@ export class Editor extends Component {
     activeTabId = null;
     /** @type {Array.<object>} */
     initialFiles = [];
+    /** @type {string|null} */
+    initialFileId = null;
 
     #editorView = null;
     #files = [];
@@ -32,30 +34,40 @@ export class Editor extends Component {
 
         this.on('theme', (theme) => this.#applyTheme(theme));
 
-        if (this.#files.length > 0) {
-            const first = this.#files[0];
-            this.openTabs = [
-                { id: first.id, label: first.label, ext: first.ext, activeClass: 'active' },
-            ];
-            this.activeTabId = first.id;
+        const activeId = this.initialFileId || (this.#files.length > 0 ? this.#files[0].id : null);
+        if (activeId) {
+            const file = this.#files.find((f) => f.id === activeId);
+            if (file) {
+                this.openTabs = [
+                    { id: file.id, label: file.label, ext: file.ext, activeClass: 'active' },
+                ];
+                this.activeTabId = file.id;
+            }
         }
     }
 
     /**
-     * Replace all files and reset tab state. Opens the first file automatically.
+     * Replace all files and reset tab state. Opens the specified file or the first file automatically.
      * @param {Array.<{id: string, label: string, ext: string, content: string}>} files - New file set
+     * @param {string} [activeFileId] - Optional file ID to open
      */
-    loadFiles(files) {
+    loadFiles(files, activeFileId) {
         this.#destroyEditorView();
         this.#files = files;
         this.#tabContents = new Map(files.map((f) => [f.id, f.content]));
 
-        if (files.length > 0) {
-            const first = files[0];
-            this.openTabs = [
-                { id: first.id, label: first.label, ext: first.ext, activeClass: 'active' },
-            ];
-            this.activeTabId = first.id;
+        const activeId = activeFileId || (files.length > 0 ? files[0].id : null);
+        if (activeId) {
+            const file = files.find((f) => f.id === activeId);
+            if (file) {
+                this.openTabs = [
+                    { id: file.id, label: file.label, ext: file.ext, activeClass: 'active' },
+                ];
+                this.activeTabId = file.id;
+            } else {
+                this.openTabs = [];
+                this.activeTabId = null;
+            }
         } else {
             this.openTabs = [];
             this.activeTabId = null;
