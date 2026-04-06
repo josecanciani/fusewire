@@ -1,6 +1,6 @@
 import { ComponentNotFoundError } from './errors/error-hierarchy.js';
 import { ComponentId, toCssName } from './component-id.js';
-import { Child, Lazy } from './component.js';
+import { Child, Lazy, ErrorBoundary } from './component.js';
 import { Component } from './component.js';
 import { LogMessage } from './log-message.js';
 import { compileTemplate } from './template-compiler.js';
@@ -25,11 +25,28 @@ import {
  * @param {Component} instance - Component instance
  * @returns {ComponentVars} Plain object with component vars
  */
-function collectVars(instance) {
+export function collectVars(instance) {
     /** @type {ComponentVars} */
     const vars = {};
+    // 1. Collect standard public class variables
     for (const key of Object.keys(instance)) {
         vars[key] = instance[key];
+    }
+    // 2. Discover autocalculated getters (convention: start with $) on the component prototype chain
+    let proto = Object.getPrototypeOf(instance);
+    // Since Component.prototype instanceof Component is false, this elegantly boundaries the scan
+    while (proto instanceof Component) {
+        const props = Object.getOwnPropertyNames(proto);
+        for (const key of props) {
+            // Only consider properties starting with $ that haven't been shadowed
+            if (key.startsWith('$') && !(key in vars)) {
+                const descriptor = Object.getOwnPropertyDescriptor(proto, key);
+                if (descriptor && typeof descriptor.get === 'function') {
+                    vars[key] = instance[key];
+                }
+            }
+        }
+        proto = Object.getPrototypeOf(proto);
     }
     return vars;
 }
@@ -47,6 +64,12 @@ function collectVars(instance) {
  * - Apply initial vars onto instance (overriding class field defaults)
  */
 export class InstanceRegistry {
+    /**
+     * Create a new InstanceRegistry.
+     * @param {import('./renderer.js').Renderer} renderer - Framework renderer
+     * @param {import('./template-store.js').TemplateStore} templateStore - Template store
+     * @param {string} [appName='default'] - App namespace identifier
+     */
     constructor(renderer, templateStore, appName = 'default') {
         this._renderer = renderer;
         this._templateStore = templateStore;
@@ -61,9 +84,26 @@ export class InstanceRegistry {
             version: 'builtin',
             htmlCode: '((child))',
             cssCode: '',
+            jsCode: '',
+            fetchedAt: 0,
+            etags: { html: '', css: '', js: '' },
         });
         this._templateStore.setCompiled(
             'FuseWire/Lazy',
+            compileTemplate('((child))', '', this._appName),
+        );
+
+        this.registerComponent('FuseWire/ErrorBoundary', ErrorBoundary);
+        this._templateStore.set('FuseWire/ErrorBoundary', {
+            version: 'builtin',
+            htmlCode: '((child))',
+            cssCode: '',
+            jsCode: '',
+            fetchedAt: 0,
+            etags: { html: '', css: '', js: '' },
+        });
+        this._templateStore.setCompiled(
+            'FuseWire/ErrorBoundary',
             compileTemplate('((child))', '', this._appName),
         );
     }
@@ -416,24 +456,36 @@ export class InstanceRegistry {
         const parentDeferred = parentEntry.needsHydration;
 
         let childInstance;
-        if (decl instanceof Child) {
-            childInstance = await this.createFromReference(decl, mountPoint, {
-                deferHydration: parentDeferred,
-            });
-            this._replaceRefInVars(parentInstance, decl, childInstance);
-            decl._replayBufferedEvents(childInstance);
-            decl._replaced = true;
-        } else {
-            // Legacy: Component instance used as declaration
-            childInstance = await this.create(
-                childId,
-                /** @type {ComponentConstructor} */ (decl.constructor),
-                collectVars(decl),
-                mountPoint,
-                { deferHydration: parentDeferred },
-            );
-            decl[REACTOR] = this._reactor;
-            decl[COMPONENT_ID] = childId;
+        try {
+            if (decl instanceof Child) {
+                childInstance = await this.createFromReference(decl, mountPoint, {
+                    deferHydration: parentDeferred,
+                });
+                this._replaceRefInVars(parentInstance, decl, childInstance);
+                decl._replayBufferedEvents(childInstance);
+                decl._replaced = true;
+            } else {
+                // Legacy: Component instance used as declaration
+                childInstance = await this.create(
+                    childId,
+                    /** @type {ComponentConstructor} */ (decl.constructor),
+                    collectVars(decl),
+                    mountPoint,
+                    { deferHydration: parentDeferred },
+                );
+                decl[REACTOR] = this._reactor;
+                decl[COMPONENT_ID] = childId;
+            }
+        } catch (error) {
+            let handled = false;
+            if (decl instanceof Child) {
+                handled = decl._emitBuffered('fw-error', {
+                    error,
+                    failedComponent: decl.componentName,
+                });
+            }
+            if (handled) return;
+            throw error;
         }
         // Set parent on the child's registry entry and remove from roots
         const childInstanceCode = childInstance[COMPONENT_ID].code;
@@ -460,66 +512,39 @@ export class InstanceRegistry {
         let childInstance;
         try {
             childInstance = await decl._creationPromise;
-        } catch (error) {
-            if (decl._options.fallback) {
-                return await this._createFallback(mountPoint, parentInstance, decl, childId, error);
+
+            // Transfer rendered DOM from detached container into the real mount point
+            const detached = decl._detachedContainer;
+            while (detached.firstChild) {
+                mountPoint.appendChild(detached.firstChild);
             }
+
+            // Update registry entry's container to the real mount point
+            const childEntry = this._instances.get(childInstance[COMPONENT_ID].code);
+            childEntry.container = mountPoint;
+            mountPoint.classList.add(toCssName(childId.name));
+
+            // Replace reference with real instance in parent vars, replay events
+            this._replaceRefInVars(parentInstance, decl, childInstance);
+            decl._replayBufferedEvents(childInstance);
+            decl._replaced = true;
+
+            // Set parent
+            childEntry.parent = parentInstance;
+            this._roots.delete(childInstance[COMPONENT_ID].code);
+
+            // Hydrate the subtree if the parent is in the document (not deferred)
+            if (!parentDeferred) {
+                await this._hydrateSubtree(childInstance[COMPONENT_ID]);
+            }
+        } catch (error) {
+            const handled = decl._emitBuffered('fw-error', {
+                error,
+                failedComponent: childId.name,
+            });
+            if (handled) return;
             throw error;
         }
-
-        // Transfer rendered DOM from detached container into the real mount point
-        const detached = decl._detachedContainer;
-        while (detached.firstChild) {
-            mountPoint.appendChild(detached.firstChild);
-        }
-
-        // Update registry entry's container to the real mount point
-        const childEntry = this._instances.get(childInstance[COMPONENT_ID].code);
-        childEntry.container = mountPoint;
-        mountPoint.classList.add(toCssName(childId.name));
-
-        // Replace reference with real instance in parent vars, replay events
-        this._replaceRefInVars(parentInstance, decl, childInstance);
-        decl._replayBufferedEvents(childInstance);
-        decl._replaced = true;
-
-        // Set parent
-        childEntry.parent = parentInstance;
-        this._roots.delete(childInstance[COMPONENT_ID].code);
-
-        // Hydrate the subtree if the parent is in the document (not deferred)
-        if (!parentDeferred) {
-            await this._hydrateSubtree(childInstance[COMPONENT_ID]);
-        }
-    }
-
-    /**
-     * Create a fallback component when child creation fails.
-     * The fallback renders in the failed child's mount point with error context.
-     * @private
-     * @param {HTMLElement} mountPoint - Mount point element
-     * @param {Component} parentInstance - Parent component instance
-     * @param {Child} decl - The failed child's reference
-     * @param {ComponentId} childId - The failed child's identity
-     * @param {Error} error - The creation error
-     */
-    async _createFallback(mountPoint, parentInstance, decl, childId, error) {
-        const fallbackRef = new Child(decl._options.fallback, childId.id, {
-            errorMessage: error.message,
-            failedComponent: decl.componentName,
-        });
-        const fallbackInstance = await this.createFromReference(fallbackRef, mountPoint);
-
-        // Update mount point attribute to match fallback's code
-        mountPoint.setAttribute('data-fusewire-id', fallbackInstance[COMPONENT_ID].code);
-        mountPoint.id = fallbackInstance[COMPONENT_ID].code;
-
-        this._replaceRefInVars(parentInstance, decl, fallbackInstance);
-        decl._replaced = true;
-
-        const fallbackCode = fallbackInstance[COMPONENT_ID].code;
-        this._instances.get(fallbackCode).parent = parentInstance;
-        this._roots.delete(fallbackCode);
     }
 
     /**
@@ -541,7 +566,12 @@ export class InstanceRegistry {
         }
         const container = document.createElement('div');
         ref._detachedContainer = container;
-        ref._creationPromise = this._eagerCreate(ref, container);
+
+        const promise = this._eagerCreate(ref, container);
+        // Suppress immediate unhandled rejection warning. The error is natively
+        // caught and handled when the parent awaits the promise during render.
+        promise.catch(() => {});
+        ref._creationPromise = promise;
     }
 
     /**
@@ -599,13 +629,24 @@ export class InstanceRegistry {
 
                 instance[LIFECYCLE_ACTIVE] = 'afterRender';
                 instance.afterRender();
-            } finally {
+                entry.needsHydration = false;
                 instance[LIFECYCLE_ACTIVE] = null;
+            } catch (error) {
+                entry.needsHydration = false;
+                instance[LIFECYCLE_ACTIVE] = null;
+                const handled = instance.emitCancellable('fw-error', {
+                    error,
+                    failedComponent: componentId.name,
+                });
+                if (!handled) {
+                    throw error;
+                }
             }
-            entry.needsHydration = false;
 
-            // Component is fully mounted and ready
-            instance.emit('fw-ready', instance);
+            if (!entry.needsHydration) {
+                // Component is fully mounted and ready
+                instance.emit('fw-ready', instance);
+            }
         }
     }
 
