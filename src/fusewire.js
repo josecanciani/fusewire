@@ -5,6 +5,9 @@
  * FuseWire - Global registry for managing Reactor instances and components
  */
 class FuseWireRegistry {
+    /**
+     * Create a new FuseWireRegistry.
+     */
     constructor() {
         this._reactors = new Map(); // appName -> Reactor
     }

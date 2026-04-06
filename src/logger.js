@@ -4,6 +4,9 @@
  * Allows logs to be directed to console, UI components, or both.
  */
 export class Logger {
+    /**
+     * Create a new Logger instance with console output enabled.
+     */
     constructor() {
         this._handlers = [];
         this._useConsole = true;
@@ -63,18 +66,38 @@ export class Logger {
         }
     }
 
+    /**
+     * Log a debug-level message.
+     * @param {string} message - Log message
+     * @param {...*} args - Additional arguments
+     */
     debug(message, ...args) {
         this.log('debug', message, ...args);
     }
 
+    /**
+     * Log an info-level message.
+     * @param {string} message - Log message
+     * @param {...*} args - Additional arguments
+     */
     info(message, ...args) {
         this.log('info', message, ...args);
     }
 
+    /**
+     * Log a warn-level message.
+     * @param {string} message - Log message
+     * @param {...*} args - Additional arguments
+     */
     warn(message, ...args) {
         this.log('warn', message, ...args);
     }
 
+    /**
+     * Log an error-level message.
+     * @param {string} message - Log message
+     * @param {...*} args - Additional arguments
+     */
     error(message, ...args) {
         this.log('error', message, ...args);
     }

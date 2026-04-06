@@ -1,5 +1,8 @@
 import { Component } from '/js/component.js';
 
+/**
+ * Game of Life component. Manages the engine, cell grid, and UI sub-components.
+ */
 export class Game extends Component {
     /** @type {number} */
     cols = 0;
@@ -24,6 +27,9 @@ export class Game extends Component {
     /** @type {function(): void} */
     #onSyncComplete = null;
 
+    /**
+     * Declare child components and wire control events.
+     */
     async init() {
         this.loadLibrary('GameOfLife/Engine');
 
@@ -45,6 +51,9 @@ export class Game extends Component {
         );
     }
 
+    /**
+     * Instantiate the simulation engine and attach a ResizeObserver to the grid element.
+     */
     hydrate() {
         const Engine = /** @type {typeof import('./Engine.js').Engine} */ (
             this.library('GameOfLife/Engine').Engine
@@ -59,6 +68,9 @@ export class Game extends Component {
         this.#resizeObserver.observe(gridEl);
     }
 
+    /**
+     * Stop the simulation, destroy the engine, and disconnect the ResizeObserver.
+     */
     destroy() {
         clearTimeout(this.#syncTimer);
         this.#engine.destroy();

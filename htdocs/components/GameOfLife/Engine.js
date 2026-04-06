@@ -184,6 +184,11 @@ export class Engine {
         }, speedToInterval(this.#speedLevel));
     }
 
+    /**
+     * Resize the internal grid to newRows x newCols, preserving existing cell state.
+     * @param {number} newRows - New number of rows
+     * @param {number} newCols - New number of columns
+     */
     #resizeGrid(newRows, newCols) {
         const oldGrid = this.#grid;
         this.#rows = newRows;
@@ -203,6 +208,9 @@ export class Engine {
         }
     }
 
+    /**
+     * Advance the simulation one generation, update stats, and notify the state change handler.
+     */
     #tick() {
         const oldGrid = this.#grid;
         this.#grid = nextGeneration(this.#grid);
@@ -230,6 +238,10 @@ export class Engine {
         this.#notify();
     }
 
+    /**
+     * Sum the number of created cells in the sliding 1-second window.
+     * @returns {number} Total cells created in the last second
+     */
     #sumCreatedLog() {
         let total = 0;
         for (const entry of this.#createdLog) {
@@ -238,6 +250,9 @@ export class Engine {
         return total;
     }
 
+    /**
+     * Invoke the onStateChange callback with the current grid and computed stats.
+     */
     #notify() {
         this.#onStateChange(
             this.#grid,

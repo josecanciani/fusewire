@@ -17,6 +17,9 @@
  * Supports conditional fetching via ETags and staleness checks.
  */
 export class TemplateStore {
+    /**
+     * Create a new TemplateStore.
+     */
     constructor() {
         this._templates = new Map();
         this._compiled = new Map();

@@ -1,5 +1,8 @@
 import { Component } from '/js/component.js';
 
+/**
+ *
+ */
 export class TagFilter extends Component {
     /** @type {Array.<{name: string, activeClass: string}>} */
     tags = [];

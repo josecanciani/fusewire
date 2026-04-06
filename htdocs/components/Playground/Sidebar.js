@@ -1,5 +1,8 @@
 import { Component } from '/js/component.js';
 
+/**
+ *
+ */
 export class Sidebar extends Component {
     /** @type {Array.<object>} */
     demos = [];

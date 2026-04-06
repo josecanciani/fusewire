@@ -1,5 +1,8 @@
 import { Component } from '/js/component.js';
 
+/**
+ *
+ */
 export class Stats extends Component {
     /** @type {number} */
     generation = 0;

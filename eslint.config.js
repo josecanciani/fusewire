@@ -5,6 +5,31 @@ export default [
         ignores: ['src/lib/**'],
     },
     {
+        // All source files are ES modules — strict mode is always active.
+        // These rules enforce that invariant statically at lint time.
+        files: ['src/**/*.js', 'htdocs/**/*.js', 'test/**/*.js'],
+        languageOptions: {
+            // Tell ESLint these are ES modules so it applies strict-mode semantics
+            sourceType: 'module',
+        },
+        rules: {
+            // ESM files are always strict; ban the redundant directive
+            strict: ['error', 'never'],
+            // Octal literals (e.g. 0755) are a SyntaxError in strict mode
+            'no-octal': 'error',
+            // Octal escape sequences in strings (e.g. '\251') are also forbidden
+            'no-octal-escape': 'error',
+            // `with` is a SyntaxError in strict mode
+            'no-restricted-syntax': [
+                'error',
+                {
+                    selector: 'WithStatement',
+                    message: '`with` statements are forbidden (SyntaxError in strict mode / ESM).',
+                },
+            ],
+        },
+    },
+    {
         files: ['src/**/*.js', 'htdocs/**/*.js'],
         plugins: { jsdoc },
         settings: {
@@ -16,6 +41,17 @@ export default [
             },
         },
         rules: {
+            'jsdoc/require-jsdoc': [
+                'error',
+                {
+                    require: {
+                        FunctionDeclaration: true,
+                        MethodDefinition: true,
+                        ClassDeclaration: true,
+                    },
+                },
+            ],
+
             // Require @param for all parameters
             'jsdoc/require-param': 'error',
             'jsdoc/require-param-description': 'error',

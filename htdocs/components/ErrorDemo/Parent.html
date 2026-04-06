@@ -1,0 +1,115 @@
+<div class="py-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2>Error Boundaries &amp; Fallbacks</h2>
+            <p>
+                This demo showcases how FuseWire handles errors in different component lifecycle hooks.
+                Each child below is configured with a <code>fallback: 'ErrorDemo/Fallback'</code> option.
+                When a child fails, the framework automatically renders the fallback and emits an <code>fw-error</code>
+                event you can see in our Playground Console or your browser's one.
+            </p>
+            <p>
+                The <code>Retry</code> buttons do exactly the same thing, but this time we are re-adding
+                the failed Component after the parent Component has been rendered (a more dynamic scenario).
+            </p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <strong>1. Fails in init()</strong>
+                </div>
+                <div class="card-body">
+                    <p class="text-secondary small mb-3">
+                        This component throws an error during the <code>async init()</code> hook, before it ever
+                        renders.
+                    </p>
+                    <div class="mb-3">
+                        ((initFail))
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted small" fw-if="initTries > 1">Load count: ((initTries))</span>
+                        <div class="text-end flex-grow-1">
+                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                    onclick="((this)).retry('init')">&#8635; Retry</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <strong>2. Fails in hydrate()</strong>
+                </div>
+                <div class="card-body">
+                    <p class="text-secondary small mb-3">
+                        This component renders successfully, but throws an error during the one-time
+                        <code>hydrate()</code> hook.
+                    </p>
+                    <div class="mb-3">
+                        ((hydrateFail))
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted small" fw-if="hydrateTries > 1">Load count: ((hydrateTries))</span>
+                        <div class="text-end flex-grow-1">
+                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                    onclick="((this)).retry('hydrate')">&#8635; Retry</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <strong>3. Fails during render</strong>
+                </div>
+                <div class="card-body">
+                    <p class="text-secondary small mb-3">
+                        This component throws an error when its template is evaluated (e.g. accessing a bad getter).
+                    </p>
+                    <div class="mb-3">
+                        ((renderFail))
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted small" fw-if="renderTries > 1">Load count: ((renderTries))</span>
+                        <div class="text-end flex-grow-1">
+                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                    onclick="((this)).retry('render')">&#8635; Retry</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <strong>4. Fails in afterRender()</strong>
+                </div>
+                <div class="card-body">
+                    <p class="text-secondary small mb-3">
+                        This component renders, but throws an error during the synchronous <code>afterRender()</code>
+                        hook.
+                    </p>
+                    <div class="mb-3">
+                        ((afterRenderFail))
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted small" fw-if="afterRenderTries > 1">Load count:
+                            ((afterRenderTries))</span>
+                        <div class="text-end flex-grow-1">
+                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                    onclick="((this)).retry('afterRender')">&#8635; Retry</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

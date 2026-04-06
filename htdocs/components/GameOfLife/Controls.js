@@ -1,5 +1,8 @@
 import { Component } from '/js/component.js';
 
+/**
+ *
+ */
 export class Controls extends Component {
     /** @type {boolean} */
     running = false;

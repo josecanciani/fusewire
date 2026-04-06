@@ -1,5 +1,4 @@
 import { Component } from '/js/component.js';
-import { ComponentId } from '/js/component-id.js';
 import { REACTOR } from '/js/symbols.js';
 
 /**
@@ -12,6 +11,9 @@ import { REACTOR } from '/js/symbols.js';
  * @property {string} [defaultFile] - The ID of the file to open by default (e.g., 'Counter/js')
  */
 
+/**
+ * Main playground component — manages demo selection, sidebar, code editor, and console panel.
+ */
 export class Home extends Component {
     /** @type {Array.<Demo>} */
     demos = [];
@@ -21,7 +23,9 @@ export class Home extends Component {
     noResults = false;
     /** @type {string|null} */
     selectedDemo = null;
-    /** @type {Component|import('/js/component.js').Child|null} */
+    /** @type {number} */
+    demoRunId = 0;
+    /** @type {import('/js/component.js').ErrorBoundary|null} */
     demoComponent = null;
     /** @type {import('../Console/Panel.js').Panel} */
     consoleComponent = null;
@@ -43,7 +47,6 @@ export class Home extends Component {
     async init() {
         this.filteredDemos = this.demos;
         this.loadLibrary('Lib/Resize');
-
         this.headerComponent = /** @type {import('./Header.js').Header} */ (
             this.createChild('Playground/Header', 'header', { theme: 'light' })
         );
@@ -62,12 +65,14 @@ export class Home extends Component {
         );
     }
 
+    /**
+     * Load the horizontal resize library and initialize the handler.
+     */
     hydrate() {
-        const startHorizontalResize =
+        this.#startHorizontalResize =
             /** @type {typeof import('../Lib/Resize.js').startHorizontalResize} */ (
                 this.library('Lib/Resize').startHorizontalResize
             );
-        this.#startHorizontalResize = startHorizontalResize;
     }
 
     /**
@@ -105,8 +110,16 @@ export class Home extends Component {
         this.demos.forEach((d) => {
             d.activeClass = d.name === name ? 'active' : '';
         });
+
         this.selectedDemo = name;
-        this.demoComponent = this.createChild(demo.name, 'demo', demo.vars || {});
+        this.demoRunId = Date.now();
+
+        this.demoComponent = /** @type {import('/js/component.js').ErrorBoundary} */ (
+            this.createErrorBoundedChild(
+                this.createChild(demo.name, `demo-${this.demoRunId}`, demo.vars || {}),
+                'Playground/DemoFallback',
+            )
+        );
 
         if (this.sidebarComponent) {
             this.sidebarComponent.update({ demos: this.demos, demoFiles });
@@ -146,22 +159,18 @@ export class Home extends Component {
      */
     async runDemo() {
         if (!this.selectedDemo) return;
-
         const demo = this.demos.find((d) => d.name === this.selectedDemo);
         const contents = this.editorComponent.getContents();
         const templateStore = this[REACTOR]._templateStore;
         const registry = this[REACTOR]._instanceRegistry;
         const components = demo.components || [demo.name];
-
         try {
             for (const componentName of components) {
                 const htmlCode = contents.get(`${componentName}/html`);
                 const cssCode = contents.get(`${componentName}/css`);
                 const jsCode = contents.get(`${componentName}/js`);
-
                 const version = await templateStore.computeHash(htmlCode + cssCode);
                 templateStore.set(componentName, { version, htmlCode, cssCode });
-
                 // Absolute paths like '/js/...' don't resolve from blob URLs,
                 // so rewrite them to full URLs using the current origin.
                 const resolvedJs = jsCode.replace(/(from\s+['"])\//g, `$1${location.origin}/`);
@@ -181,14 +190,15 @@ export class Home extends Component {
                     URL.revokeObjectURL(blobUrl);
                 }
             }
-
-            // Remove and recreate only the root demo instance — children are auto-managed
-            const demoId = new ComponentId(demo.name, 'demo');
-            if (registry.has(demoId)) {
-                await registry.remove(demoId);
-            }
-
-            this.demoComponent = this.createChild(demo.name, 'demo', {});
+            // We increment runId so the child gets a unique instance id.
+            // The framework auto-removes the old child during render().
+            this.demoRunId = Date.now();
+            this.demoComponent = /** @type {import('/js/component.js').ErrorBoundary} */ (
+                this.createErrorBoundedChild(
+                    this.createChild(demo.name, `demo-${this.demoRunId}`, {}),
+                    'Playground/DemoFallback',
+                )
+            );
             this.react();
         } catch (err) {
             this.console.error(`Run failed: ${err.message}`);
@@ -239,7 +249,9 @@ export class Home extends Component {
         }
         // Parent re-renders cascade to children but skip their afterRender(),
         // so morphing may clear the CodeMirror DOM. Restore it here.
-        if (this.editorComponent) {
+        // The editor may still be a Child proxy (not yet mounted), so verify
+        // the method exists before calling it.
+        if (this.editorComponent && typeof this.editorComponent.restoreEditorView === 'function') {
             this.editorComponent.restoreEditorView();
         }
     }

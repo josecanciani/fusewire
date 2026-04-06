@@ -10,6 +10,9 @@ import { javascript } from 'https://esm.sh/@codemirror/lang-javascript';
 // @ts-ignore
 import { oneDark } from 'https://esm.sh/@codemirror/theme-one-dark';
 
+/**
+ * Code editor panel using CodeMirror; manages tabbed files and theme switching.
+ */
 export class Editor extends Component {
     /** @type {Array.<object>} */
     openTabs = [];
@@ -189,6 +192,10 @@ export class Editor extends Component {
         }
     }
 
+    /**
+     * Persist editor content, destroy the current view, switch active tab, and re-mount editor.
+     * @param {string} id - Tab identifier to switch to
+     */
     #switchTo(id) {
         this.#saveEditorContent();
         this.#destroyEditorView();
@@ -200,12 +207,18 @@ export class Editor extends Component {
         this.react();
     }
 
+    /**
+     * Save the current editor text into the tab contents map.
+     */
     #saveEditorContent() {
         if (this.activeTabId && this.#editorView) {
             this.#tabContents.set(this.activeTabId, this.#editorView.state.doc.toString());
         }
     }
 
+    /**
+     * Mount the CodeMirror editor instance into the DOM area.
+     */
     #mountEditor() {
         const container = this.querySelector('.fw-editor-area');
         if (!container) return;
@@ -226,6 +239,9 @@ export class Editor extends Component {
         });
     }
 
+    /**
+     * Destroy the current CodeMirror EditorView and clear the reference.
+     */
     #destroyEditorView() {
         if (!this.#editorView) return;
         this.#editorView.destroy();
@@ -244,6 +260,11 @@ export class Editor extends Component {
         this.#mountEditor();
     }
 
+    /**
+     * Return the CodeMirror language extension for a given file extension.
+     * @param {string} ext - File extension ('html', 'css', or anything else for JavaScript)
+     * @returns {*} CodeMirror language extension
+     */
     #langExtension(ext) {
         if (ext === 'html') return html();
         if (ext === 'css') return css();

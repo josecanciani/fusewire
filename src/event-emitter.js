@@ -5,6 +5,9 @@
  * to release all handler references.
  */
 export class EventEmitter {
+    /**
+     * Create a new EventEmitter.
+     */
     constructor() {
         /** @type {Map<string, Set<function(...*): (void|false)>>} */
         this._handlers = new Map();

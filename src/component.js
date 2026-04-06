@@ -525,7 +525,7 @@ export class Child {
         if (this._replaced) {
             throw new Error(
                 `Child: update() called on replaced reference "${this.toComponentId().code}". ` +
-                'Use the Component instance from vars instead.',
+                    'Use the Component instance from vars instead.',
             );
         }
         Object.assign(this.vars, newVars);
@@ -537,7 +537,7 @@ export class Child {
                 .then((instance) => {
                     instance.update(newVars, true);
                 })
-                .catch(() => { });
+                .catch(() => {});
         }
 
         return Promise.resolve();
@@ -558,7 +558,7 @@ export class Child {
         if (this._replaced) {
             throw new Error(
                 `Child: on() called on replaced reference "${this.toComponentId().code}". ` +
-                'Use the Component instance from vars instead.',
+                    'Use the Component instance from vars instead.',
             );
         }
         const entry = { eventName, handler, removed: false, realUnsub: null };
@@ -630,6 +630,10 @@ export class Child {
     }
 }
 
+/**
+ * Built-in lazy-loading wrapper component.
+ * Renders a placeholder until the real child is ready, then swaps it in.
+ */
 export class Lazy extends Component {
     static componentName = 'FuseWire/Lazy';
 
@@ -642,6 +646,9 @@ export class Lazy extends Component {
     /** @type {Child} */
     placeholderChild;
 
+    /**
+     * Show placeholder immediately; swap in the real child once ready or handle load errors.
+     */
     async init() {
         this.child = this.placeholderChild;
         this.lazyChild
@@ -673,6 +680,10 @@ export class Lazy extends Component {
     }
 }
 
+/**
+ * Built-in error boundary component.
+ * Catches fw-error events from a target child and renders a fallback instead.
+ */
 export class ErrorBoundary extends Component {
     static componentName = 'FuseWire/ErrorBoundary';
 
@@ -685,6 +696,9 @@ export class ErrorBoundary extends Component {
     /** @type {Child} */
     fallbackChild;
 
+    /**
+     * Wire fw-error listener: on failure, update the fallback vars and swap child to fallback.
+     */
     async init() {
         this.child = this.targetChild;
         this.child.on('fw-error', (ctx) => {
