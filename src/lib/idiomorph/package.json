@@ -1,5 +1,6 @@
 {
   "name": "idiomorph",
+  "type": "module",
   "description": "an id-based DOM morphing library",
   "keywords": [
     "HTML"

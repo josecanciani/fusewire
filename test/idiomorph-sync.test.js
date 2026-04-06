@@ -43,6 +43,21 @@ test('Idiomorph package.json version matches', async () => {
         vendoredPkg.version,
         nodeModulesPkg.version,
         `Vendored idiomorph version (${vendoredPkg.version}) does not match node_modules (${nodeModulesPkg.version}). ` +
-        'Run: cp node_modules/idiomorph/package.json src/lib/idiomorph/'
+        'Run: cp node_modules/idiomorph/package.json src/lib/idiomorph/ && node -e "const f=\'src/lib/idiomorph/package.json\',p=JSON.parse(require(\'fs\').readFileSync(f));p.type=\'module\';require(\'fs\').writeFileSync(f,JSON.stringify(p,null,2)+\'\\n\')"'
+    );
+});
+
+test('Vendored idiomorph package.json has "type": "module"', () => {
+    const vendoredPkgPath = path.join(__dirname, '../src/lib/idiomorph/package.json');
+
+    const vendoredPkg = JSON.parse(fs.readFileSync(vendoredPkgPath, 'utf-8'));
+
+    assert.strictEqual(
+        vendoredPkg.type,
+        'module',
+        'Vendored idiomorph package.json must have "type": "module" to avoid a ' +
+        'MODULE_TYPELESS_PACKAGE_JSON Node.js warning. The upstream package does not include ' +
+        'this field, so it must be added manually after copying: ' +
+        'add \'"type": "module"\' to src/lib/idiomorph/package.json'
     );
 });
