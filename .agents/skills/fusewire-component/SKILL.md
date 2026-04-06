@@ -57,6 +57,20 @@ export class Line extends Component {
 > (`''`, `0`, `[]`) instead. This keeps templates simple (no null checks) and
 > makes the component's contract clearer.
 
+**Autocalculated variables** are derived state defined via class getters. To make a getter available to the template, **it must be prefixed with `$`**. The framework auto-evaluates these `$` getters during render, eliminating the need to manually sync derived state in `update()` or `init()`.
+```javascript
+export class Line extends Component {
+    count = 5;
+
+    /** @type {boolean} */
+    get $isLimitReached() {
+        return this.count >= 10;
+    }
+}
+```
+In the template, reference it directly without `()`: `<div fw-if="$isLimitReached">`
+Note: Avoid expensive computations in `$` getters, as they run on every render.
+
 **Private state** uses native `#private` class fields — these are internal
 counters, caches, DOM references, etc. They never appear in the template and the
 framework ignores them. Declare them in the class body with a default value:
@@ -194,7 +208,7 @@ async init() {
 `createChild` and `createLazyChild` return `Component | Child`, but by the time you read a child property it's already the real instance. To get IDE autocomplete and pass type checking (especially when the child class adds new properties like `duration` or `items`), annotate the field with a JSDoc type-only import and cast at the assignment.
 
 > [!TIP]
-> Always type child properties (including arrays) with the **specific, final component class** (e.g., `Line`, `Lazy`) rather than the generic `Component` or `Child`. This ensures correct type checking for child-specific features and provides full IDE autocomplete.
+> Always type child properties (including arrays) with the **specific, final component class** rather than the generic `Component` or `Child`. For your own components, use `import('./Console/Line.js').Line`. For framework-provided wrappers, use `import('/js/component.js').ErrorBoundary` or `import('/js/component.js').Lazy`. This ensures correct type checking for child-specific features and provides full IDE autocomplete.
 
 > [!IMPORTANT]
 > **Parentheses are mandatory** for the cast. If you omit them, `tsc` will fail with error `TS2322: Type 'Component | Child' is not assignable to type 'MyComponent'`, because the cast is not correctly applied to the entire expression.
@@ -393,6 +407,47 @@ The parent renders immediately with the placeholder. When the real child's JS an
 template load, the framework swaps the placeholder for the real component and 
 fires `fw-ready` on the fully hydrated component instance. Works
 consistently in both CSR and SSR.
+
+---
+
+## Error handling and fallbacks
+
+When a component fails to initialize or its template fails to load, the error bubbles up the component tree. You can handle this gracefully in two ways:
+
+### 1. Fallback components (Declarative)
+
+Provide a `fallback` option when creating a child. If the child fails, the framework renders the fallback in its place, passing `errorMessage` and `failedComponent` as vars. The parent continues rendering normally.
+
+```javascript
+// Eager child with fallback
+this.chart = this.createChild('Analytics/Chart', 'main', {}, { 
+    fallback: 'Common/ErrorCard' 
+});
+
+// Lazy child with fallback (configured on the lazy child reference)
+this.lazyChart = this.createLazyChild(
+    this.createChild('Analytics/HeavyChart', '', {}, null, { fallback: 'Common/ErrorCard' }),
+    this.createChild('Common/Skeleton')
+);
+```
+
+### 2. The `fw-error` event (Programmatic)
+
+The framework emits an `fw-error` event on the child reference when creation fails. If a listener returns `false`, propagation stops and the parent survives (the mount point remains empty).
+
+```javascript
+async init() {
+    this.chart = this.createChild('Analytics/Chart');
+    
+    this.chart.on('fw-error', (errorContext) => {
+        this.console.error('Chart failed:', errorContext.error);
+        // Stop propagation so the parent doesn't crash
+        return false;
+    });
+}
+```
+
+If no fallback is configured and no listener stops propagation, the error bubbles up, crashing the parent, and continuing until handled or it reaches the root.
 
 ---
 

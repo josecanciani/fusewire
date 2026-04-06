@@ -92,15 +92,26 @@ FuseWire uses **simple property path evaluation**, not JavaScript expressions:
 <div fw-if="status === 'ready'"></div>  <!-- No equality checks -->
 ```
 
-**Workaround:** Compute these in your component:
+**Modern Approach: Autocalculated Variables**
+Instead of manually synchronizing state in lifecycle hooks or `update()`, you can define deterministic derived variables using a getter prefixed with `$`:
 
 ```js
 class MyComponent extends Component {
-  async init() {
-    this.shouldShow = this.count > 5;
-    this.isReady = this.status === 'ready';
+  // The framework auto-evaluates getters starting with $ during render
+  get $shouldShow() {
+    return this.count > 5;
+  }
+  
+  get $isReady() {
+    return this.status === 'ready';
   }
 }
+```
+
+Template:
+```html
+<div fw-if="$shouldShow"></div>
+<div fw-if="$isReady"></div>
 ```
 
 ## Loops
