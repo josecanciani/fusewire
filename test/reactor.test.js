@@ -11,7 +11,7 @@ import { JSDOM } from 'jsdom';
 import { REACTOR, LIFECYCLE_ACTIVE } from '../src/symbols.js';
 
 // Mock idiomorph for testing
-const mockMorph = () => {};
+const mockMorph = () => { };
 
 // Track app names to unregister after each test
 let registeredApps = [];
@@ -57,13 +57,13 @@ describe('Reactor', () => {
             const templateStore = new TemplateStore();
             const renderer = new Renderer(mockMorph, appName);
             const registry = new InstanceRegistry(renderer, templateStore, appName);
-            
+
             const reactor = createReactor(appName, {
                 instanceRegistry: registry,
                 templateStore: templateStore,
                 renderer: renderer
             });
-            
+
             assert.ok(reactor);
             assert.strictEqual(reactor._instanceRegistry, registry);
             assert.strictEqual(reactor._templateStore, templateStore);
@@ -71,9 +71,9 @@ describe('Reactor', () => {
         });
 
         it('accepts optional config', () => {
-            const config = { 
+            const config = {
                 morphFunction: mockMorph,
-                logging: { enabled: false } 
+                logging: { enabled: false }
             };
             const reactor = createReactor('test-ctor-4', config);
             assert.deepStrictEqual(reactor._config, config);
@@ -132,7 +132,7 @@ describe('Reactor', () => {
             const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
             global.document = dom.window.document;
 
-            class Counter extends Component {}
+            class Counter extends Component { }
 
             const appName = 'test-start-1';
             const templateStore = new TemplateStore();
@@ -151,7 +151,7 @@ describe('Reactor', () => {
                 renderer: renderer
             });
             const container = dom.window.document.getElementById('app');
-            
+
             const instance = await reactor.start(container, 'Counter', 'main', { count: 0 });
 
             assert.ok(instance);
@@ -165,7 +165,7 @@ describe('Reactor', () => {
             const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
             global.document = dom.window.document;
 
-            class Counter extends Component {}
+            class Counter extends Component { }
 
             const appName = 'test-start-2';
             const templateStore = new TemplateStore();
@@ -184,7 +184,7 @@ describe('Reactor', () => {
                 renderer: renderer
             });
             const container = dom.window.document.getElementById('app');
-            
+
             const instance = await reactor.start(container, 'Counter', 'main', {});
 
             assert.strictEqual(instance[REACTOR], reactor);
@@ -194,7 +194,7 @@ describe('Reactor', () => {
             const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
             global.document = dom.window.document;
 
-            class Counter extends Component {}
+            class Counter extends Component { }
 
             let createCalled = false;
             let receivedRef = null;
@@ -213,7 +213,7 @@ describe('Reactor', () => {
                 morphFunction: mockMorph
             });
             const container = dom.window.document.getElementById('app');
-            
+
             await reactor.start(container, 'Counter', 'main', {});
 
             assert.strictEqual(createCalled, true);
@@ -225,7 +225,7 @@ describe('Reactor', () => {
             const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
             global.document = dom.window.document;
 
-            class Counter extends Component {}
+            class Counter extends Component { }
 
             const appName = 'test-start-4';
             const templateStore = new TemplateStore();
@@ -258,8 +258,8 @@ describe('Reactor', () => {
             const dom = new JSDOM('<!DOCTYPE html><div id="app"></div><div id="child"></div>');
             global.document = dom.window.document;
 
-            class Parent extends Component {}
-            class Child extends Component {}
+            class Parent extends Component { }
+            class Child extends Component { }
 
             const appName = 'test-start-5';
             const templateStore = new TemplateStore();
@@ -295,7 +295,7 @@ describe('Reactor', () => {
             const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
             global.document = dom.window.document;
 
-            class Counter extends Component {}
+            class Counter extends Component { }
 
             const appName = 'test-start-6';
             const templateStore = new TemplateStore();
@@ -326,7 +326,7 @@ describe('Reactor', () => {
     describe('react()', () => {
         it('accepts ComponentId', async () => {
             let renderCalled = false;
-            const fakeInstance = { afterRender() {} };
+            const fakeInstance = { afterRender() { } };
             const mockRegistry = {
                 async render(componentId) {
                     renderCalled = true;
@@ -340,7 +340,7 @@ describe('Reactor', () => {
                 morphFunction: mockMorph
             });
             const componentId = new ComponentId('Counter', 'main');
-            
+
             await reactor.react(componentId, 'CSR');
 
             assert.strictEqual(renderCalled, true);
@@ -348,7 +348,7 @@ describe('Reactor', () => {
 
         it('accepts string componentId', async () => {
             let renderCalled = false;
-            const fakeInstance = { afterRender() {} };
+            const fakeInstance = { afterRender() { } };
             const mockRegistry = {
                 async render(componentId) {
                     renderCalled = true;
@@ -363,16 +363,16 @@ describe('Reactor', () => {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph
             });
-            
+
             await reactor.react('Counter#main', 'CSR');
 
             assert.strictEqual(renderCalled, true);
         });
 
         it('defaults to CSR mode', async () => {
-            const fakeInstance = { afterRender() {} };
+            const fakeInstance = { afterRender() { } };
             const mockRegistry = {
-                async render() {},
+                async render() { },
                 get() { return fakeInstance; },
             };
 
@@ -380,14 +380,14 @@ describe('Reactor', () => {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph
             });
-            
+
             // Should not throw
             await reactor.react('Counter#main');
         });
 
         it('throws for unsupported render mode', async () => {
             const mockRegistry = {
-                async render() {},
+                async render() { },
                 get() { return null; },
             };
 
@@ -404,7 +404,7 @@ describe('Reactor', () => {
 
         it('delegates to instanceRegistry.render()', async () => {
             let renderCalled = false;
-            const fakeInstance = { afterRender() {} };
+            const fakeInstance = { afterRender() { } };
             const mockRegistry = {
                 async render(componentId) {
                     renderCalled = true;
@@ -416,7 +416,7 @@ describe('Reactor', () => {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph
             });
-            
+
             await reactor.react('Counter#main');
 
             assert.strictEqual(renderCalled, true);
@@ -428,7 +428,7 @@ describe('Reactor', () => {
                 afterRender() { afterRenderCalled = true; },
             };
             const mockRegistry = {
-                async render() {},
+                async render() { },
                 get() { return fakeInstance; },
             };
 
@@ -444,7 +444,7 @@ describe('Reactor', () => {
 
         it('throws if instance is not found after render()', async () => {
             const mockRegistry = {
-                async render() {},
+                async render() { },
                 get() { return null; },
             };
 
@@ -493,7 +493,7 @@ describe('Reactor', () => {
 
             const reactor = createReactor('test-attach-1', {
                 morphFunction: mockMorph,
-                console: { log() {}, warn() {}, error() {} },
+                console: { log() { }, warn() { }, error() { } },
             });
             reactor.attachConsole(attached);
 
@@ -520,7 +520,7 @@ describe('Reactor', () => {
                 morphFunction: mockMorph,
                 console: defaultConsole,
             });
-            reactor.attachConsole({ log() {}, warn() {}, error() {} });
+            reactor.attachConsole({ log() { }, warn() { }, error() { } });
 
             reactor.console.log('test');
             assert.deepStrictEqual(defaultLogs, [['log', 'test']]);
@@ -532,17 +532,17 @@ describe('Reactor', () => {
 
             const reactor = createReactor('test-attach-3', {
                 morphFunction: mockMorph,
-                console: { log() {}, warn() {}, error() {} },
+                console: { log() { }, warn() { }, error() { } },
             });
             reactor.attachConsole({
                 log(...args) { logs1.push(args); },
-                warn() {},
-                error() {},
+                warn() { },
+                error() { },
             });
             reactor.attachConsole({
                 log(...args) { logs2.push(args); },
-                warn() {},
-                error() {},
+                warn() { },
+                error() { },
             });
 
             reactor.console.log('broadcast');
@@ -555,8 +555,8 @@ describe('Reactor', () => {
             const defaultLogs = [];
             const defaultConsole = {
                 log(...args) { defaultLogs.push(args); },
-                warn() {},
-                error() {},
+                warn() { },
+                error() { },
             };
 
             const reactor = createReactor('test-attach-4', {
@@ -574,13 +574,13 @@ describe('Reactor', () => {
             const logs = [];
             const attached = {
                 log(...args) { logs.push(args); },
-                warn() {},
-                error() {},
+                warn() { },
+                error() { },
             };
 
             const reactor = createReactor('test-detach-1', {
                 morphFunction: mockMorph,
-                console: { log() {}, warn() {}, error() {} },
+                console: { log() { }, warn() { }, error() { } },
             });
             reactor.attachConsole(attached);
             reactor.console.log('before');
@@ -594,10 +594,10 @@ describe('Reactor', () => {
             const defaultLogs = [];
             const defaultConsole = {
                 log(...args) { defaultLogs.push(args); },
-                warn() {},
-                error() {},
+                warn() { },
+                error() { },
             };
-            const attached = { log() {}, warn() {}, error() {} };
+            const attached = { log() { }, warn() { }, error() { } };
 
             const reactor = createReactor('test-detach-2', {
                 morphFunction: mockMorph,
@@ -613,10 +613,10 @@ describe('Reactor', () => {
         it('is a no-op for unknown console', () => {
             const reactor = createReactor('test-detach-3', {
                 morphFunction: mockMorph,
-                console: { log() {}, warn() {}, error() {} },
+                console: { log() { }, warn() { }, error() { } },
             });
             // Should not throw
-            reactor.detachConsole({ log() {}, warn() {}, error() {} });
+            reactor.detachConsole({ log() { }, warn() { }, error() { } });
         });
 
         it('only removes the specific console from multiple', () => {
@@ -624,18 +624,18 @@ describe('Reactor', () => {
             const logs2 = [];
             const c1 = {
                 log(...args) { logs1.push(args); },
-                warn() {},
-                error() {},
+                warn() { },
+                error() { },
             };
             const c2 = {
                 log(...args) { logs2.push(args); },
-                warn() {},
-                error() {},
+                warn() { },
+                error() { },
             };
 
             const reactor = createReactor('test-detach-4', {
                 morphFunction: mockMorph,
-                console: { log() {}, warn() {}, error() {} },
+                console: { log() { }, warn() { }, error() { } },
             });
             reactor.attachConsole(c1);
             reactor.attachConsole(c2);
@@ -650,7 +650,7 @@ describe('Reactor', () => {
     describe('render queue', () => {
         it('deduplicates queued react() calls for the same component', async () => {
             let renderCount = 0;
-            const fakeInstance = { afterRender() {} };
+            const fakeInstance = { afterRender() { } };
             const mockRegistry = {
                 async render() { renderCount++; },
                 get() { return fakeInstance; },
@@ -662,17 +662,17 @@ describe('Reactor', () => {
             });
 
             // Fire two reacts for the same component in the same synchronous block.
-            // The first starts the drain (shifts the entry and begins render).
-            // The second sees the queue empty (entry was shifted) and adds again.
-            // Result: 2 renders (current + queued), NOT 1, because the first was
-            // already shifted before the second call.
+            // Because _drain() is scheduled as a microtask, the queue is not drained
+            // until the synchronous block finishes. The second call sees the component
+            // already in the queue and drops the redundant request.
+            // Result: 1 render total.
             const p1 = reactor.react('Counter#main');
             const p2 = reactor.react('Counter#main');
 
             // Both return the same drain promise
             assert.strictEqual(p1, p2);
             await p1;
-            assert.strictEqual(renderCount, 2);
+            assert.strictEqual(renderCount, 1);
         });
 
         it('processes different components sequentially', async () => {
@@ -730,9 +730,9 @@ describe('Reactor', () => {
         });
 
         it('is not draining after queue is empty', async () => {
-            const fakeInstance = { afterRender() {} };
+            const fakeInstance = { afterRender() { } };
             const mockRegistry = {
-                async render() {},
+                async render() { },
                 get() { return fakeInstance; },
             };
 
@@ -756,7 +756,7 @@ describe('Reactor', () => {
                 },
             };
             const mockRegistry = {
-                async render() {},
+                async render() { },
                 get() { return fakeInstance; },
             };
 
@@ -779,7 +779,7 @@ describe('Reactor', () => {
                 },
             };
             const mockRegistry = {
-                async render() {},
+                async render() { },
                 get() { return fakeInstance; },
             };
 
@@ -824,7 +824,7 @@ describe('Reactor', () => {
             const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
             global.document = dom.window.document;
 
-            class Counter extends Component {}
+            class Counter extends Component { }
 
             const appName = 'test-global-4';
             const templateStore = new TemplateStore();
@@ -859,7 +859,7 @@ describe('Reactor', () => {
             const dom = new JSDOM('<!DOCTYPE html><div id="app"></div>');
             global.document = dom.window.document;
 
-            class Widget extends Component {}
+            class Widget extends Component { }
 
             const appName = 'test-global-5';
             const templateStore = new TemplateStore();
@@ -893,12 +893,12 @@ describe('Reactor', () => {
             const calls = [];
             const mockRegistry = {
                 _reactor: null,
-                broadcastFromRoots() {},
+                broadcastFromRoots() { },
             };
             const reactor = createReactor('test-on-1', {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph,
-                console: { log() {}, warn() {}, error() {} },
+                console: { log() { }, warn() { }, error() { } },
             });
 
             reactor.on('theme', (value) => calls.push(value));
@@ -911,12 +911,12 @@ describe('Reactor', () => {
             const calls = [];
             const mockRegistry = {
                 _reactor: null,
-                broadcastFromRoots() {},
+                broadcastFromRoots() { },
             };
             const reactor = createReactor('test-on-2', {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph,
-                console: { log() {}, warn() {}, error() {} },
+                console: { log() { }, warn() { }, error() { } },
             });
 
             const unsub = reactor.on('theme', (value) => calls.push(value));
@@ -931,12 +931,12 @@ describe('Reactor', () => {
             const log = [];
             const mockRegistry = {
                 _reactor: null,
-                broadcastFromRoots() {},
+                broadcastFromRoots() { },
             };
             const reactor = createReactor('test-on-3', {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph,
-                console: { log() {}, warn() {}, error() {} },
+                console: { log() { }, warn() { }, error() { } },
             });
 
             reactor.on('theme', () => log.push('a'));
@@ -957,7 +957,7 @@ describe('Reactor', () => {
             const reactor = createReactor('test-bcast-1', {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph,
-                console: { log() {}, warn() {}, error() {} },
+                console: { log() { }, warn() { }, error() { } },
             });
 
             reactor.on('theme', () => order.push('reactor'));
@@ -978,7 +978,7 @@ describe('Reactor', () => {
             const reactor = createReactor('test-bcast-2', {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph,
-                console: { log() {}, warn() {}, error() {} },
+                console: { log() { }, warn() { }, error() { } },
             });
 
             reactor.on('config', (...args) => reactorArgs.push(args));
@@ -999,7 +999,7 @@ describe('Reactor', () => {
             const reactor = createReactor('test-bcast-3', {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph,
-                console: { log() {}, warn() {}, error() {} },
+                console: { log() { }, warn() { }, error() { } },
             });
 
             // Should not throw and should still propagate to components
@@ -1020,8 +1020,8 @@ describe('Reactor', () => {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph,
                 console: {
-                    log() {},
-                    warn() {},
+                    log() { },
+                    warn() { },
                     error(...args) { errors.push(args); },
                 },
             });
@@ -1047,7 +1047,7 @@ describe('Reactor', () => {
             const reactor = createReactor('test-bfrom-1', {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph,
-                console: { log() {}, warn() {}, error() {} },
+                console: { log() { }, warn() { }, error() { } },
             });
 
             const cid = new ComponentId('Panel', 'main');
@@ -1070,7 +1070,7 @@ describe('Reactor', () => {
             const reactor = createReactor('test-bfrom-2', {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph,
-                console: { log() {}, warn() {}, error() {} },
+                console: { log() { }, warn() { }, error() { } },
             });
 
             reactor.broadcastFrom(new ComponentId('Panel', 'main'), 'config', 'key', 42);
@@ -1082,12 +1082,12 @@ describe('Reactor', () => {
             const reactorCalls = [];
             const mockRegistry = {
                 _reactor: null,
-                broadcastFrom() {},
+                broadcastFrom() { },
             };
             const reactor = createReactor('test-bfrom-3', {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph,
-                console: { log() {}, warn() {}, error() {} },
+                console: { log() { }, warn() { }, error() { } },
             });
 
             reactor.on('theme', () => reactorCalls.push('fired'));

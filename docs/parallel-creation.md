@@ -186,17 +186,20 @@ The fallback component is a regular component — it receives vars, renders a te
 
 When a child's creation promise rejects and a `fallback` is declared:
 
-1. The framework creates the fallback component in the child's mount point.
-2. The parent's reference (`this.chart`) becomes the fallback instance, not a Chart.
-3. Buffered `.on()` calls replay onto the fallback — the fallback likely doesn't emit those events, so handlers never fire. This is harmless.
-4. The parent's lifecycle continues normally.
+1. The framework emits an `fw-error` event on the child reference.
+2. The framework creates the fallback component in the child's mount point.
+3. The parent's reference (`this.chart`) becomes the fallback instance, not a Chart.
+4. Buffered `.on()` calls replay onto the fallback — the fallback likely doesn't emit those events, so handlers never fire. This is harmless.
+5. The parent's lifecycle continues normally.
 
 When no `fallback` is declared:
 
-1. The error propagates through `_mountChild` → `render` → `create`.
-2. The parent's creation fails.
-3. The grandparent's `_mountChild` receives the error — if the grandparent declared a fallback for the parent, it kicks in. Otherwise the error continues upward.
-4. If no ancestor has a fallback, the app crashes (current behavior).
+1. The framework emits an `fw-error` event on the child reference.
+2. If a listener on the parent stops propagation (by returning `false`), the error is considered handled, and the parent's lifecycle continues normally.
+3. Otherwise, the error propagates through `_mountChild` → `render` → `create`.
+4. The parent's creation fails.
+5. The grandparent's `_mountChild` receives the error — if the grandparent declared a fallback for the parent, it kicks in. Otherwise the error continues upward.
+6. If no ancestor handles the error, the app crashes.
 
 ### API
 

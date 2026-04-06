@@ -248,9 +248,12 @@ export class Reactor {
             this._queue.set(code, { id, mode });
         }
 
-        // Start draining if not already running
+        // Start draining if not already running. We schedule it as a microtask
+        // to prevent nested rendering if react() is called synchronously inside
+        // a lifecycle hook or event handler executed during an ongoing render.
         if (!this._draining) {
-            this._drainPromise = this._drain();
+            this._draining = true; // reserve it synchronously
+            this._drainPromise = Promise.resolve().then(() => this._drain());
         }
         return this._drainPromise;
     }
@@ -264,7 +267,6 @@ export class Reactor {
      * @returns {Promise<void>} Resolves when the queue is empty
      */
     async _drain() {
-        this._draining = true;
         try {
             while (this._queue.size > 0) {
                 const [code, { id }] = this._queue.entries().next().value;
@@ -275,6 +277,9 @@ export class Reactor {
                     await this._instanceRegistry.render(id);
                     instance[LIFECYCLE_ACTIVE] = 'afterRender';
                     instance.afterRender();
+                } catch (error) {
+                    this._console.error(`Error during re-render of ${id.code}:`, error);
+                    throw error;
                 } finally {
                     instance[LIFECYCLE_ACTIVE] = null;
                 }

@@ -8,8 +8,8 @@ Components in FuseWire follow a well-defined lifecycle with hooks at key points.
 
 ### `constructor(vars)`
 
-**When:** Component instance is created  
-**Type:** Synchronous  
+**When:** Component instance is created
+**Type:** Synchronous
 **Purpose:** Initialize component instance
 
 ```js
@@ -29,8 +29,8 @@ constructor(vars = {}) {
 
 ### `async init()`
 
-**When:** After vars are set/updated, before first render  
-**Type:** Async  
+**When:** After vars are set/updated, before first render
+**Type:** Async
 **Purpose:** Perform async initialization, declare children, load libraries
 
 ```js
@@ -60,15 +60,15 @@ async init() {
 
 ### `update(newVars, react = true)`
 
-**When:** Called to merge new vars into the component  
-**Type:** Synchronous  
+**When:** Called to merge new vars into the component
+**Type:** Synchronous
 **Purpose:** Merge vars, optionally trigger re-render; override for custom logic
 
 ```js
 update(newVars, react = true) {
   const oldSearch = this.search;
   super.update(newVars, react);
-  
+
   if (oldSearch !== this.search) {
     console.log('Search changed:', oldSearch, '->', this.search);
     this.performSearch();
@@ -86,8 +86,8 @@ update(newVars, react = true) {
 
 ### `hydrate()`
 
-**When:** After first render, element is in the document  
-**Type:** Synchronous  
+**When:** After first render, element is in the document
+**Type:** Synchronous
 **Purpose:** One-time post-render setup that requires real DOM
 
 ```js
@@ -117,8 +117,8 @@ hydrate() {
 
 ### `afterRender()`
 
-**When:** After DOM has been rendered/updated  
-**Type:** Synchronous  
+**When:** After DOM has been rendered/updated
+**Type:** Synchronous
 **Purpose:** Per-render DOM work
 
 ```js
@@ -140,8 +140,8 @@ afterRender() {
 
 ### `destroy()`
 
-**When:** Component is removed from DOM  
-**Type:** Synchronous  
+**When:** Component is removed from DOM
+**Type:** Synchronous
 **Purpose:** Clean up resources
 
 ```js
@@ -150,12 +150,12 @@ destroy() {
   if (this.tooltip) {
     this.tooltip.destroy();
   }
-  
+
   // Cancel pending requests
   if (this.abortController) {
     this.abortController.abort();
   }
-  
+
   // Clear timers
   clearInterval(this.intervalId);
 }
@@ -173,8 +173,8 @@ destroy() {
 
 ### `fw-ready` Event
 
-**When:** Emitted by the framework immediately after `afterRender()` on the first render (after `hydrate()`).  
-**Type:** Event  
+**When:** Emitted by the framework immediately after `afterRender()` on the first render (after `hydrate()`).
+**Type:** Event
 **Purpose:** Notify parent components that this child component is fully initialized, rendered, and attached to the document.
 
 ```js
@@ -183,8 +183,8 @@ async init() {
       this.createChild('Analytics/HeavyChart', 'chart'),
       this.createChild('Common/Skeleton', 'chart')
   );
-  
-  // This listener is buffered and will be attached to the real HeavyChart 
+
+  // This listener is buffered and will be attached to the real HeavyChart
   // once it's fully created and swapped in.
   this.chart.on('fw-ready', (chartInstance) => {
     console.log('Chart is now ready to be interacted with!', chartInstance);
@@ -195,6 +195,32 @@ async init() {
 **Guidelines:**
 - Useful for interacting with lazy loaded children (`createLazyChild`), since their background creation is disconnected from the parent's render cycle.
 - Fired exactly once per component instance by the framework.
+
+---
+
+### `fw-error` Event
+
+**When:** Emitted by the framework when a component fails to initialize or load its template.
+**Type:** Event
+**Purpose:** Notify parent components of a child failure, allowing them to handle the error or stop it from bubbling up and crashing the parent.
+
+```js
+async init() {
+  this.chart = this.createChild('Analytics/HeavyChart');
+
+  this.chart.on('fw-error', (errorContext) => {
+    console.error('Chart failed to load:', errorContext.error);
+    // Stop propagation to prevent the parent from failing
+    return false;
+  });
+}
+```
+
+**Guidelines:**
+- Emitted on the `Child` reference so the parent can attach listeners before the real component exists.
+- The `errorContext` object contains `error` and `failedComponent`.
+- If a listener returns `false`, propagation stops, the parent continues normally, and the mount point remains empty.
+- If unhandled (and no fallback is configured), the error bubbles up, crashing the parent.
 
 ---
 
@@ -258,14 +284,14 @@ class SearchBox extends Component {
       this.debounceSearch();
     }
   }
-  
+
   debounceSearch() {
     clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(() => {
       this.performSearch();
     }, 300);
   }
-  
+
   destroy() {
     clearTimeout(this.searchTimer);
   }
@@ -365,22 +391,22 @@ class DebugComponent extends Component {
     super(vars);
     console.log('[constructor]', this.componentName, this.componentId, vars);
   }
-  
+
   async init() {
     console.log('[init] start', this.componentName, this.componentId);
     await super.init();
     console.log('[init] end', this.componentName, this.componentId);
   }
-  
+
   update(newVars, react = true) {
     console.log('[update]', { newVars });
     super.update(newVars, react);
   }
-  
+
   afterRender() {
     console.log('[afterRender]', this.componentContainer);
   }
-  
+
   destroy() {
     console.log('[destroy]', `${this.componentName}#${this.componentId}`);
   }

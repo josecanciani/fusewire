@@ -165,27 +165,27 @@ describe('Child', () => {
     describe('on() — buffered event subscriptions', () => {
         it('buffers a subscription', () => {
             const ref = new Child('Child', 'c1');
-            ref.on('click', () => {});
+            ref.on('click', () => { });
             assert.strictEqual(ref._bufferedEvents.length, 1);
             assert.strictEqual(ref._bufferedEvents[0].eventName, 'click');
         });
 
         it('buffers multiple subscriptions', () => {
             const ref = new Child('Child', 'c1');
-            ref.on('click', () => {});
-            ref.on('hover', () => {});
+            ref.on('click', () => { });
+            ref.on('hover', () => { });
             assert.strictEqual(ref._bufferedEvents.length, 2);
         });
 
         it('returns an unsubscribe function', () => {
             const ref = new Child('Child', 'c1');
-            const unsub = ref.on('click', () => {});
+            const unsub = ref.on('click', () => { });
             assert.strictEqual(typeof unsub, 'function');
         });
 
         it('marks entry as removed when unsubscribed before replay', () => {
             const ref = new Child('Child', 'c1');
-            const unsub = ref.on('click', () => {});
+            const unsub = ref.on('click', () => { });
             unsub();
             assert.strictEqual(ref._bufferedEvents[0].removed, true);
         });
@@ -194,7 +194,7 @@ describe('Child', () => {
             const ref = new Child('Child', 'c1');
             ref._replaced = true;
             assert.throws(
-                () => ref.on('click', () => {}),
+                () => ref.on('click', () => { }),
                 /on\(\) called on replaced reference/,
             );
         });
@@ -237,14 +237,14 @@ describe('Child', () => {
             assert.deepStrictEqual(calls, []);
         });
 
-        it('clears buffered events after replay', () => {
+        it('does not clear buffered events after replay (to support fw-error)', () => {
             const ref = new Child('Child', 'c1');
-            ref.on('click', () => {});
+            ref.on('click', () => { });
 
             const comp = makeComponent();
             ref._replayBufferedEvents(comp);
 
-            assert.strictEqual(ref._bufferedEvents.length, 0);
+            assert.strictEqual(ref._bufferedEvents.length, 1);
         });
 
         it('unsubscribe works after replay (delegates to real component)', () => {

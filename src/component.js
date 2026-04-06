@@ -105,6 +105,14 @@ export class Component {
     }
 
     /**
+     * Convert to ComponentId
+     * @returns {ComponentId} The component id
+     */
+    toComponentId() {
+        return new ComponentId(this.componentName, this.componentId, this.componentVersion);
+    }
+
+    /**
      * Init hook - called after vars are set and framework is wired, before first render.
      * Override in subclasses for initialization logic.
      * @async
@@ -132,10 +140,11 @@ export class Component {
      *
      * @param {ComponentVars} newVars - Vars to merge into the component
      * @param {boolean} react - Whether to trigger a re-render (default true)
+     * @returns {Promise<void>} Promise that resolves when the re-render is complete (if react is true)
      */
     update(newVars, react = true) {
         Object.assign(this, newVars);
-        if (react) this.react();
+        return react ? this.react() : Promise.resolve();
     }
 
     /**
@@ -175,7 +184,7 @@ export class Component {
      * @param {string|ComponentVars} [idOrVars] - Instance id, or vars if id is omitted
      * @param {ComponentVars|import('./component.js').ChildOptions} [maybeVarsOrOptions] - Vars when id is provided, or options when id is omitted
      * @param {import('./component.js').ChildOptions} [maybeOptions] - Options when id and vars are provided
-     * @returns {Component|Child} Reference that the framework replaces with the real instance after mounting
+     * @returns {Child|Component} Reference that the framework replaces with the real instance after mounting
      */
     createChild(name, idOrVars, maybeVarsOrOptions, maybeOptions) {
         let id;
@@ -202,10 +211,44 @@ export class Component {
      * component and triggers a re-render of the parent.
      * @param {Component|Child} lazyChild - The child reference to load lazily
      * @param {Component|Child} placeholderChild - Placeholder to show while loading
-     * @returns {Component|Child} Reference that the framework replaces with the real instance after mounting
+     * @returns {Child|Component} Reference that the framework replaces with the real instance after mounting
      */
     createLazyChild(lazyChild, placeholderChild) {
-        return this.createChild('FuseWire/Lazy', '', { lazyChild, placeholderChild });
+        if (!placeholderChild) {
+            throw new Error(
+                'createLazyChild requires a placeholderChild parameter to display while loading',
+            );
+        }
+        const baseId = lazyChild.toComponentId().code;
+        return this.createChild('FuseWire/Lazy', `${baseId}-lazy`, {
+            lazyChild,
+            placeholderChild,
+        });
+    }
+
+    /**
+     * Create a child component wrapped in an error boundary.
+     * If the child fails to initialize or render, the framework will catch the
+     * `fw-error` event and automatically render the fallback component instead.
+     * @param {Component|Child} targetChild - The child reference to mount
+     * @param {Component|Child|string} fallbackChildOrName - Fallback child reference or component name if targetChild fails
+     * @returns {Child|Component} Boundary reference that manages the child lifecycle
+     */
+    createErrorBoundedChild(targetChild, fallbackChildOrName) {
+        if (!fallbackChildOrName) {
+            throw new Error(
+                'createErrorBoundedChild requires a fallbackChildOrName parameter to display when an error occurs',
+            );
+        }
+        const baseId = targetChild.toComponentId().code;
+        const fallbackChild =
+            typeof fallbackChildOrName === 'string'
+                ? this.createChild(fallbackChildOrName, `${baseId}-eb-fallback`)
+                : fallbackChildOrName;
+        return this.createChild('FuseWire/ErrorBoundary', `${baseId}-eb`, {
+            targetChild,
+            fallbackChild,
+        });
     }
 
     /**
@@ -288,6 +331,29 @@ export class Component {
     }
 
     /**
+     * Emit an event and check if propagation was stopped.
+     * Works like emit(), but returns true if any handler returned false.
+     * @param {string} eventName - Event name to emit
+     * @param {...*} args - Arguments forwarded to each handler
+     * @returns {boolean} True if propagation was stopped
+     */
+    emitCancellable(eventName, ...args) {
+        if (this[LIFECYCLE_ACTIVE]) {
+            this[CONSOLE].warn(
+                `emitCancellable('${eventName}') called during ${this[LIFECYCLE_ACTIVE]}() — listeners may not be registered yet`,
+            );
+        }
+        if (!this[EVENTS]) return false;
+
+        // We can reuse emitBroadcast logic from EventEmitter since it already tracks 'stopped'
+        const result = this[EVENTS].emitBroadcast(eventName, ...args);
+        for (const err of result.errors) {
+            this[CONSOLE].error(`emitCancellable('${eventName}') listener threw: ${err.message}`);
+        }
+        return result.stopped;
+    }
+
+    /**
      * Broadcast an event top-down through this component and its children.
      * Propagation is scoped to this component's subtree only — it does not
      * reach parent or sibling components. Use reactor.broadcast() for
@@ -364,17 +430,18 @@ export class Component {
 
     /**
      * Trigger re-render of this component.
-     * Ignored during lifecycle hooks (init, update, afterRender) because
-     * the framework already renders the component after those hooks return.
+     * Ignored during initialization lifecycle hooks (init, update) because
+     * the framework already renders the component natively after those hooks return.
      * Returns a promise that resolves when the render queue has drained,
      * enabling callers to chain post-render work via `.then()`.
      * @param {string} mode - Render mode ('CSR' for client-side only)
      * @returns {Promise<void>} Resolves when the render queue drains (or immediately if ignored)
      */
     react(mode = 'CSR') {
-        if (this[LIFECYCLE_ACTIVE]) {
+        const active = this[LIFECYCLE_ACTIVE];
+        if (active === 'init' || active === 'update') {
             this[CONSOLE].warn(
-                `react() called during ${this[LIFECYCLE_ACTIVE]}() — ignored (the framework renders automatically after lifecycle hooks)`,
+                `react() called during ${active}() — ignored (the framework renders automatically after init/update)`,
             );
             return this[REACTOR]._drainPromise;
         }
@@ -410,7 +477,7 @@ export class Child {
      * @param {string} id - Instance identifier (may be empty)
      * @param {ComponentVars} vars - Initial variables for the component
      * @param {string|null} version - Template version hash, or null for latest
-     * @param {ChildOptions} options - Creation options (fallback)
+     * @param {ChildOptions} options - Creation options
      */
     constructor(componentName, id = '', vars = {}, version = null, options = {}) {
         if (!componentName || typeof componentName !== 'string') {
@@ -422,6 +489,8 @@ export class Child {
         this.version = version;
         this._options = options;
         this._replaced = false;
+        /** @type {import('./component.js').Component|null} */
+        this._realInstance = null;
         this._bufferedEvents = [];
         this._creationPromise = null;
         this._detachedContainer = null;
@@ -450,15 +519,28 @@ export class Child {
      * update() is a bug — the caller is holding a stale reference.
      *
      * @param {ComponentVars} newVars - Vars to merge into the reference
+     * @returns {Promise<void>} A resolved promise for compatibility with Component.update()
      */
     update(newVars) {
         if (this._replaced) {
             throw new Error(
                 `Child: update() called on replaced reference "${this.toComponentId().code}". ` +
-                    'Use the Component instance from vars instead.',
+                'Use the Component instance from vars instead.',
             );
         }
         Object.assign(this.vars, newVars);
+
+        // If the framework has already started eager creation of this child, we must push the updates
+        // to the real instance once it's created, otherwise they will be swallowed by the race condition.
+        if (this._creationPromise) {
+            this._creationPromise
+                .then((instance) => {
+                    instance.update(newVars, true);
+                })
+                .catch(() => { });
+        }
+
+        return Promise.resolve();
     }
 
     /**
@@ -476,7 +558,7 @@ export class Child {
         if (this._replaced) {
             throw new Error(
                 `Child: on() called on replaced reference "${this.toComponentId().code}". ` +
-                    'Use the Component instance from vars instead.',
+                'Use the Component instance from vars instead.',
             );
         }
         const entry = { eventName, handler, removed: false, realUnsub: null };
@@ -491,18 +573,50 @@ export class Child {
     }
 
     /**
+     * Emit an event to buffered listeners.
+     * Used to emit 'fw-error' when component creation fails.
+     * If any handler returns false, propagation is stopped.
+     * @param {string} eventName - Event name
+     * @param {...*} args - Arguments forwarded to each handler
+     * @returns {boolean} True if any handler returned false (propagation stopped)
+     */
+    _emitBuffered(eventName, ...args) {
+        let stopped = false;
+
+        // If already replaced, emit on the real instance since listeners were replayed.
+        // We don't iterate buffered events here because they were moved to the instance.
+        if (this._replaced && this._realInstance) {
+            return this._realInstance.emitCancellable(eventName, ...args);
+        }
+
+        for (const entry of this._bufferedEvents) {
+            if (!entry.removed && entry.eventName === eventName) {
+                try {
+                    if (entry.handler(...args) === false) {
+                        stopped = true;
+                    }
+                } catch (e) {
+                    console.error(`_emitBuffered('${eventName}') listener threw:`, e);
+                }
+            }
+        }
+        return stopped;
+    }
+
+    /**
      * Replay buffered event subscriptions on the real Component instance.
      * Called by the InstanceRegistry after the real Component is created and
      * the reference is replaced in the parent's vars.
      * @param {import('./component.js').Component} component - The fully loaded component instance
      */
     _replayBufferedEvents(component) {
+        this._realInstance = component;
         for (const entry of this._bufferedEvents) {
             if (!entry.removed) {
                 entry.realUnsub = component.on(entry.eventName, entry.handler);
             }
         }
-        this._bufferedEvents = [];
+        // Do NOT clear _bufferedEvents yet, we might need them for _emitBuffered if hydration fails
     }
 
     /**
@@ -536,8 +650,52 @@ export class Lazy extends Component {
                 this.update({ child: this.lazyChild });
             })
             .catch((err) => {
+                this.console.error(
+                    `Lazy load failed for ${this.lazyChild.componentName}: ${err.message}`,
+                );
                 this.lazyChild._creationError = err;
-                this.update({ child: this.lazyChild });
+                const handled = this.lazyChild._emitBuffered('fw-error', {
+                    error: err,
+                    failedComponent: this.lazyChild.componentName,
+                });
+                if (!handled) {
+                    // Bubble the error up to the Lazy component's parent
+                    const parentHandled = this.emitCancellable('fw-error', {
+                        error: err,
+                        failedComponent: this.lazyChild.componentName,
+                    });
+                    if (!parentHandled) {
+                        // Unhandled error in background load propagates globally
+                        throw err;
+                    }
+                }
             });
+    }
+}
+
+export class ErrorBoundary extends Component {
+    static componentName = 'FuseWire/ErrorBoundary';
+
+    /** @type {Child|Component} */
+    child;
+
+    /** @type {Child} */
+    targetChild;
+
+    /** @type {Child} */
+    fallbackChild;
+
+    async init() {
+        this.child = this.targetChild;
+        this.child.on('fw-error', (ctx) => {
+            this.fallbackChild.update({
+                errorMessage: ctx.error.message,
+                failedComponent: ctx.failedComponent,
+            });
+            this.update({
+                child: this.fallbackChild,
+            }).then(() => this.emit('error', ctx));
+            return false; // Prevent further bubbling
+        });
     }
 }

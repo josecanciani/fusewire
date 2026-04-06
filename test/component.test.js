@@ -7,689 +7,722 @@ import { Child } from '../src/component.js';
 import { COMPONENT_ID, REGISTRY_ENTRY, CONSOLE, REACTOR, LIFECYCLE_ACTIVE, EVENTS, LIBRARIES } from '../src/symbols.js';
 
 describe('Component', () => {
-	describe('Constructor', () => {
-		it('creates instance with default values', () => {
-			const comp = new Component();
-			assert.ok(comp instanceof Component);
-		});
-
-		it('creates instance with vars', () => {
-			const comp = Object.assign(new Component(), { count: 0 });
-			assert.strictEqual(comp.count, 0);
-		});
-
-	});
-
-	describe('Lifecycle Hooks', () => {
-		it('has default init hook', async () => {
-			const comp = new Component();
-			await comp.init(); // Should not throw
-		});
-
-		it('has default update method', () => {
-			const comp = new Component();
-			comp.update({}, false); // react=false since no reactor attached
-		});
-
-		it('has default destroy hook', () => {
-			const comp = new Component();
-			comp.destroy(); // Should not throw
-		});
-
-		it('has default afterRender hook', () => {
-			const comp = new Component();
-			comp.afterRender(); // Should not throw
-		});
-
-		it('allows overriding hooks', async () => {
-			class TestComponent extends Component {
-				constructor() {
-					super();
-					this._initCalled = false;
-					this._updateCalled = false;
-					this._destroyCalled = false;
-					this._afterRenderCalled = false;
-				}
-
-				async init() {
-					this._initCalled = true;
-				}
-
-				update(newVars, react = true) {
-					this._updateCalled = true;
-					this._receivedVars = newVars;
-					super.update(newVars, react);
-				}
-
-				destroy() {
-					this._destroyCalled = true;
-				}
-
-				afterRender() {
-					this._afterRenderCalled = true;
-				}
-			}
-
-			const comp = Object.assign(new TestComponent(), { count: 0 });
-
-			await comp.init();
-			assert.strictEqual(comp._initCalled, true);
-
-			comp.update({ count: 1 }, false);
-			assert.strictEqual(comp._updateCalled, true);
-			assert.deepStrictEqual(comp._receivedVars, { count: 1 });
-			assert.strictEqual(comp.count, 1, 'vars should be merged');
-
-			comp.destroy();
-			assert.strictEqual(comp._destroyCalled, true);
-
-			comp.afterRender();
-			assert.strictEqual(comp._afterRenderCalled, true);
-		});
-	});
-
-	describe('update()', () => {
-		it('shallow-merges newVars into componentVars', () => {
-			const comp = Object.assign(new Component(), { a: 1, b: 2 });
-			comp.update({ b: 99, c: 3 }, false);
-			assert.strictEqual(comp.a, 1);
-			assert.strictEqual(comp.b, 99);
-			assert.strictEqual(comp.c, 3);
-		});
-
-		it('triggers react() by default', () => {
-			const comp = Object.assign(new Component(), { x: 0 });
-			comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
-			const reactCalls = [];
-			comp[REACTOR] = {
-				react(componentId, mode) {
-					reactCalls.push({ code: componentId.code, mode });
-				},
-			};
-
-			comp.update({ x: 5 });
-			assert.strictEqual(comp.x, 5);
-			assert.strictEqual(reactCalls.length, 1);
-			assert.strictEqual(reactCalls[0].code, 'Test#u1');
-		});
-
-		it('does not react when react=false', () => {
-			const comp = Object.assign(new Component(), { x: 0 });
-			comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
-			const reactCalls = [];
-			comp[REACTOR] = {
-				react(componentId, mode) {
-					reactCalls.push({ code: componentId.code, mode });
-				},
-			};
-
-			comp.update({ x: 5 }, false);
-			assert.strictEqual(comp.x, 5);
-			assert.strictEqual(reactCalls.length, 0);
-		});
-	});
-
-	describe('react()', () => {
-		it('calls reactor.react when attached', () => {
-			const comp = new Component();
-			comp[COMPONENT_ID] = new ComponentId('Component', 'test');
-			const reactCalls = [];
-
-			comp[REACTOR] = {
-				react(componentId, mode) {
-					reactCalls.push({ code: componentId.code, mode });
-				},
-			};
-
-			comp.react('CSR');
-
-			assert.strictEqual(reactCalls.length, 1);
-			assert.strictEqual(reactCalls[0].code, 'Component#test');
-			assert.strictEqual(reactCalls[0].mode, 'CSR');
-		});
-
-		it('defaults to CSR mode', () => {
-			const comp = new Component();
-			comp[COMPONENT_ID] = new ComponentId('Component', 'test');
-			const reactCalls = [];
-
-			comp[REACTOR] = {
-				react(componentId, mode) {
-					reactCalls.push({ mode });
-				},
-			};
-
-			comp.react();
-
-			assert.strictEqual(reactCalls[0].mode, 'CSR');
-		});
-
-		it('skips react() and warns when LIFECYCLE_ACTIVE is set', () => {
-			const comp = new Component();
-			comp[COMPONENT_ID] = new ComponentId('Component', 'test');
-			const reactCalls = [];
-			const warnings = [];
-
-			comp[REACTOR] = {
-				react(componentId, mode) {
-					reactCalls.push({ code: componentId.code, mode });
-				},
-			};
-			comp[CONSOLE] = {
-				log() {},
-				warn(...args) { warnings.push(args); },
-				error() {},
-			};
-
-			comp[LIFECYCLE_ACTIVE] = 'init';
-			comp.react();
-
-			assert.strictEqual(reactCalls.length, 0, 'reactor.react should not be called');
-			assert.strictEqual(warnings.length, 1, 'should warn once');
-			assert.ok(
-				warnings[0][0].includes('init'),
-				'warning should mention the active lifecycle hook',
-			);
-		});
-
-		it('allows react() when LIFECYCLE_ACTIVE is null', () => {
-			const comp = new Component();
-			comp[COMPONENT_ID] = new ComponentId('Component', 'test');
-			const reactCalls = [];
-
-			comp[REACTOR] = {
-				react(componentId, mode) {
-					reactCalls.push({ code: componentId.code, mode });
-				},
-			};
-
-			comp[LIFECYCLE_ACTIVE] = null;
-			comp.react();
-
-			assert.strictEqual(reactCalls.length, 1);
-		});
-	});
-
-	describe('Subclassing', () => {
-		it('inherits from Component', () => {
-			class Counter extends Component {}
-
-			const counter = Object.assign(new Counter(), { count: 0 });
-			assert.ok(counter instanceof Component);
-			assert.ok(counter instanceof Counter);
-		});
-
-		it('allows adding custom methods', () => {
-			class Counter extends Component {
-
-				increment() {
-					this.count++;
-				}
-
-				decrement() {
-					this.count--;
-				}
-			}
-
-			const counter = Object.assign(new Counter(), { count: 5 });
-			counter.increment();
-			assert.strictEqual(counter.count, 6);
-			counter.decrement();
-			assert.strictEqual(counter.count, 5);
-		});
-	});
-
-	describe('Vars Management', () => {
-		it('allows direct vars mutation', () => {
-			const comp = Object.assign(new Component(), { count: 0 });
-			comp.count = 10;
-			assert.strictEqual(comp.count, 10);
-		});
-
-		it('allows nested object vars', () => {
-			const comp = Object.assign(new Component(), {
-				user: {
-					name: 'Alice',
-					profile: {
-						role: 'admin',
-					},
-				},
-			});
-
-			assert.strictEqual(comp.user.name, 'Alice');
-			assert.strictEqual(comp.user.profile.role, 'admin');
-		});
-	});
-
-	describe('migrateVars()', () => {
-		it('has default implementation that returns vars unchanged', () => {
-			const vars = { count: 5, name: 'test' };
-			const migrated = Component.migrateVars(vars);
-			assert.deepStrictEqual(migrated, vars);
-		});
-
-		it('can be overridden in subclass', () => {
-			class Counter extends Component {
-				static CURRENT_VERSION = 2;
-
-				static migrateVars(vars) {
-					// Example: renamed 'counter' to 'count' in v2
-					if ('counter' in vars && !('count' in vars)) {
-						return { ...vars, count: vars.counter };
-					}
-					return vars;
-				}
-			}
-
-			const oldVars = { counter: 10 };
-			const migrated = Counter.migrateVars(oldVars);
-
-			assert.strictEqual(migrated.count, 10);
-			assert.strictEqual(migrated.counter, 10); // Old field preserved
-		});
-
-		it('allows developer-maintained version tracking', () => {
-			class MyComponent extends Component {
-				static CURRENT_VERSION = 3;
-
-				static migrateVars(vars) {
-					const fromVersion = vars._version || 1;
-					let migrated = { ...vars };
-
-					if (fromVersion < 2) {
-						// v1 → v2: add new field
-						migrated.newField = 'default';
-					}
-
-					if (fromVersion < 3) {
-						// v2 → v3: rename field
-						migrated.renamedField = migrated.oldField;
-						delete migrated.oldField;
-					}
-
-					migrated._version = MyComponent.CURRENT_VERSION;
-					return migrated;
-				}
-			}
-
-			const oldVars = { _version: 1, oldField: 'value' };
-			const migrated = MyComponent.migrateVars(oldVars);
-
-			assert.strictEqual(migrated._version, 3);
-			assert.strictEqual(migrated.newField, 'default');
-			assert.strictEqual(migrated.renamedField, 'value');
-			assert.strictEqual(migrated.oldField, undefined);
-		});
-	});
-
-	describe('createChild()', () => {
-		it('returns a Child with correct componentName, id, and vars', () => {
-			const comp = new Component();
-                        comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => {} } };
-			const ref = comp.createChild('Sidebar', 'main', { collapsed: false });
-
-			assert.strictEqual(ref.componentName, 'Sidebar');
-			assert.strictEqual(ref.id, 'main');
-			assert.deepStrictEqual(ref.vars, { collapsed: false });
-		});
-
-		it('returns a Child with empty id when id is omitted', () => {
-			const comp = new Component();
-                        comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => {} } };
-			const ref = comp.createChild('Sidebar', { collapsed: true });
-
-			assert.strictEqual(ref.componentName, 'Sidebar');
-			assert.strictEqual(ref.id, '');
-			assert.deepStrictEqual(ref.vars, { collapsed: true });
-		});
-
-		it('returns a Child with empty id and empty vars when only name is given', () => {
-			const comp = new Component();
-                        comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => {} } };
-			const ref = comp.createChild('Sidebar');
-
-			assert.strictEqual(ref.componentName, 'Sidebar');
-			assert.strictEqual(ref.id, '');
-			assert.deepStrictEqual(ref.vars, {});
-		});
-
-		it('returns an instance of Child', () => {
-			const comp = new Component();
-                        comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => {} } };
-			const ref = comp.createChild('Sidebar', 'main', { collapsed: false });
-
-			assert.ok(ref instanceof Child);
-		});
-
-		it('passes options to Child', () => {
-			const comp = new Component();
-                        comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => {} } };
-			const ref = comp.createChild('Sidebar', 'main', {}, { fallback: 'ErrorCard' });
-
-			assert.strictEqual(ref._options.fallback, 'ErrorCard');
-		});
-
-		it('passes options when id is omitted', () => {
-			const comp = new Component();
-                        comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => {} } };
-			const ref = comp.createChild('Sidebar', { page: 1 }, { fallback: 'ErrorCard' });
-
-			assert.strictEqual(ref.id, '');
-			assert.deepStrictEqual(ref.vars, { page: 1 });
-			assert.strictEqual(ref._options.fallback, 'ErrorCard');
-		});
-	});
-
-	describe('createLazyChild()', () => {
-	        it('returns a FuseWire/Lazy Child with correct vars', () => {
-	                const comp = new Component();
-                        comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => {} } };
-	                const lazyChild = comp.createChild('HeavyChart', 'chart');
-	                const placeholderChild = comp.createChild('Skeleton', 'chart');
-	                const ref = comp.createLazyChild(lazyChild, placeholderChild);
-
-	                assert.ok(ref instanceof Child);
-	                assert.strictEqual(ref.componentName, 'FuseWire/Lazy');
-	                assert.strictEqual(ref.vars.lazyChild, lazyChild);
-	                assert.strictEqual(ref.vars.placeholderChild, placeholderChild);
-	        });
-	});	describe('Event pub/sub', () => {
-		it('on() registers a handler that emit() calls', () => {
-			const comp = new Component();
-			const calls = [];
-			comp.on('change', () => calls.push('called'));
-			comp.emit('change');
-			assert.strictEqual(calls.length, 1);
-		});
-
-		it('emit() forwards all arguments to the handler', () => {
-			const comp = new Component();
-			const received = [];
-			comp.on('select', (...args) => received.push(args));
-			comp.emit('select', 'foo', 42);
-			assert.deepStrictEqual(received, [['foo', 42]]);
-		});
-
-		it('multiple handlers for the same event are all called', () => {
-			const comp = new Component();
-			const log = [];
-			comp.on('ping', () => log.push('a'));
-			comp.on('ping', () => log.push('b'));
-			comp.emit('ping');
-			assert.deepStrictEqual(log, ['a', 'b']);
-		});
-
-		it('handlers for different events do not cross-fire', () => {
-			const comp = new Component();
-			const aLog = [];
-			const bLog = [];
-			comp.on('a', () => aLog.push(1));
-			comp.on('b', () => bLog.push(2));
-			comp.emit('a');
-			assert.deepStrictEqual(aLog, [1]);
-			assert.deepStrictEqual(bLog, []);
-		});
-
-		it('on() returns an unsubscribe function that stops the handler', () => {
-			const comp = new Component();
-			const calls = [];
-			const unsub = comp.on('click', () => calls.push('click'));
-			comp.emit('click');
-			unsub();
-			comp.emit('click');
-			assert.strictEqual(calls.length, 1);
-		});
-
-		it('emit() before any on() call does not throw', () => {
-			const comp = new Component();
-			assert.doesNotThrow(() => comp.emit('noop', 1, 2, 3));
-		});
-
-		it('EVENTS symbol key is not visible in Object.keys()', () => {
-			const comp = new Component();
-			comp.on('test', () => {});
-			assert.ok(!Object.keys(comp).includes(EVENTS.toString()));
-			assert.ok(!(String(EVENTS) in comp) || typeof EVENTS === 'symbol');
-		});
-
-		it('handlers are not called after instance[EVENTS].clear()', () => {
-			const comp = new Component();
-			const calls = [];
-			comp.on('done', () => calls.push(1));
-			comp[EVENTS].clear();
-			comp.emit('done');
-			assert.strictEqual(calls.length, 0);
-		});
-
-		it('emit() warns when called during a lifecycle hook but still fires handlers', () => {
-			const comp = new Component();
-			const warnings = [];
-			const calls = [];
-			comp[CONSOLE] = { log() {}, warn(...args) { warnings.push(args); }, error() {} };
-			comp.on('ready', () => calls.push(1));
-			comp[LIFECYCLE_ACTIVE] = 'init';
-			comp.emit('ready');
-			assert.strictEqual(warnings.length, 1);
-			assert.ok(warnings[0][0].includes('init'), 'warning should mention the lifecycle hook');
-			assert.ok(warnings[0][0].includes('ready'), 'warning should mention the event name');
-			assert.strictEqual(calls.length, 1, 'handler should still be called');
-		});
-
-		it('emit() calls all handlers even if one throws, and logs the error', () => {
-			const comp = new Component();
-			const errors = [];
-			const calls = [];
-			comp[CONSOLE] = { log() {}, warn() {}, error(...args) { errors.push(args); } };
-			comp.on('tick', () => { throw new Error('boom'); });
-			comp.on('tick', () => calls.push('ran'));
-			comp.emit('tick');
-			assert.strictEqual(calls.length, 1, 'second handler should still run');
-			assert.strictEqual(errors.length, 1, 'error should be logged');
-			assert.ok(errors[0][0].includes('boom'), 'log should include the error message');
-		});
-	});
-
-	describe('Scoped DOM queries (Smoke Test)', () => {
-		let dom;
-		let document;
-
-		beforeEach(() => {
-			dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-				url: 'http://localhost',
-			});
-			document = dom.window.document;
-			global.document = document;
-			// JSDOM does not implement CSS.escape — polyfill for tests
-			if (!global.CSS) global.CSS = {};
-			if (!global.CSS.escape) {
-				global.CSS.escape = (v) =>
-					String(v).replace(/([^\w-])/g, '\\$1');
-			}
-		});
-
-		/**
-		 * Build a Component wired to a real DOM container.
-		 */
-		function makeComponent(name, id, containerHTML) {
-			const comp = new Component();
-			const cid = new ComponentId(name, id);
-			comp[COMPONENT_ID] = cid;
-			const container = document.createElement('div');
-			container.setAttribute('data-fusewire-id', cid.code);
-			container.innerHTML = containerHTML;
-			document.body.appendChild(container);
-			comp[REGISTRY_ENTRY] = { instance: comp, container, parent: null, children: null };
-			return comp;
-		}
-
-		it('finds an element in the component own DOM', () => {
-			const comp = makeComponent('Panel', 'main', '<div class="logs">own</div>');
-			const el = comp.querySelector('.logs');
-			assert.ok(el);
-			assert.strictEqual(el.textContent, 'own');
-		});
-
-		it('skips elements inside a child mount point', () => {
-			const comp = makeComponent('Panel', 'main', [
-				'<div class="logs">own</div>',
-				'<div data-fusewire-id="Child#1" data-fusewire-parent-id="Panel#main">',
-				'  <div class="logs">child</div>',
-				'</div>',
-			].join(''));
-			const el = comp.querySelector('.logs');
-			assert.ok(el);
-			assert.strictEqual(el.textContent, 'own');
-		});
-
-		it('querySelectorAll returns elements in own DOM', () => {
-			const comp = makeComponent('Panel', 'main', '<div class="log">a</div><div class="log">b</div>');
-			const els = comp.querySelectorAll('.log');
-			assert.strictEqual(els.length, 2);
-		});
-	});
-
-	describe('broadcast()', () => {
-		it('delegates to reactor.broadcastFrom() with own componentId', () => {
-			const comp = new Component();
-			const cid = new ComponentId('Test', 'u1');
-			comp[COMPONENT_ID] = cid;
-			const broadcastCalls = [];
-			comp[REACTOR] = {
-				broadcastFrom(componentId, eventName, ...args) {
-					broadcastCalls.push({ componentId, eventName, args });
-				},
-			};
-
-			comp.broadcast('theme', 'dark');
-
-			assert.strictEqual(broadcastCalls.length, 1);
-			assert.strictEqual(broadcastCalls[0].componentId, cid);
-			assert.strictEqual(broadcastCalls[0].eventName, 'theme');
-			assert.deepStrictEqual(broadcastCalls[0].args, ['dark']);
-		});
-
-		it('throws when reactor not attached', () => {
-			const comp = new Component();
-			comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
-			assert.throws(
-				() => comp.broadcast('theme'),
-				/Cannot broadcast - reactor not attached/,
-			);
-		});
-
-		it('warns during lifecycle hook but still broadcasts', () => {
-			const comp = new Component();
-			comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
-			const warnings = [];
-			const broadcastCalls = [];
-			comp[CONSOLE] = { log() {}, warn(...args) { warnings.push(args); }, error() {} };
-			comp[REACTOR] = {
-				broadcastFrom(componentId, eventName, ...args) {
-					broadcastCalls.push({ eventName, args });
-				},
-			};
-
-			comp[LIFECYCLE_ACTIVE] = 'init';
-			comp.broadcast('theme', 'dark');
-
-			assert.strictEqual(warnings.length, 1);
-			assert.ok(warnings[0][0].includes('init'), 'warning mentions lifecycle hook');
-			assert.ok(warnings[0][0].includes('theme'), 'warning mentions event name');
-			assert.strictEqual(broadcastCalls.length, 1, 'broadcast still fires');
-		});
-
-		it('forwards multiple arguments', () => {
-			const comp = new Component();
-			comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
-			const broadcastCalls = [];
-			comp[REACTOR] = {
-				broadcastFrom(componentId, eventName, ...args) {
-					broadcastCalls.push({ eventName, args });
-				},
-			};
-
-			comp.broadcast('config', 'key', 'value', 42);
-
-			assert.deepStrictEqual(broadcastCalls[0].args, ['key', 'value', 42]);
-		});
-	});
-
-	describe('hydrate()', () => {
-		it('has a default no-op implementation', () => {
-			const comp = new Component();
-			comp.hydrate(); // Should not throw
-		});
-
-		it('can be overridden in subclasses', () => {
-			let called = false;
-			class MyComp extends Component {
-				hydrate() {
-					called = true;
-				}
-			}
-			const comp = new MyComp();
-			comp.hydrate();
-			assert.strictEqual(called, true);
-		});
-	});
-
-	describe('loadLibrary()', () => {
-		it('creates LIBRARIES map and stores entry structure', () => {
-			const comp = new Component();
-			// Verify LIBRARIES is not set initially
-			assert.strictEqual(comp[LIBRARIES], undefined);
-
-			// Simulate what loadLibrary() does without triggering a real import()
-			comp[LIBRARIES] = new Map();
-			const promise = Promise.resolve({ Engine: class {} });
-			comp[LIBRARIES].set('MyLib', { promise, module: null });
-
-			const libs = comp[LIBRARIES];
-			assert.ok(libs instanceof Map);
-			assert.ok(libs.has('MyLib'));
-			const entry = libs.get('MyLib');
-			assert.strictEqual(entry.module, null);
-			assert.ok(entry.promise instanceof Promise);
-		});
-
-		it('stores multiple libraries', () => {
-			const comp = new Component();
-			comp[LIBRARIES] = new Map();
-			comp[LIBRARIES].set('Lib1', { promise: Promise.resolve({}), module: null });
-			comp[LIBRARIES].set('Lib2', { promise: Promise.resolve({}), module: null });
-
-			assert.strictEqual(comp[LIBRARIES].size, 2);
-		});
-	});
-
-	describe('library()', () => {
-		it('throws when library was not loaded', () => {
-			const comp = new Component();
-			assert.throws(
-				() => comp.library('Missing'),
-				/Library "Missing" not loaded/,
-			);
-		});
-
-		it('throws when library is not yet resolved', () => {
-			const comp = new Component();
-			comp[LIBRARIES] = new Map([
-				['MyLib', { promise: Promise.resolve({}), module: null }],
-			]);
-			assert.throws(
-				() => comp.library('MyLib'),
-				/Library "MyLib" not yet resolved/,
-			);
-		});
-
-		it('returns the full module object', () => {
-			const comp = new Component();
-			const fakeModule = { Engine: class {}, utils: () => {} };
-			comp[LIBRARIES] = new Map([
-				['MyLib', { promise: Promise.resolve(fakeModule), module: fakeModule }],
-			]);
-			const result = comp.library('MyLib');
-			assert.strictEqual(result, fakeModule);
-		});
-	});
+    describe('Constructor', () => {
+        it('creates instance with default values', () => {
+            const comp = new Component();
+            assert.ok(comp instanceof Component);
+        });
+
+        it('creates instance with vars', () => {
+            const comp = Object.assign(new Component(), { count: 0 });
+            assert.strictEqual(comp.count, 0);
+        });
+
+    });
+
+    describe('Lifecycle Hooks', () => {
+        it('has default init hook', async () => {
+            const comp = new Component();
+            await comp.init(); // Should not throw
+        });
+
+        it('has default update method', () => {
+            const comp = new Component();
+            comp.update({}, false); // react=false since no reactor attached
+        });
+
+        it('has default destroy hook', () => {
+            const comp = new Component();
+            comp.destroy(); // Should not throw
+        });
+
+        it('has default afterRender hook', () => {
+            const comp = new Component();
+            comp.afterRender(); // Should not throw
+        });
+
+        it('allows overriding hooks', async () => {
+            class TestComponent extends Component {
+                constructor() {
+                    super();
+                    this._initCalled = false;
+                    this._updateCalled = false;
+                    this._destroyCalled = false;
+                    this._afterRenderCalled = false;
+                }
+
+                async init() {
+                    this._initCalled = true;
+                }
+
+                update(newVars, react = true) {
+                    this._updateCalled = true;
+                    this._receivedVars = newVars;
+                    super.update(newVars, react);
+                }
+
+                destroy() {
+                    this._destroyCalled = true;
+                }
+
+                afterRender() {
+                    this._afterRenderCalled = true;
+                }
+            }
+
+            const comp = Object.assign(new TestComponent(), { count: 0 });
+
+            await comp.init();
+            assert.strictEqual(comp._initCalled, true);
+
+            comp.update({ count: 1 }, false);
+            assert.strictEqual(comp._updateCalled, true);
+            assert.deepStrictEqual(comp._receivedVars, { count: 1 });
+            assert.strictEqual(comp.count, 1, 'vars should be merged');
+
+            comp.destroy();
+            assert.strictEqual(comp._destroyCalled, true);
+
+            comp.afterRender();
+            assert.strictEqual(comp._afterRenderCalled, true);
+        });
+    });
+
+    describe('update()', () => {
+        it('shallow-merges newVars into componentVars', () => {
+            const comp = Object.assign(new Component(), { a: 1, b: 2 });
+            comp.update({ b: 99, c: 3 }, false);
+            assert.strictEqual(comp.a, 1);
+            assert.strictEqual(comp.b, 99);
+            assert.strictEqual(comp.c, 3);
+        });
+
+        it('triggers react() by default', () => {
+            const comp = Object.assign(new Component(), { x: 0 });
+            comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
+            const reactCalls = [];
+            comp[REACTOR] = {
+                react(componentId, mode) {
+                    reactCalls.push({ code: componentId.code, mode });
+                },
+            };
+
+            comp.update({ x: 5 });
+            assert.strictEqual(comp.x, 5);
+            assert.strictEqual(reactCalls.length, 1);
+            assert.strictEqual(reactCalls[0].code, 'Test#u1');
+        });
+
+        it('does not react when react=false', () => {
+            const comp = Object.assign(new Component(), { x: 0 });
+            comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
+            const reactCalls = [];
+            comp[REACTOR] = {
+                react(componentId, mode) {
+                    reactCalls.push({ code: componentId.code, mode });
+                },
+            };
+
+            comp.update({ x: 5 }, false);
+            assert.strictEqual(comp.x, 5);
+            assert.strictEqual(reactCalls.length, 0);
+        });
+    });
+
+    describe('react()', () => {
+        it('calls reactor.react when attached', () => {
+            const comp = new Component();
+            comp[COMPONENT_ID] = new ComponentId('Component', 'test');
+            const reactCalls = [];
+
+            comp[REACTOR] = {
+                react(componentId, mode) {
+                    reactCalls.push({ code: componentId.code, mode });
+                },
+            };
+
+            comp.react('CSR');
+
+            assert.strictEqual(reactCalls.length, 1);
+            assert.strictEqual(reactCalls[0].code, 'Component#test');
+            assert.strictEqual(reactCalls[0].mode, 'CSR');
+        });
+
+        it('defaults to CSR mode', () => {
+            const comp = new Component();
+            comp[COMPONENT_ID] = new ComponentId('Component', 'test');
+            const reactCalls = [];
+
+            comp[REACTOR] = {
+                react(componentId, mode) {
+                    reactCalls.push({ mode });
+                },
+            };
+
+            comp.react();
+
+            assert.strictEqual(reactCalls[0].mode, 'CSR');
+        });
+
+        it('skips react() and warns when LIFECYCLE_ACTIVE is init or update', () => {
+            const comp = new Component();
+            comp[COMPONENT_ID] = new ComponentId('Component', 'test');
+            const reactCalls = [];
+            const warnings = [];
+
+            comp[REACTOR] = {
+                react(componentId, mode) {
+                    reactCalls.push({ code: componentId.code, mode });
+                },
+            };
+            comp[CONSOLE] = {
+                log() { },
+                warn(...args) { warnings.push(args); },
+                error() { },
+            };
+
+            comp[LIFECYCLE_ACTIVE] = 'init';
+            comp.react();
+
+            comp[LIFECYCLE_ACTIVE] = 'update';
+            comp.react();
+
+            assert.strictEqual(reactCalls.length, 0, 'reactor.react should not be called');
+            assert.strictEqual(warnings.length, 2, 'should warn twice');
+            assert.ok(
+                warnings[0][0].includes('init'),
+                'warning should mention the active lifecycle hook',
+            );
+        });
+
+        it('queues react() when LIFECYCLE_ACTIVE is render, hydrate or afterRender', () => {
+            const comp = new Component();
+            comp[COMPONENT_ID] = new ComponentId('Component', 'test');
+            const reactCalls = [];
+            const warnings = [];
+
+            comp[REACTOR] = {
+                react(componentId, mode) {
+                    reactCalls.push({ code: componentId.code, mode });
+                },
+            };
+            comp[CONSOLE] = {
+                log() { },
+                warn(...args) { warnings.push(args); },
+                error() { },
+            };
+
+            comp[LIFECYCLE_ACTIVE] = 'render';
+            comp.react();
+
+            comp[LIFECYCLE_ACTIVE] = 'hydrate';
+            comp.react();
+
+            comp[LIFECYCLE_ACTIVE] = 'afterRender';
+            comp.react();
+
+            assert.strictEqual(reactCalls.length, 3, 'reactor.react should be called 3 times');
+            assert.strictEqual(warnings.length, 0, 'should no longer warn');
+        });
+
+        it('allows react() when LIFECYCLE_ACTIVE is null', () => {
+            const comp = new Component();
+            comp[COMPONENT_ID] = new ComponentId('Component', 'test');
+            const reactCalls = [];
+
+            comp[REACTOR] = {
+                react(componentId, mode) {
+                    reactCalls.push({ code: componentId.code, mode });
+                },
+            };
+
+            comp[LIFECYCLE_ACTIVE] = null;
+            comp.react();
+
+            assert.strictEqual(reactCalls.length, 1);
+        });
+    });
+
+    describe('Subclassing', () => {
+        it('inherits from Component', () => {
+            class Counter extends Component { }
+
+            const counter = Object.assign(new Counter(), { count: 0 });
+            assert.ok(counter instanceof Component);
+            assert.ok(counter instanceof Counter);
+        });
+
+        it('allows adding custom methods', () => {
+            class Counter extends Component {
+
+                increment() {
+                    this.count++;
+                }
+
+                decrement() {
+                    this.count--;
+                }
+            }
+
+            const counter = Object.assign(new Counter(), { count: 5 });
+            counter.increment();
+            assert.strictEqual(counter.count, 6);
+            counter.decrement();
+            assert.strictEqual(counter.count, 5);
+        });
+    });
+
+    describe('Vars Management', () => {
+        it('allows direct vars mutation', () => {
+            const comp = Object.assign(new Component(), { count: 0 });
+            comp.count = 10;
+            assert.strictEqual(comp.count, 10);
+        });
+
+        it('allows nested object vars', () => {
+            const comp = Object.assign(new Component(), {
+                user: {
+                    name: 'Alice',
+                    profile: {
+                        role: 'admin',
+                    },
+                },
+            });
+
+            assert.strictEqual(comp.user.name, 'Alice');
+            assert.strictEqual(comp.user.profile.role, 'admin');
+        });
+    });
+
+    describe('migrateVars()', () => {
+        it('has default implementation that returns vars unchanged', () => {
+            const vars = { count: 5, name: 'test' };
+            const migrated = Component.migrateVars(vars);
+            assert.deepStrictEqual(migrated, vars);
+        });
+
+        it('can be overridden in subclass', () => {
+            class Counter extends Component {
+                static CURRENT_VERSION = 2;
+
+                static migrateVars(vars) {
+                    // Example: renamed 'counter' to 'count' in v2
+                    if ('counter' in vars && !('count' in vars)) {
+                        return { ...vars, count: vars.counter };
+                    }
+                    return vars;
+                }
+            }
+
+            const oldVars = { counter: 10 };
+            const migrated = Counter.migrateVars(oldVars);
+
+            assert.strictEqual(migrated.count, 10);
+            assert.strictEqual(migrated.counter, 10); // Old field preserved
+        });
+
+        it('allows developer-maintained version tracking', () => {
+            class MyComponent extends Component {
+                static CURRENT_VERSION = 3;
+
+                static migrateVars(vars) {
+                    const fromVersion = vars._version || 1;
+                    let migrated = { ...vars };
+
+                    if (fromVersion < 2) {
+                        // v1 → v2: add new field
+                        migrated.newField = 'default';
+                    }
+
+                    if (fromVersion < 3) {
+                        // v2 → v3: rename field
+                        migrated.renamedField = migrated.oldField;
+                        delete migrated.oldField;
+                    }
+
+                    migrated._version = MyComponent.CURRENT_VERSION;
+                    return migrated;
+                }
+            }
+
+            const oldVars = { _version: 1, oldField: 'value' };
+            const migrated = MyComponent.migrateVars(oldVars);
+
+            assert.strictEqual(migrated._version, 3);
+            assert.strictEqual(migrated.newField, 'default');
+            assert.strictEqual(migrated.renamedField, 'value');
+            assert.strictEqual(migrated.oldField, undefined);
+        });
+    });
+
+    describe('createChild()', () => {
+        it('returns a Child with correct componentName, id, and vars', () => {
+            const comp = new Component();
+            comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => { } } };
+            const ref = comp.createChild('Sidebar', 'main', { collapsed: false });
+
+            assert.strictEqual(ref.componentName, 'Sidebar');
+            assert.strictEqual(ref.id, 'main');
+            assert.deepStrictEqual(ref.vars, { collapsed: false });
+        });
+
+        it('returns a Child with empty id when id is omitted', () => {
+            const comp = new Component();
+            comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => { } } };
+            const ref = comp.createChild('Sidebar', { collapsed: true });
+
+            assert.strictEqual(ref.componentName, 'Sidebar');
+            assert.strictEqual(ref.id, '');
+            assert.deepStrictEqual(ref.vars, { collapsed: true });
+        });
+
+        it('returns a Child with empty id and empty vars when only name is given', () => {
+            const comp = new Component();
+            comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => { } } };
+            const ref = comp.createChild('Sidebar');
+
+            assert.strictEqual(ref.componentName, 'Sidebar');
+            assert.strictEqual(ref.id, '');
+            assert.deepStrictEqual(ref.vars, {});
+        });
+
+        it('returns an instance of Child', () => {
+            const comp = new Component();
+            comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => { } } };
+            const ref = comp.createChild('Sidebar', 'main', { collapsed: false });
+
+            assert.ok(ref instanceof Child);
+        });
+
+        it('passes options to Child', () => {
+            const comp = new Component();
+            comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => { } } };
+            const ref = comp.createChild('Sidebar', 'main', {}, { active: true });
+
+            assert.strictEqual(ref._options.active, true);
+        });
+
+        it('passes options when id is omitted', () => {
+            const comp = new Component();
+            comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => { } } };
+            const ref = comp.createChild('Sidebar', { page: 1 }, { active: true });
+
+            assert.strictEqual(ref.id, '');
+            assert.deepStrictEqual(ref.vars, { page: 1 });
+            assert.strictEqual(ref._options.active, true);
+        });
+    });
+
+    describe('createLazyChild()', () => {
+        it('returns a FuseWire/Lazy Child with correct vars', () => {
+            const comp = new Component();
+            comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => { } } };
+            const lazyChild = comp.createChild('HeavyChart', 'chart');
+            const placeholderChild = comp.createChild('Skeleton', 'chart');
+            const ref = comp.createLazyChild(lazyChild, placeholderChild);
+
+            assert.ok(ref instanceof Child);
+            assert.strictEqual(ref.componentName, 'FuseWire/Lazy');
+            assert.strictEqual(ref.vars.lazyChild, lazyChild);
+            assert.strictEqual(ref.vars.placeholderChild, placeholderChild);
+        });
+    }); describe('Event pub/sub', () => {
+        it('on() registers a handler that emit() calls', () => {
+            const comp = new Component();
+            const calls = [];
+            comp.on('change', () => calls.push('called'));
+            comp.emit('change');
+            assert.strictEqual(calls.length, 1);
+        });
+
+        it('emit() forwards all arguments to the handler', () => {
+            const comp = new Component();
+            const received = [];
+            comp.on('select', (...args) => received.push(args));
+            comp.emit('select', 'foo', 42);
+            assert.deepStrictEqual(received, [['foo', 42]]);
+        });
+
+        it('multiple handlers for the same event are all called', () => {
+            const comp = new Component();
+            const log = [];
+            comp.on('ping', () => log.push('a'));
+            comp.on('ping', () => log.push('b'));
+            comp.emit('ping');
+            assert.deepStrictEqual(log, ['a', 'b']);
+        });
+
+        it('handlers for different events do not cross-fire', () => {
+            const comp = new Component();
+            const aLog = [];
+            const bLog = [];
+            comp.on('a', () => aLog.push(1));
+            comp.on('b', () => bLog.push(2));
+            comp.emit('a');
+            assert.deepStrictEqual(aLog, [1]);
+            assert.deepStrictEqual(bLog, []);
+        });
+
+        it('on() returns an unsubscribe function that stops the handler', () => {
+            const comp = new Component();
+            const calls = [];
+            const unsub = comp.on('click', () => calls.push('click'));
+            comp.emit('click');
+            unsub();
+            comp.emit('click');
+            assert.strictEqual(calls.length, 1);
+        });
+
+        it('emit() before any on() call does not throw', () => {
+            const comp = new Component();
+            assert.doesNotThrow(() => comp.emit('noop', 1, 2, 3));
+        });
+
+        it('EVENTS symbol key is not visible in Object.keys()', () => {
+            const comp = new Component();
+            comp.on('test', () => { });
+            assert.ok(!Object.keys(comp).includes(EVENTS.toString()));
+            assert.ok(!(String(EVENTS) in comp) || typeof EVENTS === 'symbol');
+        });
+
+        it('handlers are not called after instance[EVENTS].clear()', () => {
+            const comp = new Component();
+            const calls = [];
+            comp.on('done', () => calls.push(1));
+            comp[EVENTS].clear();
+            comp.emit('done');
+            assert.strictEqual(calls.length, 0);
+        });
+
+        it('emit() warns when called during a lifecycle hook but still fires handlers', () => {
+            const comp = new Component();
+            const warnings = [];
+            const calls = [];
+            comp[CONSOLE] = { log() { }, warn(...args) { warnings.push(args); }, error() { } };
+            comp.on('ready', () => calls.push(1));
+            comp[LIFECYCLE_ACTIVE] = 'init';
+            comp.emit('ready');
+            assert.strictEqual(warnings.length, 1);
+            assert.ok(warnings[0][0].includes('init'), 'warning should mention the lifecycle hook');
+            assert.ok(warnings[0][0].includes('ready'), 'warning should mention the event name');
+            assert.strictEqual(calls.length, 1, 'handler should still be called');
+        });
+
+        it('emit() calls all handlers even if one throws, and logs the error', () => {
+            const comp = new Component();
+            const errors = [];
+            const calls = [];
+            comp[CONSOLE] = { log() { }, warn() { }, error(...args) { errors.push(args); } };
+            comp.on('tick', () => { throw new Error('boom'); });
+            comp.on('tick', () => calls.push('ran'));
+            comp.emit('tick');
+            assert.strictEqual(calls.length, 1, 'second handler should still run');
+            assert.strictEqual(errors.length, 1, 'error should be logged');
+            assert.ok(errors[0][0].includes('boom'), 'log should include the error message');
+        });
+    });
+
+    describe('Scoped DOM queries (Smoke Test)', () => {
+        let dom;
+        let document;
+
+        beforeEach(() => {
+            dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
+                url: 'http://localhost',
+            });
+            document = dom.window.document;
+            global.document = document;
+            // JSDOM does not implement CSS.escape — polyfill for tests
+            if (!global.CSS) global.CSS = {};
+            if (!global.CSS.escape) {
+                global.CSS.escape = (v) =>
+                    String(v).replace(/([^\w-])/g, '\\$1');
+            }
+        });
+
+        /**
+         * Build a Component wired to a real DOM container.
+         */
+        function makeComponent(name, id, containerHTML) {
+            const comp = new Component();
+            const cid = new ComponentId(name, id);
+            comp[COMPONENT_ID] = cid;
+            const container = document.createElement('div');
+            container.setAttribute('data-fusewire-id', cid.code);
+            container.innerHTML = containerHTML;
+            document.body.appendChild(container);
+            comp[REGISTRY_ENTRY] = { instance: comp, container, parent: null, children: null };
+            return comp;
+        }
+
+        it('finds an element in the component own DOM', () => {
+            const comp = makeComponent('Panel', 'main', '<div class="logs">own</div>');
+            const el = comp.querySelector('.logs');
+            assert.ok(el);
+            assert.strictEqual(el.textContent, 'own');
+        });
+
+        it('skips elements inside a child mount point', () => {
+            const comp = makeComponent('Panel', 'main', [
+                '<div class="logs">own</div>',
+                '<div data-fusewire-id="Child#1" data-fusewire-parent-id="Panel#main">',
+                '  <div class="logs">child</div>',
+                '</div>',
+            ].join(''));
+            const el = comp.querySelector('.logs');
+            assert.ok(el);
+            assert.strictEqual(el.textContent, 'own');
+        });
+
+        it('querySelectorAll returns elements in own DOM', () => {
+            const comp = makeComponent('Panel', 'main', '<div class="log">a</div><div class="log">b</div>');
+            const els = comp.querySelectorAll('.log');
+            assert.strictEqual(els.length, 2);
+        });
+    });
+
+    describe('broadcast()', () => {
+        it('delegates to reactor.broadcastFrom() with own componentId', () => {
+            const comp = new Component();
+            const cid = new ComponentId('Test', 'u1');
+            comp[COMPONENT_ID] = cid;
+            const broadcastCalls = [];
+            comp[REACTOR] = {
+                broadcastFrom(componentId, eventName, ...args) {
+                    broadcastCalls.push({ componentId, eventName, args });
+                },
+            };
+
+            comp.broadcast('theme', 'dark');
+
+            assert.strictEqual(broadcastCalls.length, 1);
+            assert.strictEqual(broadcastCalls[0].componentId, cid);
+            assert.strictEqual(broadcastCalls[0].eventName, 'theme');
+            assert.deepStrictEqual(broadcastCalls[0].args, ['dark']);
+        });
+
+        it('throws when reactor not attached', () => {
+            const comp = new Component();
+            comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
+            assert.throws(
+                () => comp.broadcast('theme'),
+                /Cannot broadcast - reactor not attached/,
+            );
+        });
+
+        it('warns during lifecycle hook but still broadcasts', () => {
+            const comp = new Component();
+            comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
+            const warnings = [];
+            const broadcastCalls = [];
+            comp[CONSOLE] = { log() { }, warn(...args) { warnings.push(args); }, error() { } };
+            comp[REACTOR] = {
+                broadcastFrom(componentId, eventName, ...args) {
+                    broadcastCalls.push({ eventName, args });
+                },
+            };
+
+            comp[LIFECYCLE_ACTIVE] = 'init';
+            comp.broadcast('theme', 'dark');
+
+            assert.strictEqual(warnings.length, 1);
+            assert.ok(warnings[0][0].includes('init'), 'warning mentions lifecycle hook');
+            assert.ok(warnings[0][0].includes('theme'), 'warning mentions event name');
+            assert.strictEqual(broadcastCalls.length, 1, 'broadcast still fires');
+        });
+
+        it('forwards multiple arguments', () => {
+            const comp = new Component();
+            comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
+            const broadcastCalls = [];
+            comp[REACTOR] = {
+                broadcastFrom(componentId, eventName, ...args) {
+                    broadcastCalls.push({ eventName, args });
+                },
+            };
+
+            comp.broadcast('config', 'key', 'value', 42);
+
+            assert.deepStrictEqual(broadcastCalls[0].args, ['key', 'value', 42]);
+        });
+    });
+
+    describe('hydrate()', () => {
+        it('has a default no-op implementation', () => {
+            const comp = new Component();
+            comp.hydrate(); // Should not throw
+        });
+
+        it('can be overridden in subclasses', () => {
+            let called = false;
+            class MyComp extends Component {
+                hydrate() {
+                    called = true;
+                }
+            }
+            const comp = new MyComp();
+            comp.hydrate();
+            assert.strictEqual(called, true);
+        });
+    });
+
+    describe('loadLibrary()', () => {
+        it('creates LIBRARIES map and stores entry structure', () => {
+            const comp = new Component();
+            // Verify LIBRARIES is not set initially
+            assert.strictEqual(comp[LIBRARIES], undefined);
+
+            // Simulate what loadLibrary() does without triggering a real import()
+            comp[LIBRARIES] = new Map();
+            const promise = Promise.resolve({ Engine: class { } });
+            comp[LIBRARIES].set('MyLib', { promise, module: null });
+
+            const libs = comp[LIBRARIES];
+            assert.ok(libs instanceof Map);
+            assert.ok(libs.has('MyLib'));
+            const entry = libs.get('MyLib');
+            assert.strictEqual(entry.module, null);
+            assert.ok(entry.promise instanceof Promise);
+        });
+
+        it('stores multiple libraries', () => {
+            const comp = new Component();
+            comp[LIBRARIES] = new Map();
+            comp[LIBRARIES].set('Lib1', { promise: Promise.resolve({}), module: null });
+            comp[LIBRARIES].set('Lib2', { promise: Promise.resolve({}), module: null });
+
+            assert.strictEqual(comp[LIBRARIES].size, 2);
+        });
+    });
+
+    describe('library()', () => {
+        it('throws when library was not loaded', () => {
+            const comp = new Component();
+            assert.throws(
+                () => comp.library('Missing'),
+                /Library "Missing" not loaded/,
+            );
+        });
+
+        it('throws when library is not yet resolved', () => {
+            const comp = new Component();
+            comp[LIBRARIES] = new Map([
+                ['MyLib', { promise: Promise.resolve({}), module: null }],
+            ]);
+            assert.throws(
+                () => comp.library('MyLib'),
+                /Library "MyLib" not yet resolved/,
+            );
+        });
+
+        it('returns the full module object', () => {
+            const comp = new Component();
+            const fakeModule = { Engine: class { }, utils: () => { } };
+            comp[LIBRARIES] = new Map([
+                ['MyLib', { promise: Promise.resolve(fakeModule), module: fakeModule }],
+            ]);
+            const result = comp.library('MyLib');
+            assert.strictEqual(result, fakeModule);
+        });
+    });
 });
