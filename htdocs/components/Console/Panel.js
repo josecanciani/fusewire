@@ -112,8 +112,10 @@ export class Panel extends Component {
      * Scroll the console to the latest log entry after each render
      */
     afterRender() {
-        const lastLog = this.querySelector('.console-panel-logs').lastElementChild;
-        if (lastLog) lastLog.scrollIntoView({ block: 'end', behavior: 'instant' });
+        const anchor = this.querySelector('.scroll-anchor');
+        if (anchor) {
+            anchor.scrollIntoView({ block: 'end', behavior: 'instant' });
+        }
     }
 
     /**
