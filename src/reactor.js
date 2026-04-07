@@ -272,6 +272,11 @@ export class Reactor {
                 const [code, { id }] = this._queue.entries().next().value;
                 this._queue.delete(code);
                 const instance = this._instanceRegistry.get(id);
+                if (!instance) {
+                    const error = new ComponentNotFoundError(id.code);
+                    this._console.error(`Error during re-render of ${id.code}:`, error);
+                    throw error;
+                }
                 try {
                     instance[LIFECYCLE_ACTIVE] = 'render';
                     await this._instanceRegistry.render(id);
