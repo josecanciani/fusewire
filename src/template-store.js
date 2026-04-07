@@ -149,6 +149,11 @@ export class TemplateStore {
         const cssUrl = `${basePath}/${componentName}.css`;
         const jsUrl = `${basePath}/${componentName}.js`;
 
+        /**
+         * Conditional formatting
+         * @param {string} fileEtag - Stored previous
+         * @returns {Record<string, any>} Properties dict
+         */
         const conditionalHeaders = (fileEtag) =>
             fileEtag ? { headers: { 'If-None-Match': fileEtag } } : {};
 

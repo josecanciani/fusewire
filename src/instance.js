@@ -754,10 +754,28 @@ export class InstanceRegistry {
     _buildConsoleFor(componentId) {
         const reactorConsole = this._reactor._console;
         return {
+            /**
+             * Log a message to the wrapped console.
+             * @param {string} message - Base string
+             * @param {...*} args - Trailing params
+             * @returns {void}
+             */
             log: (message, ...args) =>
                 reactorConsole.log(new LogMessage(componentId, message), ...args),
+            /**
+             * Log a warning to the wrapped console.
+             * @param {string} message - Base string
+             * @param {...*} args - Trailing params
+             * @returns {void}
+             */
             warn: (message, ...args) =>
                 reactorConsole.warn(new LogMessage(componentId, message), ...args),
+            /**
+             * Log an error to the wrapped console.
+             * @param {string} message - Base string
+             * @param {...*} args - Trailing params
+             * @returns {void}
+             */
             error: (message, ...args) =>
                 reactorConsole.error(new LogMessage(componentId, message), ...args),
         };

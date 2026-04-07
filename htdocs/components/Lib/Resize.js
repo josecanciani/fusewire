@@ -31,6 +31,10 @@ export function startHorizontalResize(event, target, { minWidth = 200, minGap = 
     const state = { width: startWidth, cancel: null };
     let active = true;
 
+    /**
+     * Records delta difference moving horizontal blocks dynamically.
+     * @param {MouseEvent} ev - Moving Event
+     */
     const onMove = (ev) => {
         const delta = startX - ev.clientX;
         const maxWidth = target.parentElement.getBoundingClientRect().width - minGap;
@@ -38,6 +42,9 @@ export function startHorizontalResize(event, target, { minWidth = 200, minGap = 
         target.style.flexBasis = `${state.width}px`;
     };
 
+    /**
+     * Safely dispatches the end of a moving block transaction.
+     */
     const cleanup = () => {
         if (!active) return;
         active = false;
@@ -47,6 +54,10 @@ export function startHorizontalResize(event, target, { minWidth = 200, minGap = 
         document.body.style.userSelect = '';
     };
 
+    /**
+     * Mouse detachment unmount.
+     * @returns {void}
+     */
     const onUp = () => cleanup();
 
     state.cancel = cleanup;

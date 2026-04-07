@@ -16,6 +16,7 @@ test.describe('DOM Morphing (Renderer)', () => {
         await page.waitForFunction(() => window.testReady === true);
     });
 
+    // Verified here because it fails in JSDOM - @see test/renderer.test.js 'morphs DOM on re-render'
     test('morphs DOM on re-render while preserving element identity', async ({ page }) => {
         const result = await page.evaluate(() => {
             const container = document.getElementById('container');
@@ -49,6 +50,7 @@ test.describe('DOM Morphing (Renderer)', () => {
         expect(result.textContent).toBe('10');
     });
 
+    // Verified here because it fails in JSDOM - @see test/renderer.test.js 'updates text nodes via morphing'
     test('updates text nodes via morphing', async ({ page }) => {
         const result = await page.evaluate(() => {
             const container = document.getElementById('container');
@@ -83,6 +85,7 @@ test.describe('DOM Morphing (Renderer)', () => {
         expect(result.textContent).toBe('World');
     });
 
+    // Verified here because it fails in JSDOM - @see test/renderer.test.js 'updates attributes via morphing'
     test('updates attributes via morphing', async ({ page }) => {
         const result = await page.evaluate(() => {
             const container = document.getElementById('container');

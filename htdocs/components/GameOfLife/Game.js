@@ -119,6 +119,9 @@ export class Game extends Component {
             }
             this.#resizePending = false;
             const wasRunning = this.#wasRunning;
+            /**
+             * Restores runtime state post resize evaluation.
+             */
             this.#onSyncComplete = () => {
                 this.controls.enable();
                 if (wasRunning) {
@@ -150,6 +153,9 @@ export class Game extends Component {
         let currentRow = 0;
         const ROWS_PER_BATCH = 50;
 
+        /**
+         * Generates the cell grid iteratively as DOM mounts.
+         */
         const processBatch = () => {
             const endRow = Math.min(currentRow + ROWS_PER_BATCH, grid.length);
             for (let r = currentRow; r < endRow; r++) {

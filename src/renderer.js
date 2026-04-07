@@ -48,6 +48,11 @@ export class Renderer {
             this.morphFunction(container, htmlString, {
                 morphStyle: 'innerHTML',
                 callbacks: {
+                    /**
+                     * Ignore subtree DOM tracking where handled internally.
+                     * @param {HTMLElement} oldNode - The target existing HTMLElement in the DOM
+                     * @returns {boolean|void} Return false to prevent parsing
+                     */
                     beforeNodeMorphed: (oldNode) => {
                         if (
                             oldNode.nodeType === 1 &&

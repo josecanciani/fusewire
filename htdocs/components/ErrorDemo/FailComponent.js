@@ -19,6 +19,10 @@ export class FailComponent extends Component {
 
         if (id.startsWith('render')) {
             this.badVar = {
+                /**
+                 * Formatter for error message when object stringifies.
+                 * @returns {string} Triggers intentional error
+                 */
                 toString() {
                     throw new Error(
                         'This error was thrown intentionally during template rendering (via stringification)',

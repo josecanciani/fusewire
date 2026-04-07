@@ -177,14 +177,26 @@ export class Reactor {
         const attached = this._attachedConsoles;
         const enabled = this._enableDefaultConsole;
         return {
+            /**
+             * Forwarding utility
+             * @param {...*} args - Logging arguments
+             */
             log(...args) {
                 if (enabled) defaultConsole.log(...args);
                 for (const c of attached) c.log(...args);
             },
+            /**
+             * Forwarding utility
+             * @param {...*} args - Warning arguments
+             */
             warn(...args) {
                 if (enabled) defaultConsole.warn(...args);
                 for (const c of attached) c.warn(...args);
             },
+            /**
+             * Forwarding utility
+             * @param {...*} args - Error arguments
+             */
             error(...args) {
                 if (enabled) defaultConsole.error(...args);
                 for (const c of attached) c.error(...args);

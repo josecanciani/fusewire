@@ -48,6 +48,9 @@ export default [
                         FunctionDeclaration: true,
                         MethodDefinition: true,
                         ClassDeclaration: true,
+                        ArrowFunctionExpression: true,
+                        FunctionExpression: true,
+                        ClassExpression: true,
                     },
                 },
             ],
@@ -93,7 +96,12 @@ export default [
             'jsdoc/require-description': [
                 'error',
                 {
-                    contexts: ['FunctionDeclaration', 'MethodDefinition'],
+                    contexts: [
+                        'FunctionDeclaration',
+                        'MethodDefinition',
+                        'ArrowFunctionExpression',
+                        'FunctionExpression'
+                    ],
                 },
             ],
 
