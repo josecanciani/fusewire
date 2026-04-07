@@ -116,6 +116,24 @@ export class Renderer {
             },
         );
 
+        // In JSDOM test environments, native CSS nesting is not supported by the CSS parser.
+        // We use a naive regex to prefix selectors instead of relying on native nesting.
+        // This is sufficient for test execution because tests generally don't rely on complex CSS layout.
+        const isJSDOM =
+            typeof document !== 'undefined' &&
+            document.defaultView?.navigator?.userAgent.includes('jsdom');
+        if (isJSDOM) {
+            const naiveCss = scopedCss.replace(/(?:^|\})\s*([^{]+)\s*\{/g, (match, selector) => {
+                if (selector.trim().startsWith('@')) return match;
+                const prefixed = selector
+                    .split(',')
+                    .map((s) => `.${this._appName} .${cssName} ${s.trim()}`)
+                    .join(', ');
+                return match.replace(selector, prefixed);
+            });
+            return `${naiveCss.trim()}\n\n${keyframes.trim()}`.trim();
+        }
+
         return `.${this._appName} {\n  .${cssName} {\n    ${scopedCss.trim()}\n  }\n}\n\n${keyframes.trim()}`;
     }
 

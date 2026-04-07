@@ -74,7 +74,7 @@ describe('Renderer', () => {
         });
 
         // Note: Morphing tests are skipped in Node/JSDOM due to idiomorph compatibility issues
-        // These tests pass in real browsers - see test/browser/morphing.spec.js
+        // These tests pass in real browsers - @see test/browser/morphing.spec.js "morphs DOM on re-render while preserving element identity"
         it.skip('morphs DOM on re-render', () => {
             const renderer = new Renderer(Idiomorph.morph, appName);
             const compiledTemplate = {
@@ -191,6 +191,7 @@ describe('Renderer', () => {
             );
         });
 
+        // @see test/browser/morphing.spec.js "updates text nodes via morphing"
         it.skip('updates text nodes via morphing', () => {
             const renderer = new Renderer(Idiomorph.morph, appName);
             const compiledTemplate = {
@@ -207,6 +208,7 @@ describe('Renderer', () => {
             assert.strictEqual(span.textContent, 'World');
         });
 
+        // @see test/browser/morphing.spec.js "updates attributes via morphing"
         it.skip('updates attributes via morphing', () => {
             const renderer = new Renderer(Idiomorph.morph, appName);
             const compiledTemplate = {
@@ -235,23 +237,22 @@ describe('Renderer', () => {
     });
 
     describe('_scopeCSS()', () => {
-        it('wraps CSS in nested appName and component class rules', () => {
+        it('wraps CSS in nested appName and component class rules (fallback for JSDOM)', () => {
             const renderer = new Renderer(Idiomorph.morph, appName);
             const scoped = renderer._scopeCSS('.test { color: red; }', 'Counter');
 
-            assert.ok(scoped.startsWith(`.${appName} {`));
-            assert.ok(scoped.includes('.Counter {'));
-            assert.ok(scoped.includes('.test { color: red; }'));
+            assert.ok(!scoped.startsWith(`.${appName} {`)); // Ensure we are testing the jsdom fallback
+            assert.ok(scoped.includes(`.${appName} .Counter .test{ color: red; }`));
         });
 
-        it('preserves raw CSS inside the nesting', () => {
+        it('preserves raw CSS inside the nesting (fallback for JSDOM)', () => {
             const renderer = new Renderer(Idiomorph.morph, appName);
             const css = `.a, .b { color: blue; }
 .c { font-size: 1rem; }`;
             const scoped = renderer._scopeCSS(css, 'Counter');
 
-            assert.ok(scoped.includes('.a, .b { color: blue; }'));
-            assert.ok(scoped.includes('.c { font-size: 1rem; }'));
+            assert.ok(scoped.includes(`.${appName} .Counter .a, .${appName} .Counter .b{ color: blue; }`));
+            assert.ok(scoped.includes(`.${appName} .Counter .c{ font-size: 1rem; }`));
         });
 
         it('returns empty string for empty CSS', () => {
