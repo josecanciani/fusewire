@@ -6,11 +6,12 @@ import { TemplateStore } from './template-store.js';
 import { InstanceRegistry } from './instance.js';
 import { Renderer } from './renderer.js';
 import { Idiomorph } from './lib/idiomorph/idiomorph.esm.js';
+import { ComponentNotFoundError } from './errors/error-hierarchy.js';
 import { REACTOR, LIFECYCLE_ACTIVE } from './symbols.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
 /** @typedef {{log: function(...*): void, warn: function(...*): void, error: function(...*): void}} ConsoleLike */
-/** @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: Function, instanceRegistry?: InstanceRegistry, basePath?: string, globalVars?: ComponentVars}} ReactorConfig */
+/** @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: Function, instanceRegistry?: InstanceRegistry, basePath?: string, globalVars?: ComponentVars, enableDefaultConsole?: boolean}} ReactorConfig */
 
 /**
  * Reactor - Orchestrator for CSR_ONLY mode
@@ -40,6 +41,7 @@ export class Reactor {
         this._basePath = config.basePath || './components';
         this._rootContainer = null;
         this._defaultConsole = config.console ?? globalThis.console;
+        this._enableDefaultConsole = config.enableDefaultConsole ?? false;
         this._attachedConsoles = [];
         /** @type {ConsoleLike} */
         this._console = this._buildConsoleMultiplexer();
@@ -173,17 +175,18 @@ export class Reactor {
     _buildConsoleMultiplexer() {
         const defaultConsole = this._defaultConsole;
         const attached = this._attachedConsoles;
+        const enabled = this._enableDefaultConsole;
         return {
             log(...args) {
-                defaultConsole.log(...args);
+                if (enabled) defaultConsole.log(...args);
                 for (const c of attached) c.log(...args);
             },
             warn(...args) {
-                defaultConsole.warn(...args);
+                if (enabled) defaultConsole.warn(...args);
                 for (const c of attached) c.warn(...args);
             },
             error(...args) {
-                defaultConsole.error(...args);
+                if (enabled) defaultConsole.error(...args);
                 for (const c of attached) c.error(...args);
             },
         };

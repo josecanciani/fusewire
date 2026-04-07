@@ -9,6 +9,7 @@ import { TemplateStore } from '../src/template-store.js';
 import { FuseWire } from '../src/fusewire.js';
 import { JSDOM } from 'jsdom';
 import { REACTOR, LIFECYCLE_ACTIVE } from '../src/symbols.js';
+import { ComponentNotFoundError } from '../src/errors/error-hierarchy.js';
 
 // Mock idiomorph for testing
 const mockMorph = () => { };
@@ -31,6 +32,9 @@ afterEach(() => {
  */
 function createReactor(appName, config = {}) {
     registeredApps.push(appName);
+    if ('console' in config && config.enableDefaultConsole === undefined) {
+        config.enableDefaultConsole = true;
+    }
     return new Reactor(appName, config);
 }
 
@@ -455,7 +459,7 @@ describe('Reactor', () => {
 
             await assert.rejects(
                 () => reactor.react('Counter#main'),
-                TypeError,
+                ComponentNotFoundError,
             );
         });
     });
