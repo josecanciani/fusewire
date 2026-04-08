@@ -308,6 +308,28 @@ h1 {
 
 The container element automatically gets the scoping class applied.
 
+### Styling Child Components
+
+When a parent component mounts a child, the `<fw-mount>` wrapper receives the child's component name as a class (e.g., `.UserCard`). 
+
+However, `<fw-mount>` is rendered with `display: contents`, meaning it does not generate a physical DOM box. If you attempt to apply background colors or borders directly to the mount point from the parent's CSS, they will visually fail to render.
+
+To style a child component from the parent (e.g., zebra-striping a list), use a descendant selector to penetrate the mount boundary to reach the visual container inside the child:
+
+```css
+/* ❌ WRONG: Targets the invisible mount point; background won't be painted */
+.user-list .UserCard:nth-child(odd) {
+  background-color: #f5f5f5;
+}
+
+/* ✅ RIGHT: Penetrates the mount boundary to target the physical div inside */
+.user-list .UserCard:nth-child(odd) .user-card-body {
+  background-color: #f5f5f5;
+}
+```
+
+**Note:** If your child components are dynamically generated inside an `<fw-each>` loop, do NOT use the direct child combinator (`>`) like `.user-list > .UserCard`. The `<fw-each>` tag acts as an invisible DOM wrapper between your parent container and the child mount points, which breaks direct child targeting. Always use the descendant selector (a space) instead.
+
 ## Complete Example
 
 **Counter.html:**

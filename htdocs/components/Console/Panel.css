@@ -5,7 +5,7 @@
     font-size: 12px;
 }
 
-.console-panel-logs > :nth-child(odd) {
+.console-panel-logs .Console_Line:nth-child(even) .console-line {
     background-color: var(--bs-tertiary-bg);
 }
 

@@ -451,6 +451,33 @@ If no fallback is configured and no listener stops propagation, the error bubble
 
 ---
 
+## Styling child components (CSS Penetration)
+
+Because FuseWire automatically scopes CSS to prevent collisions, targeting a child component from a parent's CSS file requires special care. 
+
+When a parent component renders a child, the corresponding `<fw-mount>` DOM node receives a class matching the child component's name (e.g., `.Console_Line`). However, the mount point itself is rendered with `display: contents`, meaning it does not generate a physical box in the browser. 
+
+If you attempt to apply visual styles like `background-color`, `padding`, or `border` directly to the child's root class from the parent's CSS, the style will be successfully applied but visually ignored by the browser.
+
+To properly apply layout styles to a child component from the parent (for example, applying zebra-striping to a list of children), you must penetrate the scoping boundary by targeting the *rendered container* inside the child component, not just the mount point.
+
+```css
+/* ❌ WRONG: Targets the invisible mount point, background will not render */
+.console-panel-logs .Console_Line:nth-child(even) {
+    background-color: #eee;
+}
+
+/* ✅ RIGHT: Targets the mount point, then targets the visible box inside it */
+.console-panel-logs .Console_Line:nth-child(even) .console-line {
+    background-color: #eee;
+}
+```
+
+> [!WARNING]
+> Do not use the direct child combinator (`>`) if the child components are rendered via `<fw-each>`. The loop directive is rendered as an actual `<fw-each>` node in the DOM tree, introducing an intermediate wrapper between your list container and the children that breaks `>`. Use the standard descendant selector (a space) instead.
+
+---
+
 ## Scoped DOM queries
 
 When a component needs direct DOM access (scrolling, measuring, third-party
