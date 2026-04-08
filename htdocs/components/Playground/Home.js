@@ -38,8 +38,14 @@ export class Home extends Component {
     /** @type {import('./Header.js').Header} */
     headerComponent = null;
 
-    #resizeState = null;
+    #rightPaneResizeState = null;
+    #consoleResizeState = null;
     #startHorizontalResize = null;
+    #startVerticalResize = null;
+    /** @type {boolean} */
+    sidebarHidden = false;
+    /** @type {string} */
+    sidebarDisplayClass = '';
 
     /**
      * Initialize the playground with a header, tag filter and console panel
@@ -69,9 +75,14 @@ export class Home extends Component {
      * Load the horizontal resize library and initialize the handler.
      */
     hydrate() {
+        const resizeLib = this.library('Lib/Resize');
         this.#startHorizontalResize =
             /** @type {typeof import('../Lib/Resize.js').startHorizontalResize} */ (
-                this.library('Lib/Resize').startHorizontalResize
+                resizeLib.startHorizontalResize
+            );
+        this.#startVerticalResize =
+            /** @type {typeof import('../Lib/Resize.js').startVerticalResize} */ (
+                resizeLib.startVerticalResize
             );
     }
 
@@ -209,8 +220,12 @@ export class Home extends Component {
      * Navigate back to the demo list.
      */
     back() {
-        if (this.#resizeState) this.#resizeState.cancel();
-        this.#resizeState = null;
+        if (this.#rightPaneResizeState) this.#rightPaneResizeState.cancel();
+        if (this.#consoleResizeState) this.#consoleResizeState.cancel();
+        this.#rightPaneResizeState = null;
+        this.#consoleResizeState = null;
+        this.sidebarHidden = false;
+        this.sidebarDisplayClass = '';
         this.selectedDemo = null;
         this.demoComponent = null;
         this.sidebarComponent = null;
@@ -222,12 +237,36 @@ export class Home extends Component {
     }
 
     /**
+     * Toggles the sidebar visibility.
+     */
+    toggleSidebar() {
+        this.sidebarHidden = !this.sidebarHidden;
+        this.sidebarDisplayClass = this.sidebarHidden ? 'd-none' : '';
+        this.react();
+    }
+
+    /**
      * Start a horizontal resize drag on the right pane.
      * @param {MouseEvent} e - The mousedown event
      */
     startResize(e) {
         const rightPane = this.querySelector('.right-pane');
-        this.#resizeState = this.#startHorizontalResize(e, rightPane);
+        this.#rightPaneResizeState = this.#startHorizontalResize(e, rightPane, {
+            direction: -1,
+            minSize: 200,
+        });
+    }
+
+    /**
+     * Start a vertical resize drag on the console panel.
+     * @param {MouseEvent} e - The mousedown event
+     */
+    startConsoleResize(e) {
+        const consoleBar = this.querySelector('.console-bar');
+        this.#consoleResizeState = this.#startVerticalResize(e, consoleBar, {
+            direction: -1,
+            minSize: 50,
+        });
     }
 
     /**
@@ -243,9 +282,15 @@ export class Home extends Component {
      * Restore resize state and CodeMirror view after each render
      */
     afterRender() {
-        if (this.selectedDemo && this.#resizeState) {
-            const rightPane = this.querySelector('.right-pane');
-            rightPane.style.flexBasis = `${this.#resizeState.width}px`;
+        if (this.selectedDemo) {
+            if (this.#rightPaneResizeState) {
+                const rightPane = this.querySelector('.right-pane');
+                rightPane.style.flexBasis = `${this.#rightPaneResizeState.size}px`;
+            }
+            if (this.#consoleResizeState) {
+                const consoleBar = this.querySelector('.console-bar');
+                consoleBar.style.height = `${this.#consoleResizeState.size}px`;
+            }
         }
         // Parent re-renders cascade to children but skip their afterRender(),
         // so morphing may clear the CodeMirror DOM. Restore it here.

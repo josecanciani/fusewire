@@ -27,16 +27,26 @@
         </p>
     </section>
     <section fw-if="selectedDemo" class="d-flex flex-grow-1 overflow-hidden">
-        ((sidebarComponent))
+        <div class="sidebar-container d-flex ((sidebarDisplayClass))">
+            ((sidebarComponent))
+        </div>
         <div class="ide-body">
             ((editorComponent))
             <div class="resize-handle" onmousedown="((this)).startResize(event)"></div>
             <div class="right-pane d-flex flex-column panel">
                 <div class="flex-grow-1 d-flex flex-column panel">
-                    <div class="panel-header">Output</div>
+                    <div class="panel-header d-flex justify-content-between align-items-center">
+                        <span>Output</span>
+                        <button type="button" class="btn btn-sm text-secondary p-0" aria-label="Toggle Sidebar" onclick="((this)).toggleSidebar()" title="Toggle Sidebar">
+                            <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M2 12.5a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z" />
+                            </svg>
+                        </button>
+                    </div>
                     <div class="flex-grow-1 overflow-auto p-2 panel">((demoComponent))</div>
                 </div>
-                <div class="console-bar border-top d-flex flex-column">
+                <div class="resize-handle-y" onmousedown="((this)).startConsoleResize(event)"></div>
+                <div class="console-bar d-flex flex-column">
                     <div class="panel-header">Console</div>
                     <div class="flex-grow-1 overflow-auto panel">((consoleComponent))</div>
                 </div>
