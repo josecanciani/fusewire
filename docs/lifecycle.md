@@ -27,29 +27,49 @@ constructor(vars = {}) {
 
 ---
 
-### `async init()`
+### `async init(previousState = null)`
 
 **When:** After vars are set/updated, before first render
 **Type:** Async
-**Purpose:** Perform async initialization, declare children, load libraries
+**Purpose:** Perform async initialization, restore private state, declare children, load libraries
 
 ```js
-async init() {
-  // Create child components (start loading in parallel)
-  this.sidebar = this.createChild('Sidebar', 'main', { items: [] });
-  this.sidebar.on('select', (id) => this.selectItem(id));
-
-  // Load libraries (non-blocking)
+async init(previousState) {
+  // --- UNCONDITIONAL BACKGROUND SETUP ---
+  // Event listeners and libraries are never serialized.
+  // We can trigger background library downloads immediately without blocking, or if you need it, add it to the Promise.all below.
   this.loadLibrary('ChartLib');
 
-  // Fetch initial data
-  const data = await fetch('/api/data').then(r => r.json());
-  this.items = data.items;
+  if (previousState) {
+    // --- RESTORE FLOW ---
+    // If previousState exists, the framework natively restored all public vars
+    // (including Child proxies) before calling init(). We just parse our extras.
+    this.#scrollPosition = previousState.scrollPosition;
+    this.#data = previousState.data;
+  } else {
+    // --- FRESH CREATION FLOW ---
+    // No saved state. Declare children and perform initial network fetches.
+    this.sidebar = this.createChild('Sidebar', 'main', { items: [] });
+
+    // Fetch data and preload the Item template concurrently for max performance
+    await Promise.all([
+      this.load('Chart/Item'),
+      fetch('/api/data').then(r => r.json())
+    ]).then(([createItem, data]) => {
+        this.#data = data.items;
+        this.items = this.#data.map(item => createItem(item.id, item));
+    });
+  }
+
+  // --- UNCONDITIONAL BINDINGS ---
+  // Re-attach event listeners regardless of whether this is a fresh or restored component
+  this.sidebar.on('select', (id) => this.selectItem(id));
 }
 ```
 
 **Guidelines:**
 - Safe for async operations (fetch, timers, etc.)
+- `previousState` provides any `extraState` opaque object previously returned by `destroy()`, or `null` if fresh.
 - Can modify component properties before render
 - Create children with `createChild()` — they start loading immediately in the background
 - Subscribe to child events with `.on()` — calls are buffered and replayed when the child mounts
@@ -140,9 +160,9 @@ afterRender() {
 
 ### `destroy()`
 
-**When:** Component is removed from DOM
-**Type:** Synchronous
-**Purpose:** Clean up resources
+**When:** Component is removed from DOM or globally replaced
+**Type:** Synchronous (can return opaque object for state preservation)
+**Purpose:** Clean up resources and optionally snapshot private state
 
 ```js
 destroy() {
@@ -158,14 +178,17 @@ destroy() {
 
   // Clear timers
   clearInterval(this.intervalId);
+
+  // Return any private state to be preserved across hot-swaps
+  return { scrollPosition: this.#scrollPosition };
 }
 ```
 
 **Guidelines:**
 - Remove event listeners
 - Cancel pending async operations
-- Destroy child resources
 - Clear timers/intervals
+- **Preserve state:** Return a serializable object to save private state into the `Persistence` module. The framework will pass this exact object back as `previousState` into `init()` if the component is lazily/eagerly recreated.
 - Called automatically by framework when component removed
 - Event subscriptions (`on()` handlers) are cleared automatically after `destroy()` runs — no manual cleanup needed
 
@@ -263,12 +286,20 @@ Note: `hydrate()` is NOT called on updates — only on first render.
 
 ```js
 class UserList extends Component {
-  async init() {
-    if (!this.users) {
-      // Only fetch if not already provided
+  async init(previousState) {
+    if (previousState && previousState.users) {
+      // Restore from a previous mounting to avoid refetching
+      this.users = previousState.users;
+    } else if (!this.users) {
+      // Only fetch if we don't have it from a parent var or previous state
       const response = await fetch('/api/users');
       this.users = await response.json();
     }
+  }
+
+  destroy() {
+    // Preserve the fetched data
+    return { users: this.users };
   }
 }
 ```

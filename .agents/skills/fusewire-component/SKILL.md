@@ -109,10 +109,11 @@ The framework runs these hooks in order during component creation:
 init()  →  render()  →  hydrate()  →  afterRender()
 ```
 
-**`async init()`** — runs once after the framework is wired up (you have access
+**`async init(previousState = null)`** — runs once after the framework is wired up (you have access
 to `this.console`, `this.createChild()`, `this.loadLibrary()`, etc.) and before
 the first render. Use it for:
 - Creating child references (`createChild`)
+- Restoring private state passed via `previousState` (saved by `destroy()`)
 - Loading libraries (`loadLibrary`)
 - Subscribing to child events (buffered on the reference)
 - Setting initial state
@@ -136,7 +137,7 @@ hydrate() {
 re-renders). Use it only for per-render DOM work: scrolling, measuring, updating
 third-party widgets. Must stay synchronous.
 
-**`destroy()`** — cleanup when the component is removed.
+**`destroy()`** — cleanup when the component is removed. You may return a serializable object here (e.g. `return { scroll: this.#scroll };`). The framework will intercept this return value and inject it into the next component instance's `init(previousState)` if it is ever recreated later.
 
 Never call `this.react()` inside `init()`, `hydrate()`, or `afterRender()` — the
 framework renders automatically after those hooks return.
@@ -395,16 +396,16 @@ async init() {
         this.createChild('Analytics/HeavyChart', 'chart'),
         this.createChild('Common/Skeleton', 'chart') // mandatory placeholder
     );
-    
+
     // You can interact with the child once it's fully created and hydrated
     this.chart.on('fw-ready', (instance) => {
-        console.log('Heavy chart is visible and fully mounted!', instance);
+        this.console.log('Heavy chart is visible and fully mounted!', instance);
     });
 }
 ```
 
 The parent renders immediately with the placeholder. When the real child's JS and
-template load, the framework swaps the placeholder for the real component and 
+template load, the framework swaps the placeholder for the real component and
 fires `fw-ready` on the fully hydrated component instance. Works
 consistently in both CSR and SSR.
 
@@ -420,8 +421,8 @@ Provide a `fallback` option when creating a child. If the child fails, the frame
 
 ```javascript
 // Eager child with fallback
-this.chart = this.createChild('Analytics/Chart', 'main', {}, { 
-    fallback: 'Common/ErrorCard' 
+this.chart = this.createChild('Analytics/Chart', 'main', {}, {
+    fallback: 'Common/ErrorCard'
 });
 
 // Lazy child with fallback (configured on the lazy child reference)
@@ -438,7 +439,7 @@ The framework emits an `fw-error` event on the child reference when creation fai
 ```javascript
 async init() {
     this.chart = this.createChild('Analytics/Chart');
-    
+
     this.chart.on('fw-error', (errorContext) => {
         this.console.error('Chart failed:', errorContext.error);
         // Stop propagation so the parent doesn't crash
@@ -453,9 +454,9 @@ If no fallback is configured and no listener stops propagation, the error bubble
 
 ## Styling child components (CSS Penetration)
 
-Because FuseWire automatically scopes CSS to prevent collisions, targeting a child component from a parent's CSS file requires special care. 
+Because FuseWire automatically scopes CSS to prevent collisions, targeting a child component from a parent's CSS file requires special care.
 
-When a parent component renders a child, the corresponding `<fw-mount>` DOM node receives a class matching the child component's name (e.g., `.Console_Line`). However, the mount point itself is rendered with `display: contents`, meaning it does not generate a physical box in the browser. 
+When a parent component renders a child, the corresponding `<fw-mount>` DOM node receives a class matching the child component's name (e.g., `.Console_Line`). However, the mount point itself is rendered with `display: contents`, meaning it does not generate a physical box in the browser.
 
 If you attempt to apply visual styles like `background-color`, `padding`, or `border` directly to the child's root class from the parent's CSS, the style will be successfully applied but visually ignored by the browser.
 

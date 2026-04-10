@@ -7,11 +7,14 @@ import { InstanceRegistry } from './instance.js';
 import { Renderer } from './renderer.js';
 import { Idiomorph } from './lib/idiomorph/idiomorph.esm.js';
 import { ComponentNotFoundError } from './errors/error-hierarchy.js';
-import { REACTOR, LIFECYCLE_ACTIVE } from './symbols.js';
+import { Persistence } from './persistence.js';
+import { StateSerializer } from './state-serializer.js';
+import { REACTOR, LIFECYCLE_ACTIVE, LIBRARIES } from './symbols.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
 /** @typedef {{log: function(...*): void, warn: function(...*): void, error: function(...*): void}} ConsoleLike */
-/** @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: Function, instanceRegistry?: InstanceRegistry, basePath?: string, globalVars?: ComponentVars, enableDefaultConsole?: boolean}} ReactorConfig */
+/** @typedef {{stringify: function(ComponentVars): string, parse: function(string): ComponentVars}} SerializerLike */
+/** @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: function(HTMLElement, string, Object<string, *>=): void, instanceRegistry?: InstanceRegistry, basePath?: string, globalVars?: ComponentVars, enableDefaultConsole?: boolean, persistence?: Persistence, serializer?: SerializerLike}} ReactorConfig */
 
 /**
  * Reactor - Orchestrator for CSR_ONLY mode
@@ -59,18 +62,33 @@ export class Reactor {
 
         // Renderer setup - use Idiomorph by default, allow override for tests
         if (!config.renderer) {
-            const morphFunction = config.morphFunction || Idiomorph.morph;
+            const morphFunction =
+                config.morphFunction ||
+                /** @type {function(HTMLElement, string, Object<string, *>=): void} */ (
+                    Idiomorph.morph
+                );
             this._renderer = new Renderer(morphFunction, this._appName);
         } else {
             this._renderer = config.renderer;
         }
 
+        // Persistence — manages storing component state across destroy/recreate cycles.
+        /** @type {Persistence} */
+        this.persistence =
+            config.persistence || new Persistence(config.serializer || new StateSerializer());
+
         this._instanceRegistry =
             config.instanceRegistry ||
-            new InstanceRegistry(this._renderer, this._templateStore, this._appName);
+            new InstanceRegistry(
+                this._renderer,
+                this._templateStore,
+                this._appName,
+                this.persistence,
+            );
 
         // Give registry a reference to this reactor so auto-mounted children get _reactor
         this._instanceRegistry._reactor = this;
+        this._instanceRegistry.persistence = this.persistence;
 
         // Register this reactor with FuseWire global registry
         FuseWire.register(this._appName, this);
@@ -103,6 +121,23 @@ export class Reactor {
      */
     get basePath() {
         return this._basePath;
+    }
+
+    /**
+     * Get the global vars merged into every render context
+     * @returns {ComponentVars} Global vars object
+     */
+    get globalVars() {
+        return this._globalVars;
+    }
+
+    /**
+     * Get a promise that resolves when the current render drain completes.
+     * Used by Component.react() to return a promise the caller can await.
+     * @returns {Promise<void>} Promise that resolves when draining finishes
+     */
+    get drainPromise() {
+        return this._drainPromise;
     }
 
     /**
@@ -307,5 +342,68 @@ export class Reactor {
         } finally {
             this._draining = false;
         }
+    }
+
+    /**
+     * Pre-fetch a component's class and template, then return a factory function.
+     * The factory is a shorthand for parentComponent.createChild(name, id, vars).
+     * Called by Component.load() — all loading logic lives here in the framework
+     * internals, not in the Component base class.
+     * @param {import('./component.js').Component} parentComponent - The component calling load()
+     * @param {string} name - Component name to pre-fetch
+     * @returns {Promise<function(string, ComponentVars=): (import('./component.js').Child|import('./component.js').Component)>} Factory function
+     */
+    async loadComponentFactory(parentComponent, name) {
+        await this._instanceRegistry.preload(name);
+
+        /**
+         * Factory function for creating child instances of the pre-loaded component.
+         * @param {string} id - Instance identifier
+         * @param {ComponentVars} [vars] - Initial variables for the component
+         * @returns {import('./component.js').Child|import('./component.js').Component} Child reference
+         */
+        return (id, vars) => parentComponent.createChild(name, id, vars);
+    }
+
+    /**
+     * Start loading a library module from the basePath.
+     * Called by component.loadLibrary() — the actual import() lives here
+     * so the Component class does not need to know about basePath.
+     * @param {string} name - Library name (resolved as basePath/name.js)
+     * @returns {Promise<object>} Promise resolving to the module object
+     */
+    loadLibrary(name) {
+        return import(`${this._basePath}/${name}.js`);
+    }
+
+    /**
+     * Declare a library dependency for a component to be loaded in parallel.
+     * @param {import('./component.js').Component} component - The component instance
+     * @param {string} name - Library name
+     */
+    loadLibraryForComponent(component, name) {
+        if (!component[LIBRARIES]) component[LIBRARIES] = new Map();
+        const promise = this.loadLibrary(name);
+        component[LIBRARIES].set(name, { promise, module: null });
+    }
+
+    /**
+     * Get a fully resolved library module for a component.
+     * @param {import('./component.js').Component} component - The component instance
+     * @param {string} name - Library name
+     * @returns {Object<string, *>} The module object
+     */
+    getLibraryForComponent(component, name) {
+        const libs = component[LIBRARIES];
+        if (!libs || !libs.has(name)) {
+            throw new Error(`Library "${name}" not loaded — call loadLibrary("${name}") in init()`);
+        }
+        const entry = libs.get(name);
+        if (!entry.module) {
+            throw new Error(
+                `Library "${name}" not yet resolved — library() can only be called in hydrate() or later`,
+            );
+        }
+        return entry.module;
     }
 }
