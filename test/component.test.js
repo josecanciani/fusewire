@@ -358,37 +358,37 @@ describe('Component', () => {
     describe('createChild()', () => {
         it('returns a Child with correct componentName, id, and vars', () => {
             const comp = new Component();
-            comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => { } } };
+            comp[REACTOR] = { instanceRegistry: { startEagerCreation: () => { } } };
             const ref = comp.createChild('Sidebar', 'main', { collapsed: false });
 
             assert.strictEqual(ref.componentName, 'Sidebar');
-            assert.strictEqual(ref.id, 'main');
+            assert.strictEqual(ref.componentId, 'main');
             assert.deepStrictEqual(ref.vars, { collapsed: false });
         });
 
         it('returns a Child with empty id when id is omitted', () => {
             const comp = new Component();
-            comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => { } } };
+            comp[REACTOR] = { instanceRegistry: { startEagerCreation: () => { } } };
             const ref = comp.createChild('Sidebar', { collapsed: true });
 
             assert.strictEqual(ref.componentName, 'Sidebar');
-            assert.strictEqual(ref.id, '');
+            assert.strictEqual(ref.componentId, '');
             assert.deepStrictEqual(ref.vars, { collapsed: true });
         });
 
         it('returns a Child with empty id and empty vars when only name is given', () => {
             const comp = new Component();
-            comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => { } } };
+            comp[REACTOR] = { instanceRegistry: { startEagerCreation: () => { } } };
             const ref = comp.createChild('Sidebar');
 
             assert.strictEqual(ref.componentName, 'Sidebar');
-            assert.strictEqual(ref.id, '');
+            assert.strictEqual(ref.componentId, '');
             assert.deepStrictEqual(ref.vars, {});
         });
 
         it('returns an instance of Child', () => {
             const comp = new Component();
-            comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => { } } };
+            comp[REACTOR] = { instanceRegistry: { startEagerCreation: () => { } } };
             const ref = comp.createChild('Sidebar', 'main', { collapsed: false });
 
             assert.ok(ref instanceof Child);
@@ -396,7 +396,7 @@ describe('Component', () => {
 
         it('passes options to Child', () => {
             const comp = new Component();
-            comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => { } } };
+            comp[REACTOR] = { instanceRegistry: { startEagerCreation: () => { } } };
             const ref = comp.createChild('Sidebar', 'main', {}, { active: true });
 
             assert.strictEqual(ref._options.active, true);
@@ -404,10 +404,10 @@ describe('Component', () => {
 
         it('passes options when id is omitted', () => {
             const comp = new Component();
-            comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => { } } };
+            comp[REACTOR] = { instanceRegistry: { startEagerCreation: () => { } } };
             const ref = comp.createChild('Sidebar', { page: 1 }, { active: true });
 
-            assert.strictEqual(ref.id, '');
+            assert.strictEqual(ref.componentId, '');
             assert.deepStrictEqual(ref.vars, { page: 1 });
             assert.strictEqual(ref._options.active, true);
         });
@@ -416,7 +416,7 @@ describe('Component', () => {
     describe('createLazyChild()', () => {
         it('returns a FuseWire/Lazy Child with correct vars', () => {
             const comp = new Component();
-            comp[REACTOR] = { _instanceRegistry: { startEagerCreation: () => { } } };
+            comp[REACTOR] = { instanceRegistry: { startEagerCreation: () => { } } };
             const lazyChild = comp.createChild('HeavyChart', 'chart');
             const placeholderChild = comp.createChild('Skeleton', 'chart');
             const ref = comp.createLazyChild(lazyChild, placeholderChild);
@@ -667,62 +667,33 @@ describe('Component', () => {
     });
 
     describe('loadLibrary()', () => {
-        it('creates LIBRARIES map and stores entry structure', () => {
+        it('forwards to the reactor', () => {
             const comp = new Component();
-            // Verify LIBRARIES is not set initially
-            assert.strictEqual(comp[LIBRARIES], undefined);
-
-            // Simulate what loadLibrary() does without triggering a real import()
-            comp[LIBRARIES] = new Map();
-            const promise = Promise.resolve({ Engine: class { } });
-            comp[LIBRARIES].set('MyLib', { promise, module: null });
-
-            const libs = comp[LIBRARIES];
-            assert.ok(libs instanceof Map);
-            assert.ok(libs.has('MyLib'));
-            const entry = libs.get('MyLib');
-            assert.strictEqual(entry.module, null);
-            assert.ok(entry.promise instanceof Promise);
-        });
-
-        it('stores multiple libraries', () => {
-            const comp = new Component();
-            comp[LIBRARIES] = new Map();
-            comp[LIBRARIES].set('Lib1', { promise: Promise.resolve({}), module: null });
-            comp[LIBRARIES].set('Lib2', { promise: Promise.resolve({}), module: null });
-
-            assert.strictEqual(comp[LIBRARIES].size, 2);
+            let calledWith = null;
+            comp[REACTOR] = {
+                loadLibraryForComponent(component, name) {
+                    calledWith = { component, name };
+                }
+            };
+            comp.loadLibrary('MyLib');
+            assert.strictEqual(calledWith.component, comp);
+            assert.strictEqual(calledWith.name, 'MyLib');
         });
     });
 
     describe('library()', () => {
-        it('throws when library was not loaded', () => {
+        it('forwards to the reactor for resolution', () => {
             const comp = new Component();
-            assert.throws(
-                () => comp.library('Missing'),
-                /Library "Missing" not loaded/,
-            );
-        });
+            const fakeModule = { Engine: class { } };
+            comp[REACTOR] = {
+                getLibraryForComponent(component, name) {
+                    if (name === 'Missing') throw new Error('Library "Missing" not loaded');
+                    if (name === 'MyLib') return fakeModule;
+                }
+            };
 
-        it('throws when library is not yet resolved', () => {
-            const comp = new Component();
-            comp[LIBRARIES] = new Map([
-                ['MyLib', { promise: Promise.resolve({}), module: null }],
-            ]);
-            assert.throws(
-                () => comp.library('MyLib'),
-                /Library "MyLib" not yet resolved/,
-            );
-        });
-
-        it('returns the full module object', () => {
-            const comp = new Component();
-            const fakeModule = { Engine: class { }, utils: () => { } };
-            comp[LIBRARIES] = new Map([
-                ['MyLib', { promise: Promise.resolve(fakeModule), module: fakeModule }],
-            ]);
-            const result = comp.library('MyLib');
-            assert.strictEqual(result, fakeModule);
+            assert.throws(() => comp.library('Missing'), /Library "Missing" not loaded/);
+            assert.strictEqual(comp.library('MyLib'), fakeModule);
         });
     });
 });

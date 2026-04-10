@@ -7,7 +7,6 @@ import {
     REACTOR,
     LIFECYCLE_ACTIVE,
     EVENTS,
-    LIBRARIES,
 } from './symbols.js';
 
 /**
@@ -17,7 +16,7 @@ import {
  */
 
 /** @typedef {string|number|boolean|null} Scalar */
-/** @typedef {{[key: string]: Scalar|Array.<Scalar>|Object}} ScalarObject */
+/** @typedef {{[key: string]: Scalar|Array.<Scalar>|Object<string, *>}} ScalarObject */
 /** @typedef {Scalar|ScalarObject|Component|Child} VarValue */
 /** @typedef {{[key: string]: (VarValue|Array<VarValue>)}} ComponentVars */
 /** @typedef {{new(): Component, componentName: string}} ComponentConstructor */
@@ -115,10 +114,17 @@ export class Component {
     /**
      * Init hook - called after vars are set and framework is wired, before first render.
      * Override in subclasses for initialization logic.
+     *
+     * When restoring a previously destroyed component, the framework passes the
+     * object returned by the previous destroy() call as previousState. Use this
+     * to skip expensive fetches and restore private fields instead.
+     *
      * @async
+     * @param {Object<string, *>|null} previousState - State returned by the previous destroy(), or null on fresh mount
      * @returns {Promise<void>}
      */
-    async init() {
+    async init(previousState) {
+        void previousState; // Bypass unused variable linter
         // Override in subclasses
     }
 
@@ -200,7 +206,7 @@ export class Component {
             options = maybeVarsOrOptions;
         }
         const ref = new Child(name, id, vars, null, options);
-        this[REACTOR]._instanceRegistry.startEagerCreation(ref);
+        this[REACTOR].instanceRegistry.startEagerCreation(ref);
         return ref;
     }
 
@@ -259,10 +265,30 @@ export class Component {
      * @param {string} name - Library name (resolved as basePath/name.js)
      */
     loadLibrary(name) {
-        if (!this[LIBRARIES]) this[LIBRARIES] = new Map();
-        const basePath = this[REACTOR]._basePath;
-        const promise = import(`${basePath}/${name}.js`);
-        this[LIBRARIES].set(name, { promise, module: null });
+        this[REACTOR].loadLibraryForComponent(this, name);
+    }
+
+    /**
+     * Pre-fetch a component's class and template in the background.
+     * Returns a Promise that resolves to a factory function for creating
+     * child instances of that component. The factory is a shorthand for
+     * createChild() with the component name already bound — call it as
+     * factory(id, vars).
+     *
+     * Use this inside Promise.all() to parallelize component loading with
+     * data fetching:
+     *
+     *   const [createItem, data] = await Promise.all([
+     *       this.load('List/Item'),
+     *       fetch('/api/data').then(r => r.json()),
+     *   ]);
+     *   this.items = data.map(d => createItem(d.id, { name: d.name }));
+     *
+     * @param {string} name - Component name (e.g., 'List/Item', 'Common/Header')
+     * @returns {Promise<function(string, import('./component.js').ComponentVars): (Child|Component)>} Factory function
+     */
+    load(name) {
+        return this[REACTOR].loadComponentFactory(this, name);
     }
 
     /**
@@ -270,20 +296,10 @@ export class Component {
      * dynamic import(). Only available in hydrate() or later — the framework
      * resolves all library promises between render and hydrate.
      * @param {string} name - Library name (same as passed to loadLibrary)
-     * @returns {Object.<string, *>} The full module object (destructure to get exports)
+     * @returns {Object<string, *>} The full module object (destructure to get exports)
      */
     library(name) {
-        const libs = this[LIBRARIES];
-        if (!libs || !libs.has(name)) {
-            throw new Error(`Library "${name}" not loaded — call loadLibrary("${name}") in init()`);
-        }
-        const entry = libs.get(name);
-        if (!entry.module) {
-            throw new Error(
-                `Library "${name}" not yet resolved — library() can only be called in hydrate() or later`,
-            );
-        }
-        return entry.module;
+        return this[REACTOR].getLibraryForComponent(this, name);
     }
 
     /**
@@ -443,7 +459,7 @@ export class Component {
             this[CONSOLE].warn(
                 `react() called during ${active}() — ignored (the framework renders automatically after init/update)`,
             );
-            return this[REACTOR]._drainPromise;
+            return this[REACTOR].drainPromise;
         }
         return this[REACTOR].react(this[COMPONENT_ID], mode);
     }
@@ -477,24 +493,54 @@ export class Child {
      * @param {string} id - Instance identifier (may be empty)
      * @param {ComponentVars} vars - Initial variables for the component
      * @param {string|null} version - Template version hash, or null for latest
-     * @param {ChildOptions} options - Creation options
+     * @param {import('./component.js').ChildOptions} options - Creation options
      */
     constructor(componentName, id = '', vars = {}, version = null, options = {}) {
         if (!componentName || typeof componentName !== 'string') {
             throw new Error('Child: componentName must be a non-empty string');
         }
-        this.componentName = componentName;
-        this.id = id;
+        this[COMPONENT_ID] = new ComponentId(componentName, id, version || '');
         this.vars = vars;
-        this.version = version;
         this._options = options;
-        this._replaced = false;
-        /** @type {import('./component.js').Component|null} */
-        this._realInstance = null;
+        this._listeners = new Map();
         this._bufferedEvents = [];
+        this._realInstance = null;
+        this._replaced = false;
         this._creationPromise = null;
         this._detachedContainer = null;
         this._creationError = null;
+    }
+
+    /**
+     * Component name — the class/template name (e.g. "Counter", "Table/Person").
+     * @returns {string} The component name
+     */
+    get componentName() {
+        return this[COMPONENT_ID].name;
+    }
+
+    /**
+     * Component instance id — unique within the component name (e.g. "main", "1234").
+     * @returns {string} The instance identifier
+     */
+    get componentId() {
+        return this[COMPONENT_ID].id;
+    }
+
+    /**
+     * Template version hash — set by the framework after each render.
+     * @returns {string} The template version
+     */
+    get componentVersion() {
+        return this[COMPONENT_ID].version;
+    }
+
+    /**
+     * Component code — full unique reference (e.g. "Counter#main").
+     * @returns {string} The component code
+     */
+    get componentCode() {
+        return this[COMPONENT_ID].code;
     }
 
     /**
@@ -502,7 +548,7 @@ export class Child {
      * @returns {ComponentId} The corresponding ComponentId
      */
     toComponentId() {
-        return new ComponentId(this.componentName, this.id);
+        return this[COMPONENT_ID];
     }
 
     /**
@@ -700,8 +746,11 @@ export class ErrorBoundary extends Component {
      * Wire fw-error listener: on failure, update the fallback vars and swap child to fallback.
      */
     async init() {
-        this.child = this.targetChild;
-        this.child.on('fw-error', (ctx) => {
+        if (!this.child) {
+            this.child = this.targetChild;
+        }
+
+        this.targetChild.on('fw-error', (ctx) => {
             this.fallbackChild.update({
                 errorMessage: ctx.error.message,
                 failedComponent: ctx.failedComponent,
