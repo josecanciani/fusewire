@@ -35,7 +35,10 @@ export default [
         settings: {
             jsdoc: {
                 preferredTypes: {
-                    object: false,
+                    object: 'Use a more specific type (e.g. structured typedef) instead of generic "object".',
+                    Object: 'Use a more specific type (e.g. structured typedef) instead of generic "Object".',
+                    Function: 'Use a more specific type with parameter signatures instead of generic "Function".',
+                    function: 'Use a more specific type with parameter signatures instead of generic "function".',
                     any: 'Use a more specific type (e.g., string, number, Component) or a union type instead of "any".',
                 },
             },

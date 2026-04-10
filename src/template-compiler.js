@@ -147,7 +147,7 @@ function renderMountPoint(decl, parentId) {
     let id;
     if (decl instanceof Child) {
         name = decl.componentName;
-        id = decl.id || '';
+        id = decl.componentId || '';
     } else {
         name = /** @type {ComponentConstructor} */ (decl.constructor).componentName;
         id = decl.componentId || '';
