@@ -222,7 +222,7 @@ describe('Reactor', () => {
 
             assert.strictEqual(createCalled, true);
             assert.strictEqual(receivedRef.componentName, 'Counter');
-            assert.strictEqual(receivedRef.id, 'main');
+            assert.strictEqual(receivedRef.componentId, 'main');
         });
 
         it('adds fusewire and appName classes to root container', async () => {

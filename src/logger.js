@@ -14,7 +14,7 @@ export class Logger {
 
     /**
      * Add a log handler
-     * @param {Function} handler - Function that receives (level, message, ...args)
+     * @param {function(Object<string, *>): void} handler - Function that receives (level, message, ...args)
      */
     addHandler(handler) {
         this._handlers.push(handler);
@@ -22,7 +22,7 @@ export class Logger {
 
     /**
      * Remove a log handler
-     * @param {Function} handler - Handler function to remove
+     * @param {function(Object<string, *>): void} handler - Handler function to remove
      */
     removeHandler(handler) {
         const index = this._handlers.indexOf(handler);

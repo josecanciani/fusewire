@@ -11,7 +11,7 @@ import { toCssName } from './component-id.js';
 export class Renderer {
     /**
      * Create a new Renderer
-     * @param {Function} morphFunction - DOM morphing function (e.g., Idiomorph.morph)
+     * @param {function(HTMLElement, string, Object<string, *>=): void} morphFunction - DOM morphing function (e.g., Idiomorph.morph)
      * @param {string} appName - Application name for CSS scoping
      */
     constructor(morphFunction, appName = 'default') {

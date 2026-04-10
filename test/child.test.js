@@ -11,17 +11,17 @@ describe('Child', () => {
         it('creates with all arguments', () => {
             const ref = new Child('UserList', 'main', { page: 1 }, '2.0');
             assert.strictEqual(ref.componentName, 'UserList');
-            assert.strictEqual(ref.id, 'main');
+            assert.strictEqual(ref.componentId, 'main');
             assert.deepStrictEqual(ref.vars, { page: 1 });
-            assert.strictEqual(ref.version, '2.0');
+            assert.strictEqual(ref.componentVersion, '2.0');
         });
 
         it('creates with defaults', () => {
             const ref = new Child('Counter');
             assert.strictEqual(ref.componentName, 'Counter');
-            assert.strictEqual(ref.id, '');
+            assert.strictEqual(ref.componentId, '');
             assert.deepStrictEqual(ref.vars, {});
-            assert.strictEqual(ref.version, null);
+            assert.strictEqual(ref.componentVersion, '');
         });
 
         it('stores componentName', () => {
@@ -31,7 +31,7 @@ describe('Child', () => {
 
         it('stores id', () => {
             const ref = new Child('Widget', 'sidebar');
-            assert.strictEqual(ref.id, 'sidebar');
+            assert.strictEqual(ref.componentId, 'sidebar');
         });
 
         it('stores vars', () => {
@@ -42,7 +42,7 @@ describe('Child', () => {
 
         it('stores version', () => {
             const ref = new Child('App', '', {}, '1.0.0');
-            assert.strictEqual(ref.version, '1.0.0');
+            assert.strictEqual(ref.componentVersion, '1.0.0');
         });
     });
 
@@ -81,14 +81,14 @@ describe('Child', () => {
     });
 
     describe('version', () => {
-        it('defaults to null', () => {
+        it('defaults to empty string', () => {
             const ref = new Child('App');
-            assert.strictEqual(ref.version, null);
+            assert.strictEqual(ref.componentVersion, '');
         });
 
         it('stores string version', () => {
             const ref = new Child('App', '', {}, '3.2.1');
-            assert.strictEqual(ref.version, '3.2.1');
+            assert.strictEqual(ref.componentVersion, '3.2.1');
         });
     });
 
