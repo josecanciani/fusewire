@@ -1,5 +1,5 @@
 /**
- * @typedef {Object} ResizeOptions
+ * @typedef {Object<string, *>} ResizeOptions
  * @property {number} [minSize]
  * @property {number} [minGap]
  * @property {number} [direction] -1 for right/bottom items, 1 for left/top items

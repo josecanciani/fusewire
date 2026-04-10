@@ -2,7 +2,7 @@ import { Component } from '/js/component.js';
 import { REACTOR } from '/js/symbols.js';
 
 /**
- * @typedef {Object} Demo
+ * @typedef {Object<string, *>} Demo
  * @property {string} name - Component name
  * @property {string[]} [tags] - Filtering tags
  * @property {Object.<string, *>} [vars] - Initial vars for the demo
@@ -201,8 +201,15 @@ export class Home extends Component {
                     URL.revokeObjectURL(blobUrl);
                 }
             }
-            // We increment runId so the child gets a unique instance id.
-            // The framework auto-removes the old child during render().
+            // Explicitly tear down the old demo instance before spawning the new one.
+            // This ensures any fixed-id inner components are deregistered and
+            // explicitly recreated from scratch rather than preserved as zombies.
+            if (this.demoComponent) {
+                // remove() synchronously deletes from _instances immediately
+                registry.remove(this.demoComponent.toComponentId());
+            }
+
+            // We increment runId so the top-level parent gets a unique instance id.
             this.demoRunId = Date.now();
             this.demoComponent = /** @type {import('/js/component.js').ErrorBoundary} */ (
                 this.createErrorBoundedChild(
