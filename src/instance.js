@@ -66,14 +66,16 @@ export function collectVars(instance) {
 export class InstanceRegistry {
     /**
      * Create a new InstanceRegistry.
-     * @param {import('./renderer.js').Renderer} renderer - Framework renderer
-     * @param {import('./template-store.js').TemplateStore} templateStore - Template store
-     * @param {string} [appName='default'] - App namespace identifier
+     * @param {import('./renderer.js').Renderer} renderer - The DOM renderer/morpher
+     * @param {import('./template-store.js').TemplateStore} templateStore - Component template store
+     * @param {string} appName - Built-in context prefix for component prefixes
+     * @param {import('./persistence.js').Persistence} [persistence] - Optional persistence layer
      */
-    constructor(renderer, templateStore, appName = 'default') {
+    constructor(renderer, templateStore, appName, persistence = null) {
         this._renderer = renderer;
         this._templateStore = templateStore;
         this._appName = appName;
+        this.persistence = persistence;
         this._reactor = null; // Set by Reactor after construction
         this._instances = new Map(); // componentId.code -> { instance, container, parent, children }
         this._roots = new Set(); // codes of root components (no parent)
@@ -134,7 +136,7 @@ export class InstanceRegistry {
 
         // Ensure template is loaded so we can read its version
         const version = await this._ensureTemplate(ref.componentName);
-        const componentId = new ComponentId(ref.componentName, ref.id, version);
+        const componentId = new ComponentId(ref.componentName, ref.componentId, version);
 
         return await this.create(componentId, ComponentClass, { ...ref.vars }, container, {
             deferHydration,
@@ -149,6 +151,10 @@ export class InstanceRegistry {
      *   - REGISTRY_ENTRY  → shared entry object (container, parent) — same object stored in the registry
      *   - CONSOLE         → pre-built console wrapper with component context
      *   - REACTOR         → Reactor reference
+     *
+     * If the Reactor's state store contains saved state for this component code,
+     * the framework automatically restores scalar vars and recreates child
+     * component references before calling init(previousState).
      *
      * @param {ComponentId} componentId - Component identifier
      * @param {ComponentConstructor} ComponentClass - Component class constructor
@@ -167,7 +173,31 @@ export class InstanceRegistry {
         container.classList.add(toCssName(componentId.name));
 
         const instance = new ComponentClass();
-        Object.assign(instance, vars);
+
+        // Check state store for previously captured state
+        let previousState = null;
+        const savedState = this.persistence.load(code);
+
+        if (savedState) {
+            // Restore state from store — envelope vars are already natively explicitly parsed by persistence
+            const restoredVars = savedState.vars;
+
+            // Filter out autocalculated getters ($ prefix) to prevent setter TypeErrors
+            for (const key of Object.keys(restoredVars)) {
+                if (key.startsWith('$')) {
+                    delete restoredVars[key];
+                }
+            }
+
+            Object.assign(instance, restoredVars);
+            previousState = savedState.extraState;
+
+            // Remove consumed state so it doesn't restore again on next create
+            this.persistence.delete(code);
+        } else {
+            // Fresh mount — use provided vars
+            Object.assign(instance, vars);
+        }
 
         // Build registry entry — the single source of truth for container/parent.
         // The component holds a reference to this same object via REGISTRY_ENTRY,
@@ -191,9 +221,9 @@ export class InstanceRegistry {
 
         // LIFECYCLE_ACTIVE stays set throughout creation to prevent premature react()
         try {
-            // Call init hook
+            // Call init hook — pass previousState so the component can skip fetches
             instance[LIFECYCLE_ACTIVE] = 'init';
-            await instance.init();
+            await instance.init(previousState);
 
             // Initial render
             instance[LIFECYCLE_ACTIVE] = 'render';
@@ -211,8 +241,15 @@ export class InstanceRegistry {
                 instance[LIFECYCLE_ACTIVE] = 'afterRender';
                 instance.afterRender();
             }
+        } catch (error) {
+            // Clean up registry if creation fails so we don't leave orphaned instances
+            this.remove(componentId);
+            throw error;
         } finally {
-            instance[LIFECYCLE_ACTIVE] = null;
+            // Only clear lifecycle if the instance wasn't removed in the catch block
+            if (this._instances.has(code)) {
+                instance[LIFECYCLE_ACTIVE] = null;
+            }
         }
 
         if (!deferHydration) {
@@ -270,10 +307,13 @@ export class InstanceRegistry {
     }
 
     /**
-     * Remove instance and clean up (cascades to children)
+     * Remove instance and clean up (cascades to children).
+     * Before teardown, snapshots the component's public vars and the
+     * return value of destroy() into the Reactor's state store so the
+     * component can be recreated with its previous state.
      * @param {ComponentId} componentId - Component identifier
      */
-    async remove(componentId) {
+    remove(componentId) {
         const code = componentId.code;
         const entry = this._instances.get(code);
 
@@ -281,17 +321,23 @@ export class InstanceRegistry {
             return; // Silently ignore non-existent instances
         }
 
-        // Recursively remove children first
+        // Recursively remove children first (they capture their own state)
         if (entry.children) {
             for (const [, childId] of entry.children) {
-                await this.remove(childId);
+                this.remove(childId);
             }
         }
 
         const { instance, container } = entry;
 
-        // Call destroy hook
-        await instance.destroy();
+        // Snapshot public vars before destroy
+        const vars = collectVars(instance);
+
+        // Call destroy hook — capture return value as extra state
+        const extraState = instance.destroy() || null;
+
+        // Store captured state in the Reactor's persistence module
+        this.persistence.save(code, { vars, extraState });
 
         // Clear event subscriptions so handlers don't keep parent instances alive
         if (instance[EVENTS]) instance[EVENTS].clear();
@@ -315,7 +361,7 @@ export class InstanceRegistry {
      */
     async _ensureTemplate(componentName) {
         if (!this._templateStore.has(componentName) && this._reactor) {
-            await this._templateStore.requestTemplate(componentName, this._reactor._basePath);
+            await this._templateStore.requestTemplate(componentName, this._reactor.basePath);
         }
         const template = this._templateStore.get(componentName);
         if (!template) {
@@ -385,7 +431,7 @@ export class InstanceRegistry {
         // Render to DOM and find child mount points.
         // Global vars (registered via reactor.registerGlobal) are merged at lower
         // priority — component vars override on name collision.
-        const vars = { ...this._reactor._globalVars, ...collectVars(instance) };
+        const vars = { ...this._reactor.globalVars, ...collectVars(instance) };
         const mountPoints = this._renderer.render(
             container,
             compiled,
@@ -402,7 +448,7 @@ export class InstanceRegistry {
         // Remove orphaned children (component cleanup — containers already detached above)
         for (const [childCode, childId] of previousChildren) {
             if (!currentChildren.has(childCode) && this.has(childId)) {
-                await this.remove(childId);
+                this.remove(childId);
             }
         }
 
@@ -428,6 +474,7 @@ export class InstanceRegistry {
 
         // Check for an eagerly-created child (reference with _creationPromise)
         const decl = declarations.get(childCode) || null;
+
         if (decl instanceof Child && decl._creationPromise) {
             return await this._attachEagerChild(mountPoint, parentInstance, decl, childId);
         }
@@ -484,7 +531,9 @@ export class InstanceRegistry {
                     failedComponent: decl.componentName,
                 });
             }
-            if (handled) return;
+            if (handled) {
+                return;
+            }
             throw error;
         }
         // Set parent on the child's registry entry and remove from roots
@@ -538,11 +587,17 @@ export class InstanceRegistry {
                 await this._hydrateSubtree(childInstance[COMPONENT_ID]);
             }
         } catch (error) {
+            // Clean up instance if it failed during hydration
+            if (childInstance) {
+                this.remove(childInstance[COMPONENT_ID]);
+            }
             const handled = decl._emitBuffered('fw-error', {
                 error,
                 failedComponent: childId.name,
             });
-            if (handled) return;
+            if (handled) {
+                return;
+            }
             throw error;
         }
     }
@@ -558,7 +613,13 @@ export class InstanceRegistry {
      * @param {Child} ref - Component reference to eagerly create
      */
     startEagerCreation(ref) {
-        const code = new ComponentId(ref.componentName, ref.id || '').code;
+        const code = new ComponentId(ref.componentName, ref.componentId || '').code;
+
+        // If explicitly requested via createChild, force fresh state
+        if (this.persistence && this.persistence.has(code)) {
+            this.persistence.delete(code);
+        }
+
         // If the component already exists in the registry (e.g. re-render with
         // same children), skip eager creation — _mountChild will re-render it.
         if (this._instances.has(code)) {
@@ -568,9 +629,9 @@ export class InstanceRegistry {
         ref._detachedContainer = container;
 
         const promise = this._eagerCreate(ref, container);
-        // Suppress immediate unhandled rejection warning. The error is natively
-        // caught and handled when the parent awaits the promise during render.
-        promise.catch(() => {});
+        promise.catch(() => {
+            // Prevent unhandled promise rejections if the eager child fails but is never mounted
+        });
         ref._creationPromise = promise;
     }
 
@@ -584,7 +645,7 @@ export class InstanceRegistry {
      * @returns {Promise<Component>} The created instance (pending hydration)
      */
     async _eagerCreate(ref, container) {
-        const code = new ComponentId(ref.componentName, ref.id || '').code;
+        const code = new ComponentId(ref.componentName, ref.componentId || '').code;
         try {
             return await this.createFromReference(ref, container, { deferHydration: true });
         } catch (error) {
@@ -683,7 +744,7 @@ export class InstanceRegistry {
      */
     _matchesChildId(value, childId) {
         if (value instanceof Child) {
-            return value.componentName === childId.name && (value.id || '') === childId.id;
+            return value.componentName === childId.name && (value.componentId || '') === childId.id;
         }
         // Legacy: Component instance
         const decl = /** @type {Component} */ (value);
@@ -717,12 +778,27 @@ export class InstanceRegistry {
     /**
      * Clear all instances (for cleanup/testing)
      */
-    async clearAll() {
+    clearAll() {
         const codes = Array.from(this._instances.keys());
         for (const code of codes) {
             const componentId = ComponentId.fromCode(code);
-            await this.remove(componentId);
+            this.remove(componentId);
         }
+    }
+
+    /**
+     * Pre-fetch a component's class and template into the cache.
+     * After this resolves, createFromReference() for this component name
+     * will find both the class and template already cached — no network
+     * round-trip required.
+     * @param {string} componentName - Component name (e.g., 'List/Item')
+     * @returns {Promise<void>}
+     */
+    async preload(componentName) {
+        await Promise.all([
+            this._loadComponentClass(componentName),
+            this._ensureTemplate(componentName),
+        ]);
     }
 
     /**
@@ -752,7 +828,7 @@ export class InstanceRegistry {
      * @returns {import('./reactor.js').ConsoleLike} Console-like object
      */
     _buildConsoleFor(componentId) {
-        const reactorConsole = this._reactor._console;
+        const reactorConsole = this._reactor.console;
         return {
             /**
              * Log a message to the wrapped console.
@@ -799,7 +875,7 @@ export class InstanceRegistry {
             );
         }
 
-        const basePath = this._reactor._basePath;
+        const basePath = this._reactor.basePath;
         const module = await import(`${basePath}/${componentName}.js`);
 
         // Try named export matching the simple name, then the full name, then default
@@ -863,7 +939,7 @@ export class InstanceRegistry {
         let id;
         if (value instanceof Child) {
             name = value.componentName;
-            id = value.id || '';
+            id = value.componentId || '';
         } else {
             const decl = /** @type {Component} */ (value);
             name = /** @type {ComponentConstructor} */ (decl.constructor).componentName;
