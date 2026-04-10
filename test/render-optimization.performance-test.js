@@ -8,7 +8,9 @@ import { Component } from '../src/component.js';
 import { ComponentId } from '../src/component-id.js';
 import { Child } from '../src/component.js';
 import { Idiomorph } from 'idiomorph';
+import { Persistence } from '../src/persistence.js';
 import { COMPONENT_ID } from '../src/symbols.js';
+import { StateSerializer } from '../src/state-serializer.js';
 
 describe('Render Optimizations', () => {
     let dom;
@@ -18,7 +20,7 @@ describe('Render Optimizations', () => {
     let templateStore;
     let container;
 
-    class ChildComponent extends Component {}
+    class ChildComponent extends Component { }
 
     beforeEach(() => {
         dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
@@ -49,13 +51,19 @@ describe('Render Optimizations', () => {
             return Idiomorph.morph(cont, html, options);
         });
 
-        registry = new InstanceRegistry(renderer, templateStore, 'testApp');
+        registry = new InstanceRegistry(
+            renderer,
+            templateStore,
+            'testApp',
+            new Persistence(new StateSerializer())
+        );
 
         registry._reactor = {
-            _console: console,
-            _basePath: './components',
-            _globalVars: {},
-            _instanceRegistry: registry,
+            console: console,
+            basePath: './components',
+            globalVars: {},
+            instanceRegistry: registry,
+            persistence: registry.persistence,
         };
 
         // ChildComponent is used across most tests — register so componentName is set
@@ -244,7 +252,7 @@ describe('Render Optimizations', () => {
             // mount point elements (via beforeNodeMorphed returning false for data-fusewire-id).
             // The reconciliation logic then reuses the same DOM elements, ensuring
             // entry.container === mountPoint and triggering the skip.
-            renderer.morphFunction = () => {};
+            renderer.morphFunction = () => { };
 
             const childCount = 20;
 
@@ -257,7 +265,7 @@ describe('Render Optimizations', () => {
                     }
                 }
             }
-            class Cell extends Component {}
+            class Cell extends Component { }
 
             registry.registerComponent('Parent', Parent);
             registry.registerComponent('Cell', Cell);

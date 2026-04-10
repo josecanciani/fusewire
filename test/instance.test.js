@@ -12,6 +12,8 @@ import { Child } from '../src/component.js';
 import { COMPONENT_ID, LIFECYCLE_ACTIVE, EVENTS, CONSOLE, LIBRARIES } from '../src/symbols.js';
 import { EventEmitter } from '../src/event-emitter.js';
 import { findChildMountPoints } from '../src/utils/dom-helpers.js';
+import { StateSerializer } from '../src/state-serializer.js';
+import { Persistence } from '../src/persistence.js';
 
 describe('InstanceRegistry', () => {
     let dom;
@@ -81,14 +83,20 @@ describe('InstanceRegistry', () => {
             return Idiomorph.morph(container, html, options);
         });
 
-        registry = new InstanceRegistry(renderer, templateStore, 'testApp');
+        registry = new InstanceRegistry(
+            renderer,
+            templateStore,
+            'testApp',
+            new Persistence(new StateSerializer())
+        );
 
         // Wire a mock reactor (normally done by Reactor constructor)
         registry._reactor = {
-            _console: console,
-            _basePath: './components',
-            _globalVars: {},
-            _instanceRegistry: registry,
+            console: console,
+            basePath: './components',
+            globalVars: {},
+            instanceRegistry: registry,
+            persistence: registry.persistence,
         };
 
         // Create a fresh container for each test
@@ -108,7 +116,7 @@ describe('InstanceRegistry', () => {
                 super();
                 this.normalVar = 'abc';
             }
-            
+
             get $computedProp() {
                 return this.normalVar + 'def';
             }
@@ -135,7 +143,7 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(vars.normalVar, 'abc', 'Collects standard properties');
             assert.strictEqual(vars.$computedProp, 'abcdef', 'Collects $ prefixed getters from base class');
             assert.strictEqual(vars.$subProp, 'sub', 'Collects $ prefixed getters from subclass');
-            
+
             assert.strictEqual(vars.normalGetter, undefined, 'Ignores getters without $ prefix');
             assert.strictEqual(vars.$methodProp, undefined, 'Ignores methods even if prefixed with $');
         });
@@ -270,13 +278,14 @@ describe('InstanceRegistry', () => {
             const reactCalls = [];
             const warnings = [];
             registry._reactor = {
-                _console: {
+                console: {
                     log() { },
                     warn(...args) { warnings.push(args); },
                     error() { },
                 },
-                _basePath: './components',
-                _globalVars: {},
+                basePath: './components',
+                globalVars: {},
+                persistence: new Persistence(new StateSerializer()),
                 react() { reactCalls.push('react'); },
             };
 
@@ -308,14 +317,15 @@ describe('InstanceRegistry', () => {
             const reactCalls = [];
             const warnings = [];
             registry._reactor = {
-                _console: {
+                console: {
                     log() { },
                     warn(...args) { warnings.push(args); },
                     error() { },
                 },
-                _basePath: './components',
-                _globalVars: {},
-                _drainPromise: Promise.resolve(),
+                basePath: './components',
+                globalVars: {},
+                persistence: new Persistence(new StateSerializer()),
+                drainPromise: Promise.resolve(),
                 react() { reactCalls.push('react'); },
             };
 
@@ -357,7 +367,7 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(instance[LIFECYCLE_ACTIVE], null);
         });
 
-        it('clears LIFECYCLE_ACTIVE even when init() throws', async () => {
+        it('removes instance from registry when init() throws', async () => {
             class ThrowingInit extends Component {
                 async init() {
                     throw new Error('init failed');
@@ -377,8 +387,9 @@ describe('InstanceRegistry', () => {
                 /init failed/,
             );
 
+            // The framework should clean up failed initializations entirely
             const instance = registry.get(componentId);
-            assert.strictEqual(instance[LIFECYCLE_ACTIVE], null);
+            assert.strictEqual(instance, null);
         });
 
         // Note: update() triggers re-render which uses morphing.
@@ -388,13 +399,14 @@ describe('InstanceRegistry', () => {
             const reactCalls = [];
             const warnings = [];
             registry._reactor = {
-                _console: {
+                console: {
                     log() { },
                     warn(...args) { warnings.push(args); },
                     error() { },
                 },
-                _basePath: './components',
-                _globalVars: {},
+                basePath: './components',
+                globalVars: {},
+                persistence: new Persistence(new StateSerializer()),
                 react() { reactCalls.push('react'); },
             };
 
@@ -1423,14 +1435,15 @@ describe('InstanceRegistry', () => {
             const reactCalls = [];
             const warnings = [];
             registry._reactor = {
-                _console: {
+                console: {
                     log() { },
                     warn(...args) { warnings.push(args); },
                     error() { },
                 },
-                _basePath: './components',
-                _globalVars: {},
-                _drainPromise: Promise.resolve(),
+                basePath: './components',
+                globalVars: {},
+                persistence: new Persistence(new StateSerializer()),
+                drainPromise: Promise.resolve(),
                 react() { reactCalls.push('react'); },
             };
 

@@ -9,6 +9,8 @@ import { ComponentId } from '../src/component-id.js';
 import { Child } from '../src/component.js';
 import { Idiomorph } from 'idiomorph';
 import { COMPONENT_ID } from '../src/symbols.js';
+import { StateSerializer } from '../src/state-serializer.js';
+import { Persistence } from '../src/persistence.js';
 
 describe('InstanceRegistry Mounting Thoroughness', () => {
     let dom;
@@ -18,8 +20,8 @@ describe('InstanceRegistry Mounting Thoroughness', () => {
     let templateStore;
     let container;
 
-    class TestComponent extends Component {}
-    class ChildComponent extends Component {}
+    class TestComponent extends Component { }
+    class ChildComponent extends Component { }
 
     beforeEach(() => {
         dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
@@ -42,13 +44,19 @@ describe('InstanceRegistry Mounting Thoroughness', () => {
         renderer = new Renderer((container, html) => {
             container.innerHTML = html;
         });
-        registry = new InstanceRegistry(renderer, templateStore, 'testApp');
+        registry = new InstanceRegistry(
+            renderer,
+            templateStore,
+            'testApp',
+            new Persistence(new StateSerializer())
+        );
 
         registry._reactor = {
-            _console: console,
-            _basePath: './components',
-            _globalVars: {},
-            _instanceRegistry: registry,
+            console: console,
+            basePath: './components',
+            globalVars: {},
+            instanceRegistry: registry,
+            persistence: registry.persistence,
         };
 
         container = document.createElement('div');
@@ -151,7 +159,7 @@ describe('InstanceRegistry Mounting Thoroughness', () => {
 
             const parent = await registry.create(parentId, TestComponent, { child: childRef }, container);
             const childId = new ComponentId('ChildComponent', 'child1');
-            
+
             // Intercept renderer to verify detach timing
             let childPresentDuringRender = true;
             const origRender = registry._renderer.render.bind(registry._renderer);
