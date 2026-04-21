@@ -315,6 +315,60 @@ describe('Template Compiler', () => {
             assert.ok(result.includes("handle('Alice')"));
             assert.ok(result.includes("handle('Bob')"));
         });
+
+        it('handles fw-if nested inside fw-each evaluating against loop variables', () => {
+            const template = compileTemplate(`
+                <div fw-each="prod in groupedItems">
+                    <h6>((prod.title))</h6>
+                    <div fw-each="item in prod.selections">
+                        <span fw-if="item.countBadge">((item.countBadge))</span>
+                    </div>
+                </div>
+            `);
+            const componentId = new ComponentId('Test', 'main');
+            const result = template.render(
+                {
+                    groupedItems: [
+                        {
+                            title: 'P1',
+                            selections: [
+                                { countBadge: 'x2' },
+                                { countBadge: '' },
+                            ],
+                        },
+                    ],
+                },
+                componentId,
+            );
+
+            assert.ok(result.includes('P1'));
+            assert.ok(result.includes('x2'));
+            // Second span evaluates falsy and correctly strips itself inside the resolved loop
+            assert.strictEqual((result.match(/<span/g) || []).length, 1);
+            // Wait, does it strip the span completely? It only stripped the inner fw-if span.
+        });
+
+        it('handles fw-if and fw-each coexisting on the same element', () => {
+            const template = compileTemplate(
+                '<ul><li fw-if="item.isVisible" fw-each="item in items">((item.name))</li></ul>'
+            );
+            const componentId = new ComponentId('Test', 'main');
+            const result = template.render(
+                {
+                    items: [
+                        { name: 'Alice', isVisible: true },
+                        { name: 'Bob', isVisible: false },
+                        { name: 'Charlie', isVisible: true },
+                    ],
+                },
+                componentId,
+            );
+
+            assert.ok(result.includes('Alice'));
+            assert.ok(!result.includes('Bob'));
+            assert.ok(result.includes('Charlie'));
+            assert.strictEqual((result.match(/<li/g) || []).length, 2);
+        });
     });
 
     describe('Component Mount Points', () => {

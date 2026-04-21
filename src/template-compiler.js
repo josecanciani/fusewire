@@ -270,105 +270,85 @@ function interpolateText(text, vars, componentId, constants) {
 }
 
 /**
- * Process fw-if directive with nesting-aware tag matching
- * @param {string} html - HTML template
- * @param {ComponentVars} vars - Variable data
- * @returns {string} Processed HTML
- */
-function processConditionals(html, vars) {
-    const openRegex = /<(\w+)([^>]*)\s+fw-if=["']([^"']+)["']([^>]*)>/i;
-    let result = html;
-    let match;
-
-    while ((match = openRegex.exec(result)) !== null) {
-        const [fullMatch, tag, beforeAttrs, condition, afterAttrs] = match;
-        const contentStart = match.index + fullMatch.length;
-
-        const closeIndex = findMatchingClose(result, tag, contentStart);
-        if (closeIndex === -1) break;
-
-        const content = result.substring(contentStart, closeIndex);
-        const closeTag = `</${tag}>`;
-        const elementEnd = closeIndex + closeTag.length;
-
-        const value = getPropertyValue(vars, condition.trim());
-
-        let replacement;
-        if (!value) {
-            replacement = '';
-        } else {
-            const attrs = (beforeAttrs + ' ' + afterAttrs).trim();
-            const openTag = attrs ? `<${tag} ${attrs}>` : `<${tag}>`;
-            replacement = `${openTag}${content}${closeTag}`;
-        }
-
-        result = result.substring(0, match.index) + replacement + result.substring(elementEnd);
-    }
-
-    return result;
-}
-
-/**
- * Process fw-each directive with nesting-aware tag matching
+ * Process directives (fw-if, fw-each) with nesting-aware tag matching in structural order
  * @param {string} html - HTML template
  * @param {ComponentVars} vars - Variable data
  * @param {ComponentId} componentId - Component instance ID
  * @param {TemplateConstants} constants - Template constants
  * @returns {string} Processed HTML
  */
-function processLoops(html, vars, componentId, constants) {
-    const openRegex = /<(\w+)([^>]*)\s+fw-each=["']([^"']+)["']([^>]*)>/i;
-    let result = html;
+function processDirectives(html, vars, componentId, constants) {
+    const directiveRegex = /<(\w+)([^>]*?)\s+(fw-if|fw-each)=["']([^"']+)["']([^>]*)>/i;
+    let result = String(html);
     let match;
 
-    while ((match = openRegex.exec(result)) !== null) {
-        const [fullMatch, tag, beforeAttrs, loopExpr, afterAttrs] = match;
+    while ((match = directiveRegex.exec(result)) !== null) {
+        const [fullMatch, tag, beforeAttrs, directiveName, expr, afterAttrs] = match;
+        const directive = directiveName.toLowerCase();
         const contentStart = match.index + fullMatch.length;
 
         const closeIndex = findMatchingClose(result, tag, contentStart);
-        if (closeIndex === -1) break;
+        if (closeIndex === -1) {
+            // Unclosed tag, just strip the directive to prevent infinite loops
+            const replacement = `<${tag}${beforeAttrs} ${afterAttrs}>`;
+            result = result.substring(0, match.index) + replacement + result.substring(contentStart);
+            continue;
+        }
 
         const content = result.substring(contentStart, closeIndex);
         const closeTag = `</${tag}>`;
         const elementEnd = closeIndex + closeTag.length;
 
-        // Parse "item in items" syntax
-        const loopMatch = loopExpr.match(/^\s*(\w+)\s+in\s+([\w.]+)\s*$/);
-        if (!loopMatch) {
-            console.warn(`Invalid fw-each syntax: ${loopExpr}`);
-            result = result.substring(0, match.index) + result.substring(elementEnd);
-            continue;
+        if (directive === 'fw-if') {
+            const condition = expr;
+            const value = getPropertyValue(vars, condition.trim());
+            let replacement;
+
+            if (!value) {
+                replacement = '';
+            } else {
+                const attrs = (beforeAttrs + ' ' + afterAttrs).trim();
+                const openTag = attrs ? `<${tag} ${attrs}>` : `<${tag}>`;
+                
+                replacement = `${openTag}${content}${closeTag}`;
+            }
+
+            result = result.substring(0, match.index) + replacement + result.substring(elementEnd);
+        } else if (directive === 'fw-each') {
+            const loopExpr = expr;
+            const loopMatch = loopExpr.match(/^\s*(\w+)\s+in\s+([\w.]+)\s*$/);
+            if (!loopMatch) {
+                console.warn(`Invalid fw-each syntax: ${loopExpr}`);
+                const attrs = (beforeAttrs + ' ' + afterAttrs).trim();
+                const openTag = attrs ? `<${tag} ${attrs}>` : `<${tag}>`;
+                const replacement = `${openTag}${content}${closeTag}`;
+                result = result.substring(0, match.index) + replacement + result.substring(elementEnd);
+                continue;
+            }
+
+            const [, itemName, collectionPath] = loopMatch;
+            const collection = getPropertyValue(vars, collectionPath);
+
+            let replacement = '';
+            if (Array.isArray(collection) && collection.length > 0) {
+                const attrs = (beforeAttrs + ' ' + afterAttrs).trim();
+                const itemResults = collection.map((item) => {
+                    const scopedVars = { ...vars, [itemName]: item };
+
+                    const itemAttrs = attrs ? ` ${attrs}` : '';
+                    let itemHtml = `<${tag}${itemAttrs}>${content}${closeTag}`;
+
+                    // Process nested directives for this isolated item structurally
+                    itemHtml = processDirectives(itemHtml, scopedVars, componentId, constants);
+
+                    // Interpolate variables scoped exclusively within this item's context
+                    return interpolateText(itemHtml, scopedVars, componentId, constants);
+                });
+                replacement = itemResults.join('');
+            }
+
+            result = result.substring(0, match.index) + replacement + result.substring(elementEnd);
         }
-
-        const [, itemName, collectionPath] = loopMatch;
-        const collection = getPropertyValue(vars, collectionPath);
-
-        if (!Array.isArray(collection) || collection.length === 0) {
-            result = result.substring(0, match.index) + result.substring(elementEnd);
-            continue;
-        }
-
-        // Render the element for each item
-        const attrs = (beforeAttrs + ' ' + afterAttrs).trim();
-        const results = collection.map((item) => {
-            // Create scoped vars with loop item
-            const scopedVars = { ...vars, [itemName]: item };
-
-            // Process the content with scoped vars
-            let itemContent = content;
-
-            // Recursively process nested conditionals and loops
-            itemContent = processConditionals(itemContent, scopedVars);
-            itemContent = processLoops(itemContent, scopedVars, componentId, constants);
-
-            // Interpolate variables in full element context (tag + content)
-            const itemAttrs = attrs ? ` ${attrs}` : '';
-            const fullElement = `<${tag}${itemAttrs}>${itemContent}${closeTag}`;
-            return interpolateText(fullElement, scopedVars, componentId, constants);
-        });
-
-        const replacement = results.join('');
-        result = result.substring(0, match.index) + replacement + result.substring(elementEnd);
     }
 
     return result;
@@ -397,14 +377,10 @@ export function compileTemplate(htmlCode, cssCode = '', appName = 'default') {
 
             let html = htmlCode.trim();
 
-            // Process directives (order matters!)
-            // 1. Process conditionals first (removes branches)
-            html = processConditionals(html, vars);
+            // Process directives (fw-if, fw-each) structural evaluation (top-down)
+            html = processDirectives(html, vars, componentId, constants);
 
-            // 2. Process loops (expands repeated elements)
-            html = processLoops(html, vars, componentId, constants);
-
-            // 3. Interpolate variables (fills in values)
+            // Interpolate variables (fills in values)
             html = interpolateText(html, vars, componentId, constants);
 
             // 4. Replace ((this)) placeholders with FuseWire.get() calls
