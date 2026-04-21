@@ -1,0 +1,24 @@
+<div class="url-demo">
+    <h2 class="url-demo-title" style="color: ((color))">((message))</h2>
+    <p class="url-demo-hint">
+        Edit the fields below and click Apply to update the URL, or change values directly in the address bar.
+    </p>
+    <form class="url-demo-fields" onsubmit="event.preventDefault(); ((this)).applyChanges()">
+        <div class="url-demo-field">
+            <label for="url-msg">Message</label>
+            <input id="url-msg" type="text" value="((message))" />
+        </div>
+        <div class="url-demo-field">
+            <label for="url-color">Color</label>
+            <div class="url-demo-color-row">
+                <input id="url-color" type="color" value="((color))" />
+                <span class="url-demo-color-value">((color))</span>
+            </div>
+        </div>
+        <button type="submit" class="url-demo-apply">Apply</button>
+    </form>
+    <div class="url-demo-info">
+        <p>This component declares <code>routeState()</code> with two keys: <code>message</code> and <code>color</code>.</p>
+        <p>When you click Apply, <code>pushRoute()</code> updates the browser URL. When you navigate back/forward, the router delivers the new values via <code>update()</code>.</p>
+    </div>
+</div>

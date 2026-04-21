@@ -12,6 +12,7 @@ import {
     LIFECYCLE_ACTIVE,
     EVENTS,
     LIBRARIES,
+    ROUTE_DEFAULTS,
 } from './symbols.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
@@ -128,10 +129,14 @@ export class InstanceRegistry {
      * Create a component from a Child (resolves the class by name)
      * @param {Child} ref - Component reference to resolve
      * @param {HTMLElement} container - DOM container
-     * @param {{deferHydration?: boolean}} options - Creation options
+     * @param {{deferHydration?: boolean, routeSegment?: import('./route-segment.js').RouteSegment}} options - Creation options
      * @returns {Promise<Component>} The created instance
      */
-    async createFromReference(ref, container, { deferHydration = false } = {}) {
+    async createFromReference(
+        ref,
+        container,
+        { deferHydration = false, routeSegment = null } = {},
+    ) {
         const ComponentClass = await this._loadComponentClass(ref.componentName);
 
         // Ensure template is loaded so we can read its version
@@ -140,6 +145,7 @@ export class InstanceRegistry {
 
         return await this.create(componentId, ComponentClass, { ...ref.vars }, container, {
             deferHydration,
+            routeSegment,
         });
     }
 
@@ -160,10 +166,16 @@ export class InstanceRegistry {
      * @param {ComponentConstructor} ComponentClass - Component class constructor
      * @param {ComponentVars} vars - Initial vars
      * @param {HTMLElement} container - DOM container
-     * @param {{deferHydration?: boolean}} options - Creation options
+     * @param {{deferHydration?: boolean, routeSegment?: import('./route-segment.js').RouteSegment}} options - Creation options
      * @returns {Promise<Component>} The created instance
      */
-    async create(componentId, ComponentClass, vars, container, { deferHydration = false } = {}) {
+    async create(
+        componentId,
+        ComponentClass,
+        vars,
+        container,
+        { deferHydration = false, routeSegment = null } = {},
+    ) {
         const code = componentId.code;
         if (this._instances.has(code)) {
             throw new Error(`Component ${code} already exists in registry`);
@@ -221,9 +233,18 @@ export class InstanceRegistry {
 
         // LIFECYCLE_ACTIVE stays set throughout creation to prevent premature react()
         try {
-            // Call init hook — pass previousState so the component can skip fetches
+            // Snapshot route defaults before init() — init may apply URL values
+            // that would overwrite the original defaults. The router compares
+            // current state against this snapshot to omit unchanged properties.
+            const routeDefaults = instance.routeState();
+            if (routeDefaults && typeof routeDefaults === 'object') {
+                instance[ROUTE_DEFAULTS] = { ...routeDefaults };
+            }
+
+            // Call init hook — pass previousState and routeSegment so the component
+            // can skip fetches and restore from URL state on first render
             instance[LIFECYCLE_ACTIVE] = 'init';
-            await instance.init(previousState);
+            await instance.init(previousState, routeSegment);
 
             // Initial render
             instance[LIFECYCLE_ACTIVE] = 'render';
@@ -277,8 +298,9 @@ export class InstanceRegistry {
      * handles rendering explicitly.
      * @param {ComponentId} componentId - Component identifier
      * @param {ComponentVars} newVars - New variable values to merge
+     * @param {import('./route-segment.js').RouteSegment|null} routeSegment - Route segment for popstate navigation, or null
      */
-    async update(componentId, newVars) {
+    async update(componentId, newVars, routeSegment = null) {
         const code = componentId.code;
         const entry = this._instances.get(code);
 
@@ -292,7 +314,7 @@ export class InstanceRegistry {
         try {
             // Merge vars without triggering react — we handle rendering below
             instance[LIFECYCLE_ACTIVE] = 'update';
-            instance.update(newVars, false);
+            instance.update(newVars, false, routeSegment);
 
             // Re-render
             instance[LIFECYCLE_ACTIVE] = 'render';
@@ -502,11 +524,22 @@ export class InstanceRegistry {
         const parentEntry = this._instances.get(parentInstance[COMPONENT_ID].code);
         const parentDeferred = parentEntry.needsHydration;
 
+        // Try to consume a route segment from the router for this child.
+        // The route key is the var name on the parent that holds this child reference.
+        let routeSegment = null;
+        if (this._reactor.router) {
+            const varName = this._findVarNameForCode(parentInstance, childCode);
+            if (varName) {
+                routeSegment = this._reactor.router.consumeSegment(varName);
+            }
+        }
+
         let childInstance;
         try {
             if (decl instanceof Child) {
                 childInstance = await this.createFromReference(decl, mountPoint, {
                     deferHydration: parentDeferred,
+                    routeSegment,
                 });
                 this._replaceRefInVars(parentInstance, decl, childInstance);
                 decl._replayBufferedEvents(childInstance);
@@ -561,6 +594,21 @@ export class InstanceRegistry {
         let childInstance;
         try {
             childInstance = await decl._creationPromise;
+
+            // Deliver route segment to eagerly-created child before DOM transfer.
+            // The child init'd with null routeSegment; if the router has a matching
+            // segment, we update + re-render into the detached container so the user
+            // never sees default state.
+            if (this._reactor.router) {
+                const varName = this._findVarNameForCode(parentInstance, childId.code);
+                if (varName) {
+                    const segment = this._reactor.router.consumeSegment(varName);
+                    if (segment && childInstance.routeState() !== false) {
+                        childInstance.update({}, false, segment);
+                        await this.render(childInstance[COMPONENT_ID]);
+                    }
+                }
+            }
 
             // Transfer rendered DOM from detached container into the real mount point
             const detached = decl._detachedContainer;
@@ -754,6 +802,27 @@ export class InstanceRegistry {
             /** @type {ComponentConstructor} */ (decl.constructor).componentName === childId.name &&
             (decl.componentId || '') === childId.id
         );
+    }
+
+    /**
+     * Find the var name on a parent instance that holds a child with the given code.
+     * Scans string-keyed properties for Component/Child instances whose code matches.
+     * @private
+     * @param {Component} parentInstance - Parent component instance
+     * @param {string} childCode - Child component code to find (e.g. "Sidebar#main")
+     * @returns {string|null} Var name (property key) or null if not found
+     */
+    _findVarNameForCode(parentInstance, childCode) {
+        for (const key of Object.keys(parentInstance)) {
+            const value = parentInstance[key];
+            if (
+                (value instanceof Component || value instanceof Child) &&
+                value.componentCode === childCode
+            ) {
+                return key;
+            }
+        }
+        return null;
     }
 
     /**

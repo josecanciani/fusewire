@@ -20,7 +20,7 @@
         } from './js/reactor.js';
 
         const reactor = new Reactor('playground', {
-            basePath: new URL('./components', window.location.href).href
+            basePath: new URL('/components', window.location.origin).href,
         });
 
         await reactor.start(document.getElementById('app'), 'Playground/Home', 'main', {
@@ -69,6 +69,13 @@
                         'GameOfLife/Dead',
                         'GameOfLife/Help',
                     ],
+                },
+                {
+                    name: 'UrlDemo/UrlDemo',
+                    title: 'URL Routing',
+                    description: 'Text and color driven by the browser URL. Edit the address bar and press Enter.',
+                    tags: ['basics'],
+                    defaultFile: 'UrlDemo/UrlDemo/js',
                 },
             ],
         });

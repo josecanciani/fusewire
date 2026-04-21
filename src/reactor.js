@@ -9,12 +9,13 @@ import { Idiomorph } from './lib/idiomorph/idiomorph.esm.js';
 import { ComponentNotFoundError } from './errors/error-hierarchy.js';
 import { Persistence } from './persistence.js';
 import { StateSerializer } from './state-serializer.js';
+import { HistoryRouter } from './history-router.js';
 import { REACTOR, LIFECYCLE_ACTIVE, LIBRARIES } from './symbols.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
 /** @typedef {{log: function(...*): void, warn: function(...*): void, error: function(...*): void}} ConsoleLike */
 /** @typedef {{stringify: function(ComponentVars): string, parse: function(string): ComponentVars}} SerializerLike */
-/** @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: function(HTMLElement, string, Object<string, *>=): void, instanceRegistry?: InstanceRegistry, basePath?: string, globalVars?: ComponentVars, enableDefaultConsole?: boolean, persistence?: Persistence, serializer?: SerializerLike}} ReactorConfig */
+/** @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: function(HTMLElement, string, Object<string, *>=): void, instanceRegistry?: InstanceRegistry, basePath?: string, globalVars?: ComponentVars, enableDefaultConsole?: boolean, persistence?: Persistence, serializer?: SerializerLike, router?: import('./history-router.js').HistoryRouter|null}} ReactorConfig */
 
 /**
  * Reactor - Orchestrator for CSR_ONLY mode
@@ -76,6 +77,15 @@ export class Reactor {
         /** @type {Persistence} */
         this.persistence =
             config.persistence || new Persistence(config.serializer || new StateSerializer());
+
+        // Router — HistoryRouter for URL-based state management.
+        // Auto-created by default; pass null to disable.
+        // Must be attached before start() so init() can receive route segments.
+        /** @type {import('./history-router.js').HistoryRouter|null} */
+        this.router = config.router === null ? null : config.router || new HistoryRouter();
+        if (this.router) {
+            this.router.attach(this);
+        }
 
         this._instanceRegistry =
             config.instanceRegistry ||
@@ -263,8 +273,28 @@ export class Reactor {
 
         const ref = new Child(componentName, id, vars);
 
+        // Consume the root route segment from the router (if configured).
+        // This passes URL state to the root component's init() so it can
+        // set vars from the URL before the first render (no flash).
+        let routeSegment = null;
+        if (this.router) {
+            routeSegment = this.router.consumeRootSegment();
+        }
+
         // Create instance via registry (resolves class, init, render, afterRender)
-        const instance = await this._instanceRegistry.createFromReference(ref, renderContainer);
+        const instance = await this._instanceRegistry.createFromReference(ref, renderContainer, {
+            routeSegment,
+        });
+
+        // Mark initial load as complete so the router stops consuming segments
+        if (this.router) {
+            this.router.completeInitialLoad();
+            // Snapshot the full tree state into the URL (replaceState, no new entry).
+            // Children mounted during init() may have routeState() values that
+            // weren't in the original URL — this ensures the URL reflects reality
+            // so that browser-back always has a complete snapshot to restore from.
+            this.router.replaceUrl();
+        }
 
         // Ensure reactor is attached (also set by create() if registry has reactor ref)
         instance[REACTOR] = this;

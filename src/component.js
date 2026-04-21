@@ -7,6 +7,7 @@ import {
     REACTOR,
     LIFECYCLE_ACTIVE,
     EVENTS,
+    ROUTE_DEFAULTS,
 } from './symbols.js';
 
 /**
@@ -119,12 +120,18 @@ export class Component {
      * object returned by the previous destroy() call as previousState. Use this
      * to skip expensive fetches and restore private fields instead.
      *
+     * When a HistoryRouter is active, routeSegment contains the parsed URL
+     * segment for this component. Use it to set state before the first render
+     * so there is no flash from defaults to URL values.
+     *
      * @async
      * @param {Object<string, *>|null} previousState - State returned by the previous destroy(), or null on fresh mount
+     * @param {import('./route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment, or null when no router or no matching segment
      * @returns {Promise<void>}
      */
-    async init(previousState) {
+    async init(previousState, routeSegment) {
         void previousState; // Bypass unused variable linter
+        void routeSegment;
         // Override in subclasses
     }
 
@@ -140,15 +147,40 @@ export class Component {
      * because it handles rendering itself. Developer code should use the
      * default `react = true` so the component re-renders automatically.
      *
+     * When a HistoryRouter is active, routeSegment is provided during popstate
+     * (browser back/forward). The base implementation auto-maps segment
+     * properties onto the component vars declared by routeState(). Override
+     * this method when you need custom logic (e.g. type coercion beyond
+     * simple strings, derived state computation).
+     *
      * Subclasses can override to add custom logic (e.g. validation or
      * derived state), and must call `super.update(newVars, react)` to
      * apply the merge and trigger re-render.
      *
      * @param {ComponentVars} newVars - Vars to merge into the component
      * @param {boolean} react - Whether to trigger a re-render (default true)
+     * @param {import('./route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment during popstate, or null
      * @returns {Promise<void>} Promise that resolves when the re-render is complete (if react is true)
      */
-    update(newVars, react = true) {
+    update(newVars, react = true, routeSegment = null) {
+        // Auto-map route segment properties to component vars when routeState
+        // declares the property names. This default mapping uses raw strings;
+        // components needing typed values should override update().
+        if (routeSegment) {
+            const state = this.routeState();
+            if (state !== false) {
+                const defaults = this[ROUTE_DEFAULTS];
+                for (const key of Object.keys(state)) {
+                    const value = routeSegment.get(key);
+                    if (value !== null) {
+                        this[key] = value;
+                    } else if (defaults && key in defaults) {
+                        // Property absent from URL — reset to pre-init default
+                        this[key] = defaults[key];
+                    }
+                }
+            }
+        }
         Object.assign(this, newVars);
         return react ? this.react() : Promise.resolve();
     }
@@ -445,6 +477,47 @@ export class Component {
     }
 
     /**
+     * Declare this component's contribution to the URL.
+     * Override to opt into routing.
+     *
+     * Return values:
+     * - `false` — not routed; skip this component and its entire subtree
+     * - `{}` — structural pass-through; no URL segment, but children are walked
+     * - `{ key: value, ... }` — routed; keys become URL property names
+     *
+     * @returns {false|Object<string, string>} Route state object, empty object for pass-through, or false to opt out
+     */
+    routeState() {
+        return false;
+    }
+
+    /**
+     * Serialize the full component tree and push a new browser history entry.
+     * Use for navigations the user expects to undo with the Back button.
+     * Delegates to the HistoryRouter injected into the Reactor.
+     * @throws {Error} If no HistoryRouter is configured on the reactor
+     */
+    pushRoute() {
+        if (!this[REACTOR].router) {
+            throw new Error('pushRoute() requires a HistoryRouter on the Reactor');
+        }
+        this[REACTOR].router.pushUrl();
+    }
+
+    /**
+     * Serialize the full component tree and replace the current browser history entry.
+     * Use for transient state changes (sort order, filters) that shouldn't clutter history.
+     * Delegates to the HistoryRouter injected into the Reactor.
+     * @throws {Error} If no HistoryRouter is configured on the reactor
+     */
+    replaceRoute() {
+        if (!this[REACTOR].router) {
+            throw new Error('replaceRoute() requires a HistoryRouter on the Reactor');
+        }
+        this[REACTOR].router.replaceUrl();
+    }
+
+    /**
      * Trigger re-render of this component.
      * Ignored during initialization lifecycle hooks (init, update) because
      * the framework already renders the component natively after those hooks return.
@@ -729,6 +802,7 @@ export class Lazy extends Component {
 /**
  * Built-in error boundary component.
  * Catches fw-error events from a target child and renders a fallback instead.
+ * Acts as a routing pass-through so the router can reach routed children.
  */
 export class ErrorBoundary extends Component {
     static componentName = 'FuseWire/ErrorBoundary';
@@ -760,5 +834,14 @@ export class ErrorBoundary extends Component {
             }).then(() => this.emit('error', ctx));
             return false; // Prevent further bubbling
         });
+    }
+
+    /**
+     * Pass-through for routing — no URL segment of its own, but the router
+     * walks through to reach routed children (e.g. the wrapped component).
+     * @returns {Object<string, string>} Empty object (structural pass-through)
+     */
+    routeState() {
+        return {};
     }
 }

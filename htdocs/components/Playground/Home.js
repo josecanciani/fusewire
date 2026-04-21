@@ -48,9 +48,13 @@ export class Home extends Component {
     sidebarDisplayClass = '';
 
     /**
-     * Initialize the playground with a header, tag filter and console panel
+     * Initialize the playground with a header, tag filter and console panel.
+     * When a HistoryRouter is active, reads the demo name from the URL
+     * segment and auto-selects it before the first render (no flash).
+     * @param {Object<string, *>|null} previousState - State from previous destroy(), or null
+     * @param {import('/js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment, or null
      */
-    async init() {
+    async init(previousState, routeSegment) {
         this.filteredDemos = this.demos;
         this.loadLibrary('Lib/Resize');
         this.headerComponent = /** @type {import('./Header.js').Header} */ (
@@ -69,6 +73,14 @@ export class Home extends Component {
         this.consoleComponent = /** @type {import('../Console/Panel.js').Panel} */ (
             this.createChild('Console/Panel', 'console', { logs: [] })
         );
+
+        if (routeSegment) {
+            const title = routeSegment.getString('demo');
+            const demo = this.demos.find((d) => d.title === title);
+            if (demo) {
+                await this.#loadDemo(demo.name);
+            }
+        }
     }
 
     /**
@@ -87,6 +99,42 @@ export class Home extends Component {
     }
 
     /**
+     * Declare the selected demo as the Home component's URL contribution.
+     * Uses the demo title (human-readable, no slashes) instead of the
+     * component path to produce clean URLs.
+     * @returns {Object<string, string>} Route state with the current demo title
+     */
+    routeState() {
+        const demo = this.demos.find((d) => d.name === this.selectedDemo);
+        return { demo: demo ? demo.title : '' };
+    }
+
+    /**
+     * Handle URL changes (browser back/forward) by reading the demo title
+     * from the route segment and navigating accordingly.
+     * @param {import('/js/component.js').ComponentVars} newVars - Vars to merge
+     * @param {boolean} react - Whether to trigger a re-render
+     * @param {import('/js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment during popstate
+     * @returns {Promise<void>} Resolves when the state change is complete
+     */
+    update(newVars, react = true, routeSegment = null) {
+        if (routeSegment) {
+            const title = routeSegment.getString('demo');
+            const demo = this.demos.find((d) => d.title === title);
+            const name = demo ? demo.name : '';
+            if (name && name !== this.selectedDemo) {
+                this.#loadDemo(name).then(() => this.react());
+                return Promise.resolve();
+            }
+            if (!name && this.selectedDemo) {
+                this.#backWithoutPush();
+                return Promise.resolve();
+            }
+        }
+        return super.update(newVars, react, routeSegment);
+    }
+
+    /**
      * Filter demos by active tags (AND — demo must have all selected tags).
      * Empty array means show all.
      * @param {Array.<string>} tags - Active tag names
@@ -101,13 +149,30 @@ export class Home extends Component {
     }
 
     /**
-     * Select and load a demo by name.
+     * Select and load a demo by name, pushing a new history entry.
+     * Use this for user-initiated navigation (sidebar click, etc.).
+     * pushRoute() runs first to create the history entry, then react()
+     * mounts children and replaceRoute() enriches the URL with their state.
      * @param {string} name - Demo name
      */
     async selectDemo(name) {
+        if (await this.#loadDemo(name)) {
+            this.pushRoute();
+            this.react().then(() => this.replaceRoute());
+        }
+    }
+
+    /**
+     * Core demo-loading logic. Creates child components, fetches source
+     * files, and wires up the sidebar/editor — but does NOT push a URL
+     * or trigger a render. Callers decide whether to push/react.
+     * @param {string} name - Demo name
+     * @returns {Promise.<boolean>} true if the demo was loaded, false if skipped
+     */
+    async #loadDemo(name) {
         const demo = this.demos.find((d) => d.name === name);
-        if (!demo) return;
-        if (this.selectedDemo === name) return;
+        if (!demo) return false;
+        if (this.selectedDemo === name) return false;
 
         const files = await this.#fetchDemoFiles(demo);
         const defaultFileId = demo.defaultFile || files[0]?.id;
@@ -162,7 +227,7 @@ export class Home extends Component {
             );
         }
 
-        this.react();
+        return true;
     }
 
     /**
@@ -224,9 +289,29 @@ export class Home extends Component {
     }
 
     /**
-     * Navigate back to the demo list.
+     * Navigate back to the demo list and push a new history entry.
      */
     back() {
+        this.#resetDemoState();
+        this.pushRoute();
+        this.react();
+    }
+
+    /**
+     * Internal back logic without URL push — used by the popstate handler
+     * to avoid pushing a duplicate history entry when the browser already
+     * navigated back.
+     */
+    #backWithoutPush() {
+        this.#resetDemoState();
+        this.react();
+    }
+
+    /**
+     * Clear all demo-related state: resize handlers, sidebar, editor, and
+     * the active demo selection. Does not trigger a render or URL update.
+     */
+    #resetDemoState() {
         if (this.#rightPaneResizeState) this.#rightPaneResizeState.cancel();
         if (this.#consoleResizeState) this.#consoleResizeState.cancel();
         this.#rightPaneResizeState = null;
@@ -240,7 +325,6 @@ export class Home extends Component {
         this.demos.forEach((d) => {
             d.activeClass = '';
         });
-        this.react();
     }
 
     /**

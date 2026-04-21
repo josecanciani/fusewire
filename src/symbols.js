@@ -33,3 +33,6 @@ export const EVENTS = Symbol('events');
 
 /** @type {symbol} Library loading state — Map<string, {promise, exportNames, module}> */
 export const LIBRARIES = Symbol('libraries');
+
+/** @type {symbol} Snapshot of routeState() defaults captured before init() — used by the router to omit unchanged values from the URL */
+export const ROUTE_DEFAULTS = Symbol('routeDefaults');

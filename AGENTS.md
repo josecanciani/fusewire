@@ -15,11 +15,14 @@ lib/fusewire/
     component.js
     component-id.js
     event-emitter.js
+    history-router.js
     instance.js
     reactor.js
     renderer.js
+    route-segment.js
     template-compiler.js
     template-store.js
+    url-service.js
     config.js
     errors/
     utils/
@@ -112,7 +115,7 @@ npm run test:all
 
 All functions must have JSDoc comments with:
 
-- **Description:** What the function does
+- **Description:** What the function does. *CRITICAL: You MUST include this plaintext block description before any @param annotations. `eslint-plugin-jsdoc` will fail CI if a method lacks a conversational description string.*
 - **@param:** All parameters with specific types (no generic `{Object}` or `{Function}`)
   - Use `{ComponentId}`, `{Component}`, `{Reactor}`, etc. for custom types
   - Use `{HTMLElement}`, `{Element}`, `{string}`, `{number}`, `{boolean}` for standard types
