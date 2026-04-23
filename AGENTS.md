@@ -26,8 +26,13 @@ lib/fusewire/
     config.js
     errors/
     utils/
+  checks/                   # Reusable component validation (Node.js only, exported for consumers)
+    index.js                # Entry point — runAllChecks() with dynamic discovery
+    css-class-consistency.js
+    no-style-tags.js
+    var-jsdoc.js
   test/                     # Node.js tests (JSDOM)
-    *.test.js
+    *.test.js               # Includes component-checks.test.js (runs all checks/)
     browser/                # Playwright browser tests
       morphing.spec.js
       morphing-test.html
@@ -361,6 +366,88 @@ afterRender() {
     if (lastLog) lastLog.scrollIntoView({ block: 'end', behavior: 'instant' });
 }
 ```
+
+## Component Checks (Reusable Validation)
+
+The `checks/` directory contains reusable component validation utilities that run in Node.js. These checks are exported via `@fusewire/client/checks` so consumer projects can run them against their own components.
+
+### Available checks
+
+| Check | What it validates |
+|---|---|
+| `css-class-consistency` | HTML classes match CSS selectors; CSS classes are used in HTML; nested CSS is valid in child context |
+| `no-style-tags` | Component HTML files do not contain inline `<style>` tags |
+| `var-jsdoc` | Every public class field has a `@type` JSDoc annotation with valid types |
+
+### How consumer projects use checks
+
+Consumer projects install `@fusewire/client` as a production dependency (the server needs `src/` files at runtime). The checks are a bonus export used only in their test suites:
+
+```javascript
+// In the consumer project's test file (e.g. test/component-checks.test.js)
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+import { runAllChecks } from '@fusewire/client/checks';
+
+const componentDir = new URL('../src/components', import.meta.url).pathname;
+
+describe('FuseWire component checks', () => {
+    it('passes all checks', async () => {
+        const results = await runAllChecks(componentDir, {
+            globalClasses: ['container', 'btn', 'btn-primary'],
+        });
+        const failures = results.filter((r) => r.violations.length > 0);
+        if (failures.length > 0) {
+            const msg = failures
+                .flatMap((r) => r.violations.map((v) => `[${r.name}] ${v.message}`))
+                .join('\n\n');
+            assert.fail(msg);
+        }
+    });
+});
+```
+
+New checks added to `checks/` are picked up automatically — consumer projects do not need to update their test files.
+
+### How checks work internally
+
+Each check module in `checks/` exports:
+- `name` — human-readable identifier (e.g. `'no-style-tags'`)
+- `check(componentDir, config)` — scans the given directory and returns violations
+
+The types are defined in `checks/index.js`:
+- **`CheckConfig`** — `{ globalClasses?: string[], disabledChecks?: string[] }`
+- **`CheckViolation`** — `{ file: string, message: string }`
+- **`CheckResult`** — `{ name: string, violations: CheckViolation[] }`
+
+The entry point (`checks/index.js`) discovers all sibling `.js` files at runtime via `readdirSync` and dynamically imports them. Checks whose `name` appears in `config.disabledChecks` are skipped. No manifest or registration needed.
+
+Our own test (`test/component-checks.test.js`) uses `runAllChecks()` exactly the same way a consumer project would — dogfooding the public API.
+
+### Adding a new check
+
+1. Create `checks/my-new-check.js` following the convention:
+
+```javascript
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
+
+export const name = 'my-new-check';
+
+/**
+ * Description of what this check validates.
+ * @param {string} componentDir - Absolute path to the component directory to scan
+ * @param {import('./index.js').CheckConfig} config - Project-level configuration
+ * @returns {Array.<import('./index.js').CheckViolation>} Violations found
+ */
+export function check(componentDir, config) {
+    // Scan files in componentDir recursively
+    // Return [] if everything is fine, or [{file, message}] for violations
+    return [];
+}
+```
+
+2. The check is automatically picked up by `runAllChecks()` and tested by `test/component-checks.test.js` — no other files need updating
 
 ## Common Issues
 

@@ -16,7 +16,8 @@
         "./logger.js": "./src/logger.js",
         "./config.js": "./src/config.js",
         "./errors": "./src/errors/error-hierarchy.js",
-        "./utils/dom-helpers.js": "./src/utils/dom-helpers.js"
+        "./utils/dom-helpers.js": "./src/utils/dom-helpers.js",
+        "./checks": "./checks/index.js"
     },
     "scripts": {
         "test": "npm run lint && npm run format:check && npm run test:node",
