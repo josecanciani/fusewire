@@ -204,7 +204,7 @@ function validateClassesInChildContext(classes, childName, registry, globals) {
 /**
  * Check CSS class consistency across component HTML, CSS, and JS files.
  *
- * Three rules per component:
+ * Four rules per component:
  *
  *   Rule 1 — HTML classes defined: every static class token in the HTML must be
  *   defined as a top-level selector in the component CSS, listed in globalClasses,
@@ -216,6 +216,10 @@ function validateClassesInChildContext(classes, childName, registry, globals) {
  *
  *   Rule 3 — Nested CSS valid: classes nested inside a child component scope
  *   block must be valid in the child component's context.
+ *
+ *   Rule 4 — Annotation hygiene: fw-external-classes and fw-dynamic-classes
+ *   must not list classes that are already in globalClasses. Global classes
+ *   belong in .fusewire.json, not in per-component annotations.
  *
  * @param {string} componentDir - Absolute path to the component directory to scan
  * @param {import('./index.js').CheckConfig} config - Project-level configuration
@@ -261,9 +265,12 @@ export function check(componentDir, config) {
                 message:
                     `${label}: HTML uses classes not defined in CSS: ${htmlOnly.join(', ')}\n` +
                     `Fix: add them to ${cssLabel}, or:\n` +
-                    '  - For project-wide classes (e.g. Bootstrap): add to config.globalClasses\n' +
-                    `  - For component-specific external classes: add to ${cssLabel}:\n` +
-                    `      /* fw-external-classes: ${htmlOnly.join(', ')} */`,
+                    '  - For classes from a CSS framework (Bootstrap, Tailwind, etc.):\n' +
+                    '      add to globalClasses in .fusewire.json\n' +
+                    '  - For classes injected by a third-party widget at runtime (e.g. CodeMirror):\n' +
+                    `      add to ${cssLabel}: /* fw-external-classes: ${htmlOnly.join(', ')} */\n` +
+                    '      (use fw-external-classes only for true exceptions — framework\n' +
+                    '      classes belong in globalClasses)',
             });
         }
 
@@ -283,13 +290,37 @@ export function check(componentDir, config) {
                 message:
                     `${cssLabel}: CSS defines classes not used in HTML: ${cssOnly.join(', ')}\n` +
                     `Fix: remove from ${cssLabel}, or:\n` +
-                    `  - For third-party widget classes: add to ${cssLabel}:\n` +
-                    `      /* fw-external-classes: ${cssOnly.join(', ')} */\n` +
-                    `  - For dynamically interpolated classes (e.g. class="log-((level))"): add to ${cssLabel}:\n` +
-                    `      /* fw-dynamic-classes: ${cssOnly.join(', ')} */\n` +
-                    '  - For classes scoped to a child component\'s elements: nest them in the child scope:\n' +
-                    `      .ChildName { .${cssOnly[0]} { ... } }\n` +
-                    '      (after declaring the child via createChild() in the JS file)',
+                    `  - For dynamically interpolated classes (e.g. class="log-((level))"):\n` +
+                    `      add to ${cssLabel}: /* fw-dynamic-classes: ${cssOnly.join(', ')} */\n` +
+                    '  - For classes scoped to a child component\'s elements:\n' +
+                    `      nest them: .ChildName { .${cssOnly[0]} { ... } }\n` +
+                    '      (the child must be declared via createChild() in the JS file)\n' +
+                    '  - For classes injected by a third-party widget at runtime (e.g. CodeMirror):\n' +
+                    `      add to ${cssLabel}: /* fw-external-classes: ${cssOnly.join(', ')} */\n` +
+                    '      (use fw-external-classes only for true exceptions — framework\n' +
+                    '      classes belong in globalClasses in .fusewire.json)',
+            });
+        }
+
+        // Rule 4: Annotation hygiene — fw-* annotations must not list global classes
+        const redundantExternal = [...externalClasses].filter((cls) => globals.has(cls));
+        const redundantDynamic = [...dynamicClasses].filter((cls) => globals.has(cls));
+        if (redundantExternal.length > 0) {
+            violations.push({
+                file: cssPath,
+                message:
+                    `${cssLabel}: fw-external-classes lists classes already in globalClasses: ${redundantExternal.join(', ')}\n` +
+                    'Fix: remove them from the fw-external-classes annotation.\n' +
+                    'Classes defined in .fusewire.json globalClasses do not need per-component annotations.',
+            });
+        }
+        if (redundantDynamic.length > 0) {
+            violations.push({
+                file: cssPath,
+                message:
+                    `${cssLabel}: fw-dynamic-classes lists classes already in globalClasses: ${redundantDynamic.join(', ')}\n` +
+                    'Fix: remove them from the fw-dynamic-classes annotation.\n' +
+                    'Classes defined in .fusewire.json globalClasses do not need per-component annotations.',
             });
         }
 

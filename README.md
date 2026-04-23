@@ -84,20 +84,29 @@ FuseWire ships reusable component validation checks that you can run against you
 
 ### Quick setup
 
-Create a test file in your project (e.g. `test/component-checks.test.js`):
+1. Create a `.fusewire.json` in your project root:
+
+```json
+{
+    "globalClasses": ["container", "btn", "btn-primary"],
+    "disabledChecks": []
+}
+```
+
+2. Create a test file in your project (e.g. `test/component-checks.test.js`):
 
 ```js
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { runAllChecks } from '@fusewire/client/checks';
 
 const componentDir = new URL('../src/components', import.meta.url).pathname;
+const config = JSON.parse(readFileSync(new URL('../.fusewire.json', import.meta.url), 'utf-8'));
 
 describe('FuseWire Component Quality Checks', () => {
     it('all checks pass', async () => {
-        const results = await runAllChecks(componentDir, {
-            globalClasses: ['container', 'btn', 'btn-primary'],
-        });
+        const results = await runAllChecks(componentDir, config);
         const failures = results.filter((r) => r.violations.length > 0);
         if (failures.length > 0) {
             const msg = failures
@@ -109,9 +118,7 @@ describe('FuseWire Component Quality Checks', () => {
 });
 ```
 
-### Configuration
-
-`runAllChecks(componentDir, config)` accepts a `CheckConfig` object:
+### Configuration (`.fusewire.json`)
 
 | Property | Type | Description |
 |---|---|---|

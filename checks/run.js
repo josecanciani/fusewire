@@ -14,7 +14,7 @@
  *                  from the specified component's files.
  *
  * The script reads project configuration from the working directory's
- * package.json under the "fusewire" key:
+ * .fusewire.json file:
  *   - globalClasses  {Array.<string>}  CSS classes available globally
  *   - disabledChecks {Array.<string>}  Check names to skip
  *
@@ -112,18 +112,17 @@ function resolveArgs() {
 }
 
 /**
- * Read fusewire configuration from the working directory's package.json.
- * @returns {import('./index.js').CheckConfig} Config extracted from package.json
+ * Read fusewire configuration from the working directory's .fusewire.json.
+ * @returns {import('./index.js').CheckConfig} Config extracted from .fusewire.json
  */
 function readProjectConfig() {
-    const pkgPath = join(process.cwd(), 'package.json');
-    if (!existsSync(pkgPath)) return {};
+    const configPath = join(process.cwd(), '.fusewire.json');
+    if (!existsSync(configPath)) return {};
 
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-    const fw = pkg.fusewire ?? {};
+    const config = JSON.parse(readFileSync(configPath, 'utf-8'));
     return {
-        globalClasses: fw.globalClasses ?? [],
-        disabledChecks: fw.disabledChecks ?? [],
+        globalClasses: config.globalClasses ?? [],
+        disabledChecks: config.disabledChecks ?? [],
     };
 }
 

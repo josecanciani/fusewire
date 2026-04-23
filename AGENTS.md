@@ -387,15 +387,15 @@ Consumer projects install `@fusewire/client` as a production dependency (the ser
 // In the consumer project's test file (e.g. test/component-checks.test.js)
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { runAllChecks } from '@fusewire/client/checks';
 
 const componentDir = new URL('../src/components', import.meta.url).pathname;
+const config = JSON.parse(readFileSync(new URL('../.fusewire.json', import.meta.url), 'utf-8'));
 
 describe('FuseWire component checks', () => {
     it('passes all checks', async () => {
-        const results = await runAllChecks(componentDir, {
-            globalClasses: ['container', 'btn', 'btn-primary'],
-        });
+        const results = await runAllChecks(componentDir, config);
         const failures = results.filter((r) => r.violations.length > 0);
         if (failures.length > 0) {
             const msg = failures
@@ -408,6 +408,22 @@ describe('FuseWire component checks', () => {
 ```
 
 New checks added to `checks/` are picked up automatically — consumer projects do not need to update their test files.
+
+### Project configuration (`.fusewire.json`)
+
+Each project has a `.fusewire.json` file in its root directory:
+
+```json
+{
+    "globalClasses": ["container", "btn", "btn-primary"],
+    "disabledChecks": []
+}
+```
+
+- **`globalClasses`** — CSS class names available project-wide (e.g. Bootstrap utilities). The `css-class-consistency` check skips these automatically.
+- **`disabledChecks`** — Check names to skip (e.g. `["var-jsdoc"]`).
+
+The CLI runner (`checks/run.js`) and the test suite both read from `.fusewire.json`.
 
 ### How checks work internally
 

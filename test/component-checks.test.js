@@ -7,9 +7,9 @@ import { runAllChecks } from '../checks/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Read project-level global CSS classes from package.json fusewire config.
-const pkg = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf-8'));
-const globalClasses = pkg.fusewire?.globalClasses ?? [];
+// Read project-level config from .fusewire.json.
+const config = JSON.parse(readFileSync(join(__dirname, '../.fusewire.json'), 'utf-8'));
+const globalClasses = config.globalClasses ?? [];
 
 const componentDir = join(__dirname, '../htdocs/components');
 

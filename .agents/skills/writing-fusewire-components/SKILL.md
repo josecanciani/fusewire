@@ -490,6 +490,40 @@ To properly apply layout styles to a child component from the parent (for exampl
 
 ---
 
+## Dynamic CSS classes
+
+When a template builds class names via variable interpolation, the CSS file must
+declare which classes are generated at runtime. Without this, the
+`css-class-consistency` check flags them as unused.
+
+Add a `fw-dynamic-classes` comment at the top of the component's `.css` file
+listing every class that will be produced by interpolation:
+
+```css
+/* fw-dynamic-classes: log-warn, log-error, log-debug */
+
+.console-line { padding: 1px 0.5rem; }
+.log-warn { color: #e5c07b; }
+.log-error { color: #e06c75; }
+.log-debug { color: #61afef; }
+```
+
+```html
+<div class="log-((level)) console-line">((message))</div>
+```
+
+When `level` is `'warn'`, the rendered output is
+`<div class="log-warn console-line">`. The annotation exempts `log-warn`,
+`log-error`, and `log-debug` from the "CSS class not used in HTML" rule.
+
+Plan for this annotation when designing class names that depend on component
+vars. If the `css-class-consistency` check flags other class mismatches
+(external framework classes, child component scoping, etc.), follow the fix
+instructions in the check output — it tells you exactly what annotation or
+change to apply.
+
+---
+
 ## Scoped DOM queries
 
 When a component needs direct DOM access (scrolling, measuring, third-party
@@ -622,78 +656,21 @@ export class Counter extends Component {
 ## Quality checks (required after component changes)
 
 After creating or modifying a component (JS, HTML, or CSS), **always run the
-quality checks** before considering your work done. The checks validate template
-conventions, CSS class consistency, JSDoc on vars, and more.
+quality checks** before considering your work done.
 
-### Finding the runner
-
-The check runner lives at `checks/run.js` inside the `@fusewire/client` package.
-Locate it based on how the project consumes the library:
+The check runner lives at `checks/run.js` inside the `@fusewire/client` package:
 
 | Installation method | Runner path |
 |---|---|
 | npm dependency | `node_modules/@fusewire/client/checks/run.js` |
 | Git submodule | `<submodule-path>/checks/run.js` (e.g. `lib/fusewire/checks/run.js`) |
 
-### Running the checks
-
-The runner accepts a component directory for a full scan, or a specific component
-name to check just that component:
+**After creating or modifying a component, prefer the single-component form:**
 
 ```bash
-# Full scan — all components
-node <runner-path> <componentDir>
-
-# Single component — only report violations for this component
 node <runner-path> <componentDir> <componentName>
 ```
 
-**After creating or modifying a component, prefer the single-component form.**
-The runner still scans the full tree internally (for cross-component validation
-like CSS class scoping), but only reports violations from the specified
-component's files.
-
-Example — check only `Console/Line` (npm):
-```bash
-node node_modules/@fusewire/client/checks/run.js ./src/components Console/Line
-```
-
-Example — check only `Console/Line` (submodule at `lib/fusewire`):
-```bash
-node lib/fusewire/checks/run.js ./src/components Console/Line
-```
-
-Example — full scan of all components:
-```bash
-node lib/fusewire/checks/run.js ./src/components
-```
-
-The runner reads project configuration from the working directory's
-`package.json` under the `"fusewire"` key:
-
-- `fusewire.globalClasses` — CSS classes available globally (e.g. Bootstrap
-  utilities) that should not be flagged by `css-class-consistency`
-- `fusewire.disabledChecks` — Check names to skip (e.g. `["var-jsdoc"]`)
-
-### Exit codes
-
-| Code | Meaning |
-|---|---|
-| 0 | All checks passed |
-| 1 | Violations found — fix them before committing |
-| 2 | Usage error (missing arguments, bad paths) |
-
-### What the checks validate
-
-| Check | What it catches |
-|---|---|
-| `css-class-consistency` | CSS classes in HTML that don't exist in the component's `.css` file or global classes |
-| `no-style-tags` | Inline `<style>` tags in HTML (styles belong in the colocated `.css` file) |
-| `template-attribute-order` | `fw-*` directives placed after regular attributes; `fw-if` before `fw-each` on the same element |
-| `var-jsdoc` | Public vars in the JS class missing `@type` JSDoc annotations |
-
-### When violations are found
-
-The runner prints each violation with a human-readable description and a
-suggested fix. Read the output carefully — it tells you exactly what to change.
-Fix all violations before presenting your changes to the user.
+The runner reads project configuration from `.fusewire.json` in the working
+directory. Violation messages include specific fix instructions — follow them
+directly. Fix all violations before presenting your changes to the user.
