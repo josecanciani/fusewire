@@ -1,5 +1,5 @@
 ---
-name: fusewire-component
+name: Writing FuseWire Components
 description: >
   How to write well-designed FuseWire client-side components for this project.
   Use this skill whenever the user asks to create, design, or review a FuseWire
@@ -190,6 +190,17 @@ async init() {
 
 The template places the child via `((logs))` (or the specific var name). The
 engine auto-mounts it — no manual wiring needed.
+
+### Modals and overlays
+
+`createChild()` nests the child DOM physically inside the parent's subtree.
+This means child components inherit the parent's CSS stacking context. A modal
+or overlay spawned deep inside a list component (e.g., inside a `ProductCard`)
+will be trapped under the parent's `z-index` and cannot overlay the full page
+as intended.
+
+Spawn page-level modals and overlays at the root component (e.g., `Home`) so
+they sit at the top of the stacking context hierarchy.
 
 ### Subscribing to child events (buffered references)
 
@@ -525,10 +536,24 @@ afterRender() {
 
 ---
 
+## Debugging: this.console vs window.console
+
+`this.console` is the framework's in-app logger — it routes output to the
+Console component visible in the UI. In test environments and when no Console
+component is mounted, `this.console` output is silently discarded.
+
+When debugging component behavior, use `window.console.log()` (or
+`window.console.error()`, etc.) to ensure output always reaches the terminal
+or browser devtools regardless of whether a Console component is mounted.
+
+---
+
 ## Component decomposition
 
 A component should have one clear responsibility. When something starts feeling
-like it has two concerns, it probably needs to be two components.
+like it has two concerns, it probably needs to be two components. Reusability
+is another signal — if the same UI pattern appears in multiple places, extract
+it into a shared component (e.g., `Common/Carousel`).
 
 **The clearest signal to split:** a list where each item has its own rendering
 logic or non-trivial state. The parent manages the list; a child component
@@ -591,3 +616,84 @@ export class Counter extends Component {
     }
 }
 ```
+
+---
+
+## Quality checks (required after component changes)
+
+After creating or modifying a component (JS, HTML, or CSS), **always run the
+quality checks** before considering your work done. The checks validate template
+conventions, CSS class consistency, JSDoc on vars, and more.
+
+### Finding the runner
+
+The check runner lives at `checks/run.js` inside the `@fusewire/client` package.
+Locate it based on how the project consumes the library:
+
+| Installation method | Runner path |
+|---|---|
+| npm dependency | `node_modules/@fusewire/client/checks/run.js` |
+| Git submodule | `<submodule-path>/checks/run.js` (e.g. `lib/fusewire/checks/run.js`) |
+
+### Running the checks
+
+The runner accepts a component directory for a full scan, or a specific component
+name to check just that component:
+
+```bash
+# Full scan — all components
+node <runner-path> <componentDir>
+
+# Single component — only report violations for this component
+node <runner-path> <componentDir> <componentName>
+```
+
+**After creating or modifying a component, prefer the single-component form.**
+The runner still scans the full tree internally (for cross-component validation
+like CSS class scoping), but only reports violations from the specified
+component's files.
+
+Example — check only `Console/Line` (npm):
+```bash
+node node_modules/@fusewire/client/checks/run.js ./src/components Console/Line
+```
+
+Example — check only `Console/Line` (submodule at `lib/fusewire`):
+```bash
+node lib/fusewire/checks/run.js ./src/components Console/Line
+```
+
+Example — full scan of all components:
+```bash
+node lib/fusewire/checks/run.js ./src/components
+```
+
+The runner reads project configuration from the working directory's
+`package.json` under the `"fusewire"` key:
+
+- `fusewire.globalClasses` — CSS classes available globally (e.g. Bootstrap
+  utilities) that should not be flagged by `css-class-consistency`
+- `fusewire.disabledChecks` — Check names to skip (e.g. `["var-jsdoc"]`)
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | All checks passed |
+| 1 | Violations found — fix them before committing |
+| 2 | Usage error (missing arguments, bad paths) |
+
+### What the checks validate
+
+| Check | What it catches |
+|---|---|
+| `css-class-consistency` | CSS classes in HTML that don't exist in the component's `.css` file or global classes |
+| `no-style-tags` | Inline `<style>` tags in HTML (styles belong in the colocated `.css` file) |
+| `template-attribute-order` | `fw-*` directives placed after regular attributes; `fw-if` before `fw-each` on the same element |
+| `var-jsdoc` | Public vars in the JS class missing `@type` JSDoc annotations |
+
+### When violations are found
+
+The runner prints each violation with a human-readable description and a
+suggested fix. Read the output carefully — it tells you exactly what to change.
+Fix all violations before presenting your changes to the user.

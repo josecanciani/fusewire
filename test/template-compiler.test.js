@@ -348,7 +348,7 @@ describe('Template Compiler', () => {
             // Wait, does it strip the span completely? It only stripped the inner fw-if span.
         });
 
-        it('handles fw-if and fw-each coexisting on the same element', () => {
+        it('handles fw-if and fw-each coexisting on the same element (fw-if first)', () => {
             const template = compileTemplate(
                 '<ul><li fw-if="item.isVisible" fw-each="item in items">((item.name))</li></ul>'
             );
@@ -368,6 +368,57 @@ describe('Template Compiler', () => {
             assert.ok(!result.includes('Bob'));
             assert.ok(result.includes('Charlie'));
             assert.strictEqual((result.match(/<li/g) || []).length, 2);
+        });
+
+        it('handles fw-each and fw-if coexisting on the same element (fw-each first)', () => {
+            const template = compileTemplate(
+                '<ul><li fw-each="item in items" fw-if="item.active">((item.name))</li></ul>'
+            );
+            const componentId = new ComponentId('Test', 'main');
+            const result = template.render(
+                {
+                    items: [
+                        { name: 'X', active: false },
+                        { name: 'Y', active: true },
+                    ],
+                },
+                componentId,
+            );
+
+            assert.ok(!result.includes('X'));
+            assert.ok(result.includes('Y'));
+            assert.strictEqual((result.match(/<li/g) || []).length, 1);
+        });
+
+        it('handles fw-if and fw-each coexisting with extra attributes', () => {
+            const template = compileTemplate(
+                '<ul><li class="item" fw-if="item.ok" fw-each="item in items" data-x="1">((item.v))</li></ul>'
+            );
+            const componentId = new ComponentId('Test', 'main');
+            const result = template.render(
+                { items: [{ v: 'A', ok: true }, { v: 'B', ok: false }] },
+                componentId,
+            );
+
+            assert.ok(result.includes('A'));
+            assert.ok(!result.includes('B'));
+            assert.ok(result.includes('class="item"'));
+            assert.ok(result.includes('data-x="1"'));
+        });
+
+        it('handles fw-if and fw-each coexisting when all items are filtered out', () => {
+            const template = compileTemplate(
+                '<ul><li fw-if="item.show" fw-each="item in items">((item.name))</li></ul>'
+            );
+            const componentId = new ComponentId('Test', 'main');
+            const result = template.render(
+                { items: [{ name: 'A', show: false }, { name: 'B', show: false }] },
+                componentId,
+            );
+
+            assert.ok(!result.includes('A'));
+            assert.ok(!result.includes('B'));
+            assert.strictEqual(result.match(/<li/g), null);
         });
     });
 

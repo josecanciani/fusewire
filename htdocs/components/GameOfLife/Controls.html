@@ -1,17 +1,17 @@
 <div class="controls-bar" data-disabled="((disabled))">
     <div class="controls-buttons">
-        <button type="button" class="btn btn-sm btn-success" fw-if="!running" onclick="((this)).play()">
+        <button fw-if="!running" type="button" class="btn btn-sm btn-success" onclick="((this)).play()">
             &#9654; Play
         </button>
-        <button type="button" class="btn btn-sm btn-warning" fw-if="running" onclick="((this)).pause()">
+        <button fw-if="running" type="button" class="btn btn-sm btn-warning" onclick="((this)).pause()">
             &#9646;&#9646; Pause
         </button>
         <button type="button" class="btn btn-sm btn-secondary" onclick="((this)).step()">&#8250; Step</button>
         <button type="button" class="btn btn-sm btn-outline-danger" onclick="((this)).reset()">&#8635; Reset</button>
-        <button type="button" class="btn btn-sm btn-outline-info" fw-if="!showHelp" onclick="((this)).toggleHelp()">
+        <button fw-if="!showHelp" type="button" class="btn btn-sm btn-outline-info" onclick="((this)).toggleHelp()">
             ? Help
         </button>
-        <button type="button" class="btn btn-sm btn-info" fw-if="showHelp" onclick="((this)).toggleHelp()">
+        <button fw-if="showHelp" type="button" class="btn btn-sm btn-info" onclick="((this)).toggleHelp()">
             &#10005; Close Help
         </button>
     </div>

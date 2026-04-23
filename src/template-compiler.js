@@ -30,7 +30,8 @@ function getPropertyValue(data, path) {
             return undefined;
         }
         value = /** @type {VarValue|Array<VarValue>|ComponentVars|undefined} */ (
-            /** @type {ComponentVars} */ (value)[part]
+            /** @type {ComponentVars} */
+            (value)[part]
         );
     }
 
@@ -291,7 +292,8 @@ function processDirectives(html, vars, componentId, constants) {
         if (closeIndex === -1) {
             // Unclosed tag, just strip the directive to prevent infinite loops
             const replacement = `<${tag}${beforeAttrs} ${afterAttrs}>`;
-            result = result.substring(0, match.index) + replacement + result.substring(contentStart);
+            result =
+                result.substring(0, match.index) + replacement + result.substring(contentStart);
             continue;
         }
 
@@ -300,6 +302,21 @@ function processDirectives(html, vars, componentId, constants) {
         const elementEnd = closeIndex + closeTag.length;
 
         if (directive === 'fw-if') {
+            // When both fw-if and fw-each are on the same element, fw-each takes priority.
+            // Rewrite so fw-each is matched first; fw-if is kept for per-item evaluation.
+            const combinedAttrs = beforeAttrs + afterAttrs;
+            const eachInAttrs = combinedAttrs.match(/\s+fw-each=["']([^"']+)["']/i);
+            if (eachInAttrs) {
+                const cleanAttrs = combinedAttrs.replace(eachInAttrs[0], '');
+                const rewritten =
+                    `<${tag} fw-each="${eachInAttrs[1]}"${cleanAttrs} fw-if="${expr}">` +
+                    content +
+                    closeTag;
+                result =
+                    result.substring(0, match.index) + rewritten + result.substring(elementEnd);
+                continue;
+            }
+
             const condition = expr;
             const value = getPropertyValue(vars, condition.trim());
             let replacement;
@@ -309,7 +326,7 @@ function processDirectives(html, vars, componentId, constants) {
             } else {
                 const attrs = (beforeAttrs + ' ' + afterAttrs).trim();
                 const openTag = attrs ? `<${tag} ${attrs}>` : `<${tag}>`;
-                
+
                 replacement = `${openTag}${content}${closeTag}`;
             }
 
@@ -322,7 +339,8 @@ function processDirectives(html, vars, componentId, constants) {
                 const attrs = (beforeAttrs + ' ' + afterAttrs).trim();
                 const openTag = attrs ? `<${tag} ${attrs}>` : `<${tag}>`;
                 const replacement = `${openTag}${content}${closeTag}`;
-                result = result.substring(0, match.index) + replacement + result.substring(elementEnd);
+                result =
+                    result.substring(0, match.index) + replacement + result.substring(elementEnd);
                 continue;
             }
 
@@ -333,7 +351,10 @@ function processDirectives(html, vars, componentId, constants) {
             if (Array.isArray(collection) && collection.length > 0) {
                 const attrs = (beforeAttrs + ' ' + afterAttrs).trim();
                 const itemResults = collection.map((item) => {
-                    const scopedVars = { ...vars, [itemName]: item };
+                    const scopedVars = {
+                        ...vars,
+                        [itemName]: item,
+                    };
 
                     const itemAttrs = attrs ? ` ${attrs}` : '';
                     let itemHtml = `<${tag}${itemAttrs}>${content}${closeTag}`;

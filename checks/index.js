@@ -37,7 +37,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export async function runAllChecks(componentDir, config = {}) {
     const disabled = new Set(config.disabledChecks ?? []);
     const files = readdirSync(__dirname)
-        .filter((f) => f.endsWith('.js') && f !== 'index.js')
+        .filter((f) => f.endsWith('.js') && f !== 'index.js' && f !== 'run.js')
         .sort();
 
     const results = [];

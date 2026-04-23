@@ -1,5 +1,5 @@
 <div class="alert alert-danger mb-0 position-relative">
-    <span class="badge bg-danger position-absolute top-0 end-0 m-2" fw-if="$showLoadCount">Load count: ((tries))</span>
+    <span fw-if="$showLoadCount" class="badge bg-danger position-absolute top-0 end-0 m-2">Load count: ((tries))</span>
     <h5 class="alert-heading">Component Failed</h5>
     <p class="mb-1"><strong>Source:</strong> <code>((failedComponent))</code></p>
     <p class="mb-0 text-break"><strong>Error:</strong> ((errorMessage))</p>
