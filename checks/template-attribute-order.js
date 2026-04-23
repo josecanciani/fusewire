@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { extractOpeningTags } from '../src/template-parser.js';
 
 export const name = 'template-attribute-order';
 
@@ -20,35 +21,6 @@ function findHtmlFiles(dir) {
         }
     }
     return files;
-}
-
-/**
- * Extract all opening tags from an HTML string, handling multi-line tags.
- * Returns each tag with its starting line number and attribute list.
- * @param {string} html - HTML content
- * @returns {Array.<{line: number, tag: string, attrs: Array.<{name: string, pos: number}>}>} Opening tags found
- */
-function extractOpeningTags(html) {
-    const tags = [];
-    const tagRegex = /<(\w+)((?:\s+[^>]*?)?)>/gs;
-    let match;
-    while ((match = tagRegex.exec(html)) !== null) {
-        const tagName = match[1];
-        const attrString = match[2];
-        const line = html.substring(0, match.index).split('\n').length;
-
-        const attrs = [];
-        const attrRegex = /\s+([\w-]+)=/g;
-        let attrMatch;
-        while ((attrMatch = attrRegex.exec(attrString)) !== null) {
-            attrs.push({ name: attrMatch[1], pos: attrMatch.index });
-        }
-
-        if (attrs.length > 0) {
-            tags.push({ line, tag: tagName, attrs });
-        }
-    }
-    return tags;
 }
 
 /**

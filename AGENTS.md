@@ -377,6 +377,8 @@ The `checks/` directory contains reusable component validation utilities that ru
 |---|---|
 | `css-class-consistency` | HTML classes match CSS selectors; CSS classes are used in HTML; nested CSS is valid in child context |
 | `no-style-tags` | Component HTML files do not contain inline `<style>` tags |
+| `template-attribute-order` | `fw-*` directives placed after regular attributes; `fw-if` before `fw-each` on the same element |
+| `template-syntax` | Invalid `fw-each` expressions; unclosed directive tags |
 | `var-jsdoc` | Every public class field has a `@type` JSDoc annotation with valid types |
 
 ### How consumer projects use checks

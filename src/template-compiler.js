@@ -1,6 +1,12 @@
 import { ComponentId } from './component-id.js';
 import { Child } from './component.js';
 import { Component } from './component.js';
+import {
+    FW_EACH_SYNTAX,
+    DIRECTIVE_REGEX,
+    INTERPOLATION_REGEX,
+    findMatchingClose,
+} from './template-parser.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
 /** @typedef {import('./component.js').VarValue} VarValue */
@@ -45,54 +51,6 @@ function getPropertyValue(data, path) {
  */
 function isComponent(value) {
     return value instanceof Child || value instanceof Component;
-}
-
-/**
- * Find the position of the matching closing tag, accounting for nesting.
- * Handles same-tag nesting correctly (e.g., div inside div).
- * @param {string} html - HTML string to search in
- * @param {string} tagName - Tag name to match (e.g., "div")
- * @param {number} startIndex - Position after the opening tag's closing bracket
- * @returns {number} Position of the matching closing tag's `<`, or -1 if not found
- */
-function findMatchingClose(html, tagName, startIndex) {
-    const lowerHtml = html.toLowerCase();
-    const lowerTag = tagName.toLowerCase();
-    const closeTag = `</${lowerTag}>`;
-    const openTag = `<${lowerTag}`;
-    let depth = 1;
-    let i = startIndex;
-
-    while (i < lowerHtml.length && depth > 0) {
-        const nextAngle = lowerHtml.indexOf('<', i);
-        if (nextAngle === -1) break;
-
-        // Check for closing tag: </tagName>
-        if (lowerHtml.startsWith(closeTag, nextAngle)) {
-            depth--;
-            if (depth === 0) return nextAngle;
-            i = nextAngle + closeTag.length;
-            continue;
-        }
-
-        // Check for opening tag: <tagName followed by whitespace, >, or /
-        if (lowerHtml.startsWith(openTag, nextAngle)) {
-            const charAfter = lowerHtml[nextAngle + openTag.length];
-            if (/[\s>/]/.test(charAfter || '')) {
-                // Skip self-closing tags (end with />)
-                const endBracket = lowerHtml.indexOf('>', nextAngle);
-                if (endBracket !== -1 && lowerHtml[endBracket - 1] !== '/') {
-                    depth++;
-                }
-                i = endBracket !== -1 ? endBracket + 1 : nextAngle + 1;
-                continue;
-            }
-        }
-
-        i = nextAngle + 1;
-    }
-
-    return -1;
 }
 
 /**
@@ -173,7 +131,7 @@ function interpolateText(text, vars, componentId, constants) {
     let currentAttributeName = '';
     let quoteChar = '';
 
-    const regex = /\(\(([^)]+)\)\)/g;
+    const regex = new RegExp(INTERPOLATION_REGEX.source, INTERPOLATION_REGEX.flags);
     let match;
 
     while ((match = regex.exec(text)) !== null) {
@@ -279,11 +237,10 @@ function interpolateText(text, vars, componentId, constants) {
  * @returns {string} Processed HTML
  */
 function processDirectives(html, vars, componentId, constants) {
-    const directiveRegex = /<(\w+)([^>]*?)\s+(fw-if|fw-each)=["']([^"']+)["']([^>]*)>/i;
     let result = String(html);
     let match;
 
-    while ((match = directiveRegex.exec(result)) !== null) {
+    while ((match = DIRECTIVE_REGEX.exec(result)) !== null) {
         const [fullMatch, tag, beforeAttrs, directiveName, expr, afterAttrs] = match;
         const directive = directiveName.toLowerCase();
         const contentStart = match.index + fullMatch.length;
@@ -333,7 +290,7 @@ function processDirectives(html, vars, componentId, constants) {
             result = result.substring(0, match.index) + replacement + result.substring(elementEnd);
         } else if (directive === 'fw-each') {
             const loopExpr = expr;
-            const loopMatch = loopExpr.match(/^\s*(\w+)\s+in\s+([\w.]+)\s*$/);
+            const loopMatch = loopExpr.match(FW_EACH_SYNTAX);
             if (!loopMatch) {
                 console.warn(`Invalid fw-each syntax: ${loopExpr}`);
                 const attrs = (beforeAttrs + ' ' + afterAttrs).trim();
