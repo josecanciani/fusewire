@@ -64,6 +64,14 @@ describe('Template Compiler', () => {
             assert.ok(result.includes('42'));
         });
 
+        it('interpolates $-prefixed calculated vars', () => {
+            const template = compileTemplate('<span>(($formattedTotal))</span>');
+            const componentId = new ComponentId('Test', 'main');
+            const result = template.render({ $formattedTotal: '$1,234.56' }, componentId);
+
+            assert.ok(result.includes('$1,234.56'));
+        });
+
         it('handles multiple interpolations', () => {
             const template = compileTemplate('<div>((first)) ((last))</div>');
             const componentId = new ComponentId('Test', 'main');

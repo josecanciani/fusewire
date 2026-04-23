@@ -7,12 +7,12 @@
  */
 
 /**
- * Regex source pattern for a single variable identifier (one or more word
- * characters: [a-zA-Z0-9_]).  Not a standalone regex — designed for
+ * Regex source pattern for a single variable identifier (word characters plus
+ * dollar sign: [a-zA-Z0-9_$]).  Not a standalone regex — designed for
  * composition into larger patterns like VAR_PATH and INTERPOLATION_REGEX.
  * @type {string}
  */
-export const VAR_NAME = '\\w+';
+export const VAR_NAME = '[\\w$]+';
 
 /**
  * Regex source pattern for a dotted variable path (e.g. "user.name", "item",
