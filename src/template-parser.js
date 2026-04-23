@@ -7,15 +7,31 @@
  */
 
 /**
+ * Regex source pattern for a single variable identifier (one or more word
+ * characters: [a-zA-Z0-9_]).  Not a standalone regex — designed for
+ * composition into larger patterns like VAR_PATH and INTERPOLATION_REGEX.
+ * @type {string}
+ */
+export const VAR_NAME = '\\w+';
+
+/**
+ * Regex source pattern for a dotted variable path (e.g. "user.name", "item",
+ * "deep.nested.value").  Built from VAR_NAME.  Not a standalone regex —
+ * designed for composition.
+ * @type {string}
+ */
+export const VAR_PATH = `${VAR_NAME}(?:\\.${VAR_NAME})*`;
+
+/**
  * Regex that matches a valid fw-each expression: "itemName in collectionPath".
  *
- * - Item name: one or more word characters ([a-zA-Z0-9_])
- * - Collection path: word characters with optional dots (e.g. "items", "user.posts")
+ * - Item name: a single identifier (VAR_NAME)
+ * - Collection path: dot-separated identifiers (VAR_PATH)
  *
  * Capture groups: (1) item name, (2) collection path.
  * @type {RegExp}
  */
-export const FW_EACH_SYNTAX = /^\s*(\w+)\s+in\s+([\w.]+)\s*$/;
+export const FW_EACH_SYNTAX = new RegExp(`^\\s*(${VAR_NAME})\\s+in\\s+(${VAR_PATH})\\s*$`);
 
 /**
  * Regex that matches the first fw-if or fw-each directive in an opening HTML tag.
@@ -32,13 +48,15 @@ export const DIRECTIVE_REGEX =
     /<(\w+)([^>]*?)\s+(fw-if|fw-each)=[\x22']([^\x22']+)[\x22']([^>]*)>/i;
 
 /**
- * Regex that matches a ((...)) interpolation placeholder.
+ * Regex that matches a ((...)) interpolation placeholder.  The capture group
+ * only matches valid variable paths (VAR_PATH) so adjacent JS parentheses
+ * like goTo(((dot.index))) do not leak into the match.
  *
  * Capture group (1) is the variable path (e.g. "user.name", "this", "count").
  * Use with the global flag for iterative matching.
  * @type {RegExp}
  */
-export const INTERPOLATION_REGEX = /\(\(([^)]+)\)\)/g;
+export const INTERPOLATION_REGEX = new RegExp(`\\(\\((${VAR_PATH})\\)\\)`, 'g');
 
 /**
  * Find the position of the matching closing tag, accounting for nesting.

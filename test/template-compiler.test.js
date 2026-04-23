@@ -508,6 +508,27 @@ describe('Template Compiler', () => {
             const matches = result.match(/FuseWire\.get\('testApp', 'Counter#main'\)/g);
             assert.strictEqual(matches.length, 2);
         });
+
+        it('handles ((this)) adjacent to ((...)) inside function-call parentheses', () => {
+            const template = compileTemplate(
+                '<ul><li fw-each="dot in dots" onclick="((this)).goTo(((dot.index)))">((dot.label))</li></ul>',
+                '',
+                'testApp',
+            );
+            const componentId = new ComponentId('Nav', 'main');
+            const result = template.render({
+                dots: [
+                    { index: 0, label: 'First' },
+                    { index: 1, label: 'Second' },
+                ],
+            }, componentId);
+
+            assert.ok(result.includes('.goTo(0)'), 'dot.index=0 should resolve correctly');
+            assert.ok(result.includes('.goTo(1)'), 'dot.index=1 should resolve correctly');
+            assert.ok(result.includes('First'));
+            assert.ok(result.includes('Second'));
+            assert.ok(!result.includes('dot.index'), 'dot.index should not remain as literal text');
+        });
     });
 
     describe('Raw CSS (no scoping)', () => {
