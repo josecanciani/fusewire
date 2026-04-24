@@ -1,0 +1,19 @@
+{
+    "extends": "./jsconfig.json",
+    "compilerOptions": {
+        "declaration": true,
+        "emitDeclarationOnly": true,
+        "outDir": "./dist/types",
+        "rootDir": ".",
+        "allowJs": true,
+        "checkJs": true,
+        "module": "ESNext",
+        "target": "ESNext",
+        "moduleResolution": "Bundler",
+        "noEmit": false
+    },
+    "include": [
+        "src/**/*.js",
+        "types.d.ts"
+    ]
+}

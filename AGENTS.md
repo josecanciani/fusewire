@@ -49,7 +49,8 @@ lib/fusewire/
 | `npm run test:browser`  | Run Playwright browser tests (slow) |
 | `npm run test:performance` | Run performance-focused tests (`*.performance-test.js`) (slow) |
 | `npm run test:all`      | Run all tests (fast + slow tests)  |
-| `npm run lint`          | Comprehensive linting (oxlint, jsdoc, typecheck, html) |
+| `npm run build:types`   | Generate TypeScript declaration files (`.d.ts`) from JSDoc |
+| `npm run lint`          | Comprehensive linting (oxlint, jsdoc, typecheck & type generation, html) |
 | `npm run format`        | Format codebase files in-place     |
 | `npm run format:check`  | Check formatter compliance         |
 
@@ -129,7 +130,8 @@ All functions must have JSDoc comments with:
   - Always include parameter descriptions
 - **@returns:** Return type and description (if function returns a value)
 
-Enforced via ESLint with `eslint-plugin-jsdoc`. Run `npm run jsdoc-check` to validate.
+Enforced via ESLint with `eslint-plugin-jsdoc` and the TypeScript compiler. Run `npm run lint` or `npm test` to validate.
+Note: Running tests automatically checks strict type compliance and generates `.d.ts` declaration files for consumer TypeScript projects via the `build:types` script.
 
 Example:
 ```javascript

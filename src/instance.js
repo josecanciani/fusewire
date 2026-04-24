@@ -260,8 +260,8 @@ export class InstanceRegistry {
         const entry = {
             instance,
             container,
-            parent: null,
-            children: null,
+            parent: /** @type {import('./component.js').Component|null} */ (null),
+            children: /** @type {Map<string, string>|null} */ (null),
             needsHydration: deferHydration,
         };
         this._instances.set(code, entry);

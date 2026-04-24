@@ -132,7 +132,7 @@ export class Renderer {
                 if (selector.trim().startsWith('@')) return match;
                 const prefixed = selector
                     .split(',')
-                    .map((s) => `.${this._appName} .${cssName} ${s.trim()}`)
+                    .map((/** @type {string} */ s) => `.${this._appName} .${cssName} ${s.trim()}`)
                     .join(', ');
                 return match.replace(selector, prefixed);
             });

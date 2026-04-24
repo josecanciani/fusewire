@@ -23,6 +23,7 @@ export class Game extends Component {
     #resizeObserver;
     #resizePending = false;
     #wasRunning = false;
+    /** @type {number|null} */
     #syncTimer = null;
     /** @type {function(): void} */
     #onSyncComplete = null;
@@ -59,7 +60,7 @@ export class Game extends Component {
             this.library('GameOfLife/Engine').Engine
         );
         this.#engine = new Engine((grid, engineStats, done) => {
-            this.stats.update(engineStats);
+            this.stats.update(/** @type {Record<string, number>} */ (engineStats));
             this.#syncCells(grid, done);
         });
 
@@ -149,6 +150,7 @@ export class Game extends Component {
         this.cols = grid[0].length;
         const onComplete = this.#onSyncComplete;
         this.#onSyncComplete = null;
+        /** @type {any[]} */
         const cells = [];
         let currentRow = 0;
         const ROWS_PER_BATCH = 50;

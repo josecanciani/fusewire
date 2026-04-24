@@ -606,6 +606,7 @@ export class Child {
         this.vars = vars;
         this._options = options;
         this._listeners = new Map();
+        /** @type {any[]} */
         this._bufferedEvents = [];
         this._realInstance = null;
         this._replaced = false;
@@ -683,7 +684,7 @@ export class Child {
         // to the real instance once it's created, otherwise they will be swallowed by the race condition.
         if (this._creationPromise) {
             this._creationPromise
-                .then((instance) => {
+                .then((/** @type {Component} */ instance) => {
                     instance.update(newVars, true);
                 })
                 .catch(() => {});
@@ -710,7 +711,12 @@ export class Child {
                     'Use the Component instance from vars instead.',
             );
         }
-        const entry = { eventName, handler, removed: false, realUnsub: null };
+        const entry = {
+            eventName,
+            handler,
+            removed: false,
+            realUnsub: /** @type {function(): void | null} */ (null),
+        };
         this._bufferedEvents.push(entry);
         return () => {
             if (entry.realUnsub) {

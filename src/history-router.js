@@ -280,6 +280,7 @@ export class HistoryRouter {
      * @returns {string} Full URL path (e.g. "/dashboard:id=123/table:id=10")
      */
     #serialize() {
+        /** @type {string[]} */
         const parts = [];
         const registry = this.#reactor.instanceRegistry;
         for (const rootCode of registry._roots || []) {
@@ -304,6 +305,7 @@ export class HistoryRouter {
         if (this.#hasRouteProperties(state)) {
             // Filter out properties that still match their pre-init defaults
             const defaults = entry.instance[ROUTE_DEFAULTS];
+            /** @type {Record<string, any>} */
             const filtered = {};
             for (const [key, value] of Object.entries(state)) {
                 if (!defaults || value !== defaults[key]) {

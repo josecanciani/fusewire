@@ -8,6 +8,7 @@ export class Logger {
      * Create a new Logger instance with console output enabled.
      */
     constructor() {
+        /** @type {any[]} */
         this._handlers = [];
         this._useConsole = true;
     }
@@ -56,7 +57,9 @@ export class Logger {
 
         // Send to console
         if (this._useConsole) {
-            const consoleMethod = console[level] || console.log;
+            const consoleMethod = /** @type {Record<string, function>} */ (
+                /** @type {unknown} */ (console)
+            )[level] || console.log;
             consoleMethod(`[${level.toUpperCase()}]`, message, ...args);
         }
 

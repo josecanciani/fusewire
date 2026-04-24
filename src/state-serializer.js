@@ -23,8 +23,8 @@ function isComponentRef(value) {
  * serializable markers. Called by JSON.stringify for every value
  * in the object tree.
  * @param {string} _key - Property key (unused)
- * @param {Component|Child|string|number|boolean|null|Array|object} value - Value to potentially replace
- * @returns {object|string|number|boolean|null|Array} Serializable value
+ * @param {Component|Child|string|number|boolean|null|Array<any>|object} value - Value to potentially replace
+ * @returns {object|string|number|boolean|null|Array<any>} Serializable value
  */
 function componentReplacer(_key, value) {
     if (value instanceof Component) {

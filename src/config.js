@@ -50,7 +50,8 @@ export function updateConfig(updates) {
     // Shallow merge for top-level properties
     Object.keys(updates).forEach((key) => {
         if (key !== 'logging') {
-            config[key] = updates[key];
+            /** @type {Record<string, unknown>} */ (config)[key] =
+                /** @type {Record<string, unknown>} */ (updates)[key];
         }
     });
 }

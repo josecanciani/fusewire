@@ -23,7 +23,9 @@ export class Editor extends Component {
     /** @type {string|null} */
     initialFileId = null;
 
+    /** @type {{state: {doc: {toString(): string}}, destroy(): void} | null} */
     #editorView = null;
+    /** @type {any[]} */
     #files = [];
     #tabContents = new Map();
     #darkMode = false;
@@ -85,7 +87,7 @@ export class Editor extends Component {
      * @param {string} id - File identifier
      */
     openFile(id) {
-        const existing = this.openTabs.find((t) => t.id === id);
+        const existing = this.openTabs.find((t) => /** @type {{id: string}} */ (t).id === id);
         if (existing) {
             if (this.activeTabId !== id) this.#switchTo(id);
             return;
@@ -93,7 +95,7 @@ export class Editor extends Component {
         this.#saveEditorContent();
         const file = this.#files.find((f) => f.id === id);
         this.openTabs.forEach((t) => {
-            t.activeClass = '';
+            /** @type {{id: string, activeClass: string}} */ (t).activeClass = '';
         });
         this.openTabs.push({ id, label: file.label, ext: file.ext, activeClass: 'active' });
         this.#switchTo(id);
@@ -113,7 +115,7 @@ export class Editor extends Component {
      * @param {string} id - Tab identifier
      */
     closeTab(id) {
-        const idx = this.openTabs.findIndex((t) => t.id === id);
+        const idx = this.openTabs.findIndex((t) => /** @type {{id: string}} */ (t).id === id);
         if (idx === -1) return;
 
         if (this.activeTabId === id) this.#saveEditorContent();
@@ -126,8 +128,8 @@ export class Editor extends Component {
 
         if (this.openTabs.length > 0) {
             const next = this.openTabs[Math.min(idx, this.openTabs.length - 1)];
-            next.activeClass = 'active';
-            this.#switchTo(next.id);
+            /** @type {{id: string, activeClass: string}} */ (next).activeClass = 'active';
+            this.#switchTo(/** @type {{id: string}} */ (next).id);
         } else {
             this.#destroyEditorView();
             this.activeTabId = null;
@@ -200,7 +202,8 @@ export class Editor extends Component {
         this.#saveEditorContent();
         this.#destroyEditorView();
         this.openTabs.forEach((t) => {
-            t.activeClass = t.id === id ? 'active' : '';
+            /** @type {{id: string, activeClass: string}} */ (t).activeClass =
+                /** @type {{id: string}} */ (t).id === id ? 'active' : '';
         });
         this.activeTabId = id;
         this.emit('activeFileChanged', id);
@@ -222,7 +225,9 @@ export class Editor extends Component {
     #mountEditor() {
         const container = this.querySelector('.fw-editor-area');
         if (!container) return;
-        const tab = this.openTabs.find((t) => t.id === this.activeTabId);
+        const tab = this.openTabs.find(
+            (t) => /** @type {{id: string}} */ (t).id === this.activeTabId,
+        );
         const content = this.#tabContents.get(this.activeTabId);
         const fontTheme = EditorView.theme({ '&': { fontSize: '12px' } });
         const noGrammarly = EditorView.contentAttributes.of({
@@ -230,7 +235,12 @@ export class Editor extends Component {
             'data-gramm_editor': 'false',
             'data-enable-grammarly': 'false',
         });
-        const extensions = [basicSetup, fontTheme, noGrammarly, this.#langExtension(tab.ext)];
+        const extensions = [
+            basicSetup,
+            fontTheme,
+            noGrammarly,
+            this.#langExtension(/** @type {{ext: string}} */ (tab).ext),
+        ];
         if (this.#darkMode) extensions.push(oneDark);
         this.#editorView = new EditorView({
             doc: content,

@@ -5,18 +5,54 @@
     "type": "module",
     "main": "./src/reactor.js",
     "exports": {
-        "./component.js": "./src/component.js",
-        "./component-id.js": "./src/component-id.js",
-        "./reactor.js": "./src/reactor.js",
-        "./renderer.js": "./src/renderer.js",
-        "./instance.js": "./src/instance.js",
-        "./template.js": "./src/template.js",
-        "./template-compiler.js": "./src/template-compiler.js",
-        "./template-store.js": "./src/template-store.js",
-        "./logger.js": "./src/logger.js",
-        "./config.js": "./src/config.js",
-        "./errors": "./src/errors/error-hierarchy.js",
-        "./utils/dom-helpers.js": "./src/utils/dom-helpers.js",
+        "./component.js": {
+            "types": "./dist/types/src/component.d.ts",
+            "default": "./src/component.js"
+        },
+        "./component-id.js": {
+            "types": "./dist/types/src/component-id.d.ts",
+            "default": "./src/component-id.js"
+        },
+        "./reactor.js": {
+            "types": "./dist/types/src/reactor.d.ts",
+            "default": "./src/reactor.js"
+        },
+        "./renderer.js": {
+            "types": "./dist/types/src/renderer.d.ts",
+            "default": "./src/renderer.js"
+        },
+        "./instance.js": {
+            "types": "./dist/types/src/instance.d.ts",
+            "default": "./src/instance.js"
+        },
+        "./template.js": {
+            "types": "./dist/types/src/template.d.ts",
+            "default": "./src/template.js"
+        },
+        "./template-compiler.js": {
+            "types": "./dist/types/src/template-compiler.d.ts",
+            "default": "./src/template-compiler.js"
+        },
+        "./template-store.js": {
+            "types": "./dist/types/src/template-store.d.ts",
+            "default": "./src/template-store.js"
+        },
+        "./logger.js": {
+            "types": "./dist/types/src/logger.d.ts",
+            "default": "./src/logger.js"
+        },
+        "./config.js": {
+            "types": "./dist/types/src/config.d.ts",
+            "default": "./src/config.js"
+        },
+        "./errors": {
+            "types": "./dist/types/src/errors/error-hierarchy.d.ts",
+            "default": "./src/errors/error-hierarchy.js"
+        },
+        "./utils/dom-helpers.js": {
+            "types": "./dist/types/src/utils/dom-helpers.d.ts",
+            "default": "./src/utils/dom-helpers.js"
+        },
         "./checks": "./checks/index.js"
     },
     "scripts": {
@@ -32,7 +68,8 @@
         "format:html": "html-beautify -r 'htdocs/**/*.html'",
         "html-check": "html-validate 'htdocs/**/*.html'",
         "jsdoc-check": "eslint src/ htdocs/",
-        "typecheck": "tsc -p jsconfig.json --noEmit"
+        "typecheck": "npm run build:types",
+        "build:types": "tsc -p tsconfig.build.json"
     },
     "devDependencies": {
         "@playwright/test": "^1.58.2",
@@ -61,5 +98,6 @@
         "client-side"
     ],
     "author": "Jose Canciani",
-    "license": "MIT"
+    "license": "MIT",
+    "types": "./dist/types/src/reactor.d.ts"
 }

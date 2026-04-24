@@ -33,7 +33,7 @@ export function startHorizontalResize(
     handle.classList.add('dragging');
     document.body.style.userSelect = 'none';
 
-    const state = { size: startSize, cancel: null };
+    const state = { size: startSize, cancel: /** @type {function(): void | null} */ (null) };
     let active = true;
 
     /**
@@ -93,7 +93,7 @@ export function startVerticalResize(
     handle.classList.add('dragging');
     document.body.style.userSelect = 'none';
 
-    const state = { size: startSize, cancel: null };
+    const state = { size: startSize, cancel: /** @type {function(): void | null} */ (null) };
     let active = true;
 
     /**

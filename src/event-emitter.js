@@ -41,7 +41,7 @@ export class EventEmitter {
      * and returned so the caller can log them with component context.
      * @param {string} eventName - Event name to emit
      * @param {...*} args - Arguments forwarded to each handler
-     * @returns {Array.<Error>} Errors thrown by handlers, in call order
+     * @returns {Array.<unknown>} Errors thrown by handlers, in call order
      */
     emit(eventName, ...args) {
         const errors = [];
@@ -76,7 +76,7 @@ export class EventEmitter {
      * should stop for this component's subtree.
      * @param {string} eventName - Event name to emit
      * @param {...*} args - Arguments forwarded to each handler
-     * @returns {{errors: Array.<Error>, stopped: boolean}} Errors and whether propagation was stopped
+     * @returns {{errors: Array.<unknown>, stopped: boolean}} Errors and whether propagation was stopped
      */
     emitBroadcast(eventName, ...args) {
         const errors = [];

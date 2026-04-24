@@ -160,8 +160,14 @@ export class TemplateStore {
         // Fetch all three files in parallel
         const [htmlResponse, cssResponse, jsResponse] = await Promise.all([
             fetch(htmlUrl, conditionalHeaders(etags.html)),
-            fetch(cssUrl, conditionalHeaders(etags.css)).catch(() => null),
-            fetch(jsUrl, conditionalHeaders(etags.js)).catch(() => null),
+            /* eslint-disable jsdoc/no-undefined-types */
+            fetch(cssUrl, conditionalHeaders(etags.css)).catch(
+                () => /** @type {Response|null} */ (null),
+            ),
+            fetch(jsUrl, conditionalHeaders(etags.js)).catch(
+                () => /** @type {Response|null} */ (null),
+            ),
+            /* eslint-enable jsdoc/no-undefined-types */
         ]);
 
         const htmlNotModified = htmlResponse.status === 304;

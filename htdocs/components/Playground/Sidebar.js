@@ -38,7 +38,8 @@ export class Sidebar extends Component {
      */
     highlightFile(id) {
         this.demoFiles.forEach((f) => {
-            f.activeClass = f.id === id ? 'active' : '';
+            /** @type {{id: string, activeClass: string}} */ (f).activeClass =
+                /** @type {{id: string}} */ (f).id === id ? 'active' : '';
         });
         this.react();
     }
