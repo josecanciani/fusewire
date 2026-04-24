@@ -1027,11 +1027,18 @@ export class PortalChild extends Component {
         this.#childCode = childRef.componentCode;
 
         // Forward wrapped events from PortalHost → re-emit on self
-        host.on('fw-portal-event', (evt) => {
-            if (evt.childCode === this.#childCode) {
-                this.emit(evt.eventName, ...evt.args);
-            }
-        });
+        host.on(
+            'fw-portal-event',
+            /**
+             * Handle wrapped events from the PortalHost
+             * @param {{childCode: string, eventName: string, args: any[]}} evt - The wrapped event
+             */
+            (evt) => {
+                if (evt.childCode === this.#childCode) {
+                    this.emit(evt.eventName, ...evt.args);
+                }
+            },
+        );
 
         this.#realChild = await childRef.whenReady();
     }
