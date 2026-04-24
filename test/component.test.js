@@ -5,6 +5,7 @@ import { Component } from '../src/component.js';
 import { ComponentId } from '../src/component-id.js';
 import { Child } from '../src/component.js';
 import { COMPONENT_ID, REGISTRY_ENTRY, CONSOLE, REACTOR, LIFECYCLE_ACTIVE, EVENTS, LIBRARIES } from '../src/symbols.js';
+import { StrictConsole } from './strict-console.js';
 
 describe('Component', () => {
     describe('Constructor', () => {
@@ -168,18 +169,16 @@ describe('Component', () => {
             const comp = new Component();
             comp[COMPONENT_ID] = new ComponentId('Component', 'test');
             const reactCalls = [];
-            const warnings = [];
+            const testConsole = new StrictConsole();
+            testConsole.expectWarning(/init/);
+            testConsole.expectWarning(/update/);
 
             comp[REACTOR] = {
                 react(componentId, mode) {
                     reactCalls.push({ code: componentId.code, mode });
                 },
             };
-            comp[CONSOLE] = {
-                log() { },
-                warn(...args) { warnings.push(args); },
-                error() { },
-            };
+            comp[CONSOLE] = testConsole;
 
             comp[LIFECYCLE_ACTIVE] = 'init';
             comp.react();
@@ -188,29 +187,21 @@ describe('Component', () => {
             comp.react();
 
             assert.strictEqual(reactCalls.length, 0, 'reactor.react should not be called');
-            assert.strictEqual(warnings.length, 2, 'should warn twice');
-            assert.ok(
-                warnings[0][0].includes('init'),
-                'warning should mention the active lifecycle hook',
-            );
+            testConsole.assertClean();
         });
 
         it('queues react() when LIFECYCLE_ACTIVE is render, hydrate or afterRender', () => {
             const comp = new Component();
             comp[COMPONENT_ID] = new ComponentId('Component', 'test');
             const reactCalls = [];
-            const warnings = [];
+            const testConsole = new StrictConsole();
 
             comp[REACTOR] = {
                 react(componentId, mode) {
                     reactCalls.push({ code: componentId.code, mode });
                 },
             };
-            comp[CONSOLE] = {
-                log() { },
-                warn(...args) { warnings.push(args); },
-                error() { },
-            };
+            comp[CONSOLE] = testConsole;
 
             comp[LIFECYCLE_ACTIVE] = 'render';
             comp.react();
@@ -222,7 +213,7 @@ describe('Component', () => {
             comp.react();
 
             assert.strictEqual(reactCalls.length, 3, 'reactor.react should be called 3 times');
-            assert.strictEqual(warnings.length, 0, 'should no longer warn');
+            testConsole.assertClean();
         });
 
         it('allows react() when LIFECYCLE_ACTIVE is null', () => {
@@ -496,29 +487,28 @@ describe('Component', () => {
 
         it('emit() warns when called during a lifecycle hook but still fires handlers', () => {
             const comp = new Component();
-            const warnings = [];
+            const testConsole = new StrictConsole();
+            testConsole.expectWarning(/init/);
             const calls = [];
-            comp[CONSOLE] = { log() { }, warn(...args) { warnings.push(args); }, error() { } };
+            comp[CONSOLE] = testConsole;
             comp.on('ready', () => calls.push(1));
             comp[LIFECYCLE_ACTIVE] = 'init';
             comp.emit('ready');
-            assert.strictEqual(warnings.length, 1);
-            assert.ok(warnings[0][0].includes('init'), 'warning should mention the lifecycle hook');
-            assert.ok(warnings[0][0].includes('ready'), 'warning should mention the event name');
+            testConsole.assertClean();
             assert.strictEqual(calls.length, 1, 'handler should still be called');
         });
 
         it('emit() calls all handlers even if one throws, and logs the error', () => {
             const comp = new Component();
-            const errors = [];
+            const testConsole = new StrictConsole();
+            testConsole.expectError(/boom/);
             const calls = [];
-            comp[CONSOLE] = { log() { }, warn() { }, error(...args) { errors.push(args); } };
+            comp[CONSOLE] = testConsole;
             comp.on('tick', () => { throw new Error('boom'); });
             comp.on('tick', () => calls.push('ran'));
             comp.emit('tick');
             assert.strictEqual(calls.length, 1, 'second handler should still run');
-            assert.strictEqual(errors.length, 1, 'error should be logged');
-            assert.ok(errors[0][0].includes('boom'), 'log should include the error message');
+            testConsole.assertClean();
         });
     });
 
@@ -613,9 +603,10 @@ describe('Component', () => {
         it('warns during lifecycle hook but still broadcasts', () => {
             const comp = new Component();
             comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
-            const warnings = [];
+            const testConsole = new StrictConsole();
+            testConsole.expectWarning(/init/);
             const broadcastCalls = [];
-            comp[CONSOLE] = { log() { }, warn(...args) { warnings.push(args); }, error() { } };
+            comp[CONSOLE] = testConsole;
             comp[REACTOR] = {
                 broadcastFrom(componentId, eventName, ...args) {
                     broadcastCalls.push({ eventName, args });
@@ -625,9 +616,7 @@ describe('Component', () => {
             comp[LIFECYCLE_ACTIVE] = 'init';
             comp.broadcast('theme', 'dark');
 
-            assert.strictEqual(warnings.length, 1);
-            assert.ok(warnings[0][0].includes('init'), 'warning mentions lifecycle hook');
-            assert.ok(warnings[0][0].includes('theme'), 'warning mentions event name');
+            testConsole.assertClean();
             assert.strictEqual(broadcastCalls.length, 1, 'broadcast still fires');
         });
 

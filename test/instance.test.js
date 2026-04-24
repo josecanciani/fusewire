@@ -1,4 +1,4 @@
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { JSDOM } from 'jsdom';
 import { InstanceRegistry, collectVars } from '../src/instance.js';
@@ -14,6 +14,7 @@ import { EventEmitter } from '../src/event-emitter.js';
 import { findChildMountPoints } from '../src/utils/dom-helpers.js';
 import { StateSerializer } from '../src/state-serializer.js';
 import { Persistence } from '../src/persistence.js';
+import { StrictConsole } from './strict-console.js';
 
 describe('InstanceRegistry', () => {
     let dom;
@@ -22,6 +23,7 @@ describe('InstanceRegistry', () => {
     let renderer;
     let templateStore;
     let container;
+    let strictConsole;
 
     // Test component class
     class TestComponent extends Component {
@@ -91,8 +93,9 @@ describe('InstanceRegistry', () => {
         );
 
         // Wire a mock reactor (normally done by Reactor constructor)
+        strictConsole = new StrictConsole();
         registry._reactor = {
-            console: console,
+            console: strictConsole,
             basePath: './components',
             globalVars: {},
             instanceRegistry: registry,
@@ -102,6 +105,10 @@ describe('InstanceRegistry', () => {
         // Create a fresh container for each test
         container = document.createElement('div');
         document.body.appendChild(container);
+    });
+
+    afterEach(() => {
+        strictConsole.assertClean();
     });
 
     describe('Constructor', () => {
@@ -276,13 +283,10 @@ describe('InstanceRegistry', () => {
     describe('lifecycle guard', () => {
         it('prevents react() during init() in create()', async () => {
             const reactCalls = [];
-            const warnings = [];
+            const testConsole = new StrictConsole();
+            testConsole.expectWarning(/init/);
             registry._reactor = {
-                console: {
-                    log() { },
-                    warn(...args) { warnings.push(args); },
-                    error() { },
-                },
+                console: testConsole,
                 basePath: './components',
                 globalVars: {},
                 persistence: new Persistence(new StateSerializer()),
@@ -306,22 +310,14 @@ describe('InstanceRegistry', () => {
             await registry.create(componentId, InitReacter, {}, container);
 
             assert.strictEqual(reactCalls.length, 0, 'reactor.react should not be called');
-            assert.strictEqual(warnings.length, 1, 'should warn once');
-            assert.ok(
-                warnings[0][0].message.includes('init'),
-                'warning should mention init',
-            );
+            testConsole.assertClean();
         });
 
         it('queues react() during afterRender() in create()', async () => {
             const reactCalls = [];
-            const warnings = [];
+            const testConsole = new StrictConsole();
             registry._reactor = {
-                console: {
-                    log() { },
-                    warn(...args) { warnings.push(args); },
-                    error() { },
-                },
+                console: testConsole,
                 basePath: './components',
                 globalVars: {},
                 persistence: new Persistence(new StateSerializer()),
@@ -346,7 +342,7 @@ describe('InstanceRegistry', () => {
             await registry.create(componentId, AfterRenderReacter, {}, container);
 
             assert.strictEqual(reactCalls.length, 1, 'reactor.react should be called');
-            assert.strictEqual(warnings.length, 0, 'should not warn');
+            testConsole.assertClean();
         });
 
         it('clears LIFECYCLE_ACTIVE after create() completes', async () => {
@@ -397,13 +393,10 @@ describe('InstanceRegistry', () => {
         // The guard logic itself is tested at the Component level in component.test.js
         it.skip('prevents react() during update() in InstanceRegistry.update()', async () => {
             const reactCalls = [];
-            const warnings = [];
+            const testConsole = new StrictConsole();
+            testConsole.expectWarning(/update/);
             registry._reactor = {
-                console: {
-                    log() { },
-                    warn(...args) { warnings.push(args); },
-                    error() { },
-                },
+                console: testConsole,
                 basePath: './components',
                 globalVars: {},
                 persistence: new Persistence(new StateSerializer()),
@@ -427,18 +420,11 @@ describe('InstanceRegistry', () => {
             registry.registerComponent('UpdateReacter', UpdateReacter);
 
             await registry.create(componentId, UpdateReacter, { message: 'a' }, container);
-            // Clear warnings from create() — the update() override also fires during create
-            warnings.length = 0;
-            reactCalls.length = 0;
 
             await registry.update(componentId, { message: 'b' });
 
             assert.strictEqual(reactCalls.length, 0, 'reactor.react should not be called');
-            assert.strictEqual(warnings.length, 1, 'should warn once');
-            assert.ok(
-                warnings[0][0].includes('update'),
-                'warning should mention update',
-            );
+            testConsole.assertClean();
         });
     });
 
@@ -1128,7 +1114,7 @@ describe('InstanceRegistry', () => {
             const id = ComponentId.fromCode(code);
             const instance = new Component();
             instance[COMPONENT_ID] = id;
-            instance[CONSOLE] = { log() { }, warn() { }, error() { } };
+            instance[CONSOLE] = new StrictConsole();
             const entry = { instance, container: document.createElement('div'), parent: parentInstance, children };
             registry._instances.set(code, entry);
             if (!parentInstance) registry._roots.add(code);
@@ -1236,16 +1222,13 @@ describe('InstanceRegistry', () => {
         });
 
         it('logs errors from handlers and continues propagation', () => {
-            const errors = [];
             const calls = [];
             const childId = new ComponentId('Child', 'c1');
 
             const parentEntry = wireEntry('App#main', null, new Map([['Child#c1', childId]]));
-            parentEntry.instance[CONSOLE] = {
-                log() { },
-                warn() { },
-                error(...args) { errors.push(args); },
-            };
+            const parentConsole = new StrictConsole();
+            parentConsole.expectError(/boom/);
+            parentEntry.instance[CONSOLE] = parentConsole;
             parentEntry.instance[EVENTS] = new EventEmitter();
             parentEntry.instance[EVENTS].on('theme', () => { throw new Error('boom'); });
 
@@ -1255,8 +1238,7 @@ describe('InstanceRegistry', () => {
 
             registry.broadcastFromRoots('theme', []);
 
-            assert.strictEqual(errors.length, 1);
-            assert.ok(errors[0][0].includes('boom'));
+            parentConsole.assertClean();
             assert.deepStrictEqual(calls, ['child'], 'child still called after parent error');
         });
 
@@ -1309,7 +1291,7 @@ describe('InstanceRegistry', () => {
             const id = ComponentId.fromCode(code);
             const instance = new Component();
             instance[COMPONENT_ID] = id;
-            instance[CONSOLE] = { log() { }, warn() { }, error() { } };
+            instance[CONSOLE] = new StrictConsole();
             const entry = { instance, container: document.createElement('div'), parent: parentInstance, children };
             registry._instances.set(code, entry);
             return entry;
@@ -1433,13 +1415,9 @@ describe('InstanceRegistry', () => {
 
         it('queues react() during hydrate()', async () => {
             const reactCalls = [];
-            const warnings = [];
+            const testConsole = new StrictConsole();
             registry._reactor = {
-                console: {
-                    log() { },
-                    warn(...args) { warnings.push(args); },
-                    error() { },
-                },
+                console: testConsole,
                 basePath: './components',
                 globalVars: {},
                 persistence: new Persistence(new StateSerializer()),
@@ -1464,7 +1442,7 @@ describe('InstanceRegistry', () => {
             await registry.create(componentId, HydrateReacter, {}, container);
 
             assert.strictEqual(reactCalls.length, 1, 'reactor.react should be called');
-            assert.strictEqual(warnings.length, 0, 'should not warn');
+            testConsole.assertClean();
         });
 
         it('hydrate() is not called during update (only create)', async () => {

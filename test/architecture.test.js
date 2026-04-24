@@ -3,6 +3,50 @@ import assert from 'node:assert';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+describe('Test Infrastructure', () => {
+    it('all test files that create a Reactor must use StrictConsole', async () => {
+        const testDir = new URL('.', import.meta.url).pathname;
+
+        async function walk(dir) {
+            let results = [];
+            const list = await fs.readdir(dir);
+            for (const file of list) {
+                const fullPath = path.resolve(dir, file);
+                const stat = await fs.stat(fullPath);
+                if (stat.isDirectory()) {
+                    results = results.concat(await walk(fullPath));
+                } else if (file.endsWith('.test.js')) {
+                    results.push(fullPath);
+                }
+            }
+            return results;
+        }
+
+        const testFiles = await walk(testDir);
+        const violations = [];
+
+        for (const file of testFiles) {
+            const content = await fs.readFile(file, 'utf-8');
+            if (!content.includes('new Reactor(')) {
+                continue;
+            }
+            if (!content.includes('StrictConsole')) {
+                violations.push(
+                    `${path.basename(file)} creates a Reactor but does not use StrictConsole.`,
+                );
+            }
+        }
+
+        if (violations.length > 0) {
+            assert.fail(
+                'Every test file that creates a Reactor must import and use StrictConsole ' +
+                'to catch unexpected warnings and errors.\n' +
+                'Violations:\n' + violations.join('\n'),
+            );
+        }
+    });
+});
+
 describe('Architecture & Dependencies', () => {
     it('Core framework files in src/ must not reference htdocs/ example components', async () => {
         const srcPath = new URL('../src', import.meta.url).pathname;

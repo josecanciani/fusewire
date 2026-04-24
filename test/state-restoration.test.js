@@ -12,16 +12,25 @@ import { FuseWire } from '../src/fusewire.js';
 import { JSDOM } from 'jsdom';
 import { REACTOR } from '../src/symbols.js';
 import { StateSerializer } from '../src/state-serializer.js';
+import { StrictConsole } from './strict-console.js';
 
 const mockMorph = () => { };
 
 let registeredApps = [];
+let activeStrictConsoles = [];
 
 afterEach(() => {
-    for (const name of registeredApps) {
-        FuseWire.unregister(name);
+    try {
+        for (const strict of activeStrictConsoles) {
+            strict.assertClean();
+        }
+    } finally {
+        activeStrictConsoles = [];
+        for (const name of registeredApps) {
+            FuseWire.unregister(name);
+        }
+        registeredApps = [];
     }
-    registeredApps = [];
 });
 
 /**
@@ -32,6 +41,11 @@ afterEach(() => {
  */
 function createReactor(appName, config = {}) {
     registeredApps.push(appName);
+    if (!('console' in config)) {
+        const strict = new StrictConsole();
+        config.console = strict;
+        activeStrictConsoles.push(strict);
+    }
     if ('console' in config && config.enableDefaultConsole === undefined) {
         config.enableDefaultConsole = true;
     }

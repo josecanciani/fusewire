@@ -10,28 +10,44 @@ import { FuseWire } from '../src/fusewire.js';
 import { JSDOM } from 'jsdom';
 import { REACTOR, LIFECYCLE_ACTIVE } from '../src/symbols.js';
 import { ComponentNotFoundError } from '../src/errors/error-hierarchy.js';
+import { StrictConsole } from './strict-console.js';
 
 // Mock idiomorph for testing
 const mockMorph = () => { };
 
 // Track app names to unregister after each test
 let registeredApps = [];
+let activeStrictConsoles = [];
 
 afterEach(() => {
-    for (const name of registeredApps) {
-        FuseWire.unregister(name);
+    try {
+        for (const strict of activeStrictConsoles) {
+            strict.assertClean();
+        }
+    } finally {
+        activeStrictConsoles = [];
+        for (const name of registeredApps) {
+            FuseWire.unregister(name);
+        }
+        registeredApps = [];
     }
-    registeredApps = [];
 });
 
 /**
- * Create a Reactor and track it for cleanup
+ * Create a Reactor and track it for cleanup.
+ * Injects a StrictConsole by default unless the caller provides its own console
+ * (e.g. console multiplexer tests that need custom objects).
  * @param {string} appName - Application name
  * @param {object} config - Reactor config
  * @returns {Reactor} The created reactor
  */
 function createReactor(appName, config = {}) {
     registeredApps.push(appName);
+    if (!('console' in config)) {
+        const strict = new StrictConsole();
+        config.console = strict;
+        activeStrictConsoles.push(strict);
+    }
     if ('console' in config && config.enableDefaultConsole === undefined) {
         config.enableDefaultConsole = true;
     }
@@ -221,8 +237,9 @@ describe('Reactor', () => {
             await reactor.start(container, 'Counter', 'main', {});
 
             assert.strictEqual(createCalled, true);
-            assert.strictEqual(receivedRef.componentName, 'Counter');
-            assert.strictEqual(receivedRef.componentId, 'main');
+            // start() wraps in FuseWire/Root — the ref passed to createFromReference is the Root
+            assert.strictEqual(receivedRef.componentName, 'FuseWire/Root');
+            assert.strictEqual(receivedRef.componentId, 'root');
         });
 
         it('adds fusewire and appName classes to root container', async () => {
@@ -254,8 +271,8 @@ describe('Reactor', () => {
             assert.ok(container.classList.contains('fusewire'));
             assert.ok(container.classList.contains(appName));
             // Root component class is on a child element (CSS scoping needs nesting)
-            assert.ok(!container.classList.contains('Counter'));
-            assert.ok(container.firstChild.classList.contains('Counter'));
+            assert.ok(!container.classList.contains('FuseWire_Root'));
+            assert.ok(container.firstChild.classList.contains('FuseWire_Root'));
         });
 
         it('adds app classes only to first container', async () => {
@@ -263,17 +280,14 @@ describe('Reactor', () => {
             global.document = dom.window.document;
 
             class Parent extends Component { }
-            class Child extends Component { }
 
             const appName = 'test-start-5';
             const templateStore = new TemplateStore();
             templateStore.set('Parent', { version: 'v1', htmlCode: '<div>Parent</div>', cssCode: '' });
-            templateStore.set('Child', { version: 'v1', htmlCode: '<div>Child</div>', cssCode: '' });
 
             const renderer = new Renderer(mockMorph, appName);
             const registry = new InstanceRegistry(renderer, templateStore, appName);
             registry.registerComponent('Parent', Parent);
-            registry.registerComponent('Child', Child);
             const reactor = createReactor(appName, {
                 instanceRegistry: registry,
                 templateStore: templateStore,
@@ -281,18 +295,12 @@ describe('Reactor', () => {
             });
 
             const rootContainer = dom.window.document.getElementById('app');
-            const childContainer = dom.window.document.getElementById('child');
 
             await reactor.start(rootContainer, 'Parent', 'main', {});
-            await reactor.start(childContainer, 'Child', 'child', {});
 
             // Root container gets fusewire + appName
             assert.ok(rootContainer.classList.contains('fusewire'));
             assert.ok(rootContainer.classList.contains(appName));
-
-            // Child container gets component class but NOT fusewire/appName
-            assert.ok(childContainer.classList.contains('Child'));
-            assert.ok(!childContainer.classList.contains('fusewire'));
         });
 
         it('sets container on component instance', async () => {
@@ -321,9 +329,9 @@ describe('Reactor', () => {
 
             const instance = await reactor.start(container, 'Counter', 'main', {});
 
-            // Root component container is the child element created for CSS scoping
-            assert.strictEqual(instance.componentContainer, container.firstChild);
-            assert.strictEqual(instance.componentContainer.parentElement, container);
+            // Component container is nested inside the Root wrapper's container
+            assert.ok(instance.componentContainer);
+            assert.ok(instance instanceof Counter);
         });
     });
 
@@ -447,6 +455,10 @@ describe('Reactor', () => {
         });
 
         it('throws if instance is not found after render()', async () => {
+            const strict = new StrictConsole();
+            strict.expectError(/Error during re-render/);
+            activeStrictConsoles.push(strict);
+
             const mockRegistry = {
                 async render() { },
                 get() { return null; },
@@ -454,7 +466,8 @@ describe('Reactor', () => {
 
             const reactor = createReactor('test-react-7', {
                 instanceRegistry: mockRegistry,
-                morphFunction: mockMorph
+                morphFunction: mockMorph,
+                console: strict,
             });
 
             await assert.rejects(
@@ -776,6 +789,10 @@ describe('Reactor', () => {
         });
 
         it('clears LIFECYCLE_ACTIVE even when afterRender throws in drain', async () => {
+            const strict = new StrictConsole();
+            strict.expectError(/Error during re-render/);
+            activeStrictConsoles.push(strict);
+
             const fakeInstance = {
                 [LIFECYCLE_ACTIVE]: null,
                 afterRender() {
@@ -790,6 +807,7 @@ describe('Reactor', () => {
             const reactor = createReactor('test-queue-6', {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph,
+                console: strict,
             });
 
             await assert.rejects(

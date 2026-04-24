@@ -8,9 +8,11 @@ import { Component } from '../src/component.js';
 import { FuseWire } from '../src/fusewire.js';
 import { REACTOR } from '../src/symbols.js';
 import { UrlService } from '../src/url-service.js';
+import { StrictConsole } from './strict-console.js';
 
 // Track app names to unregister after each test
 let registeredApps = [];
+let activeStrictConsoles = [];
 let dom;
 
 /**
@@ -21,6 +23,11 @@ let dom;
  */
 function createReactor(appName, config = {}) {
     registeredApps.push(appName);
+    if (!('console' in config)) {
+        const strict = new StrictConsole();
+        config.console = strict;
+        activeStrictConsoles.push(strict);
+    }
     return new Reactor(appName, { morphFunction: () => {}, ...config });
 }
 
@@ -36,15 +43,22 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    for (const name of registeredApps) {
-        FuseWire.unregister(name);
+    try {
+        for (const strict of activeStrictConsoles) {
+            strict.assertClean();
+        }
+    } finally {
+        activeStrictConsoles = [];
+        for (const name of registeredApps) {
+            FuseWire.unregister(name);
+        }
+        registeredApps = [];
+        delete global.document;
+        delete global.HTMLElement;
+        delete global.localStorage;
+        delete global.history;
+        delete global.location;
     }
-    registeredApps = [];
-    delete global.document;
-    delete global.HTMLElement;
-    delete global.localStorage;
-    delete global.history;
-    delete global.location;
 });
 
 describe('HistoryRouter', () => {
