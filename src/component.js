@@ -1012,6 +1012,9 @@ export class PortalChild extends Component {
     /** @type {string} */
     #childCode;
 
+    /** @type {Component} */
+    #realChild;
+
     /**
      * Connect to the PortalHost and request creation of the real child.
      * Subscribes to fw-portal-event on the host and re-emits matching
@@ -1029,6 +1032,8 @@ export class PortalChild extends Component {
                 this.emit(evt.eventName, ...evt.args);
             }
         });
+
+        this.#realChild = await childRef.whenReady();
     }
 
     /**
@@ -1050,12 +1055,9 @@ export class PortalChild extends Component {
 
     /**
      * Get the real child Component instance from the PortalHost.
-     * Returns null if the child has not been mounted yet.
-     * @returns {Component|null} The real child instance
+     * @returns {Component} The real child instance
      */
     getChild() {
-        const host = this[REACTOR].getPortalHostSync(this.portalHostId);
-        const child = host.children.find((c) => c.componentCode === this.#childCode);
-        return child instanceof Component ? child : null;
+        return this.#realChild;
     }
 }
