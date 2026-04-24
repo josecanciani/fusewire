@@ -290,6 +290,36 @@ export class Component {
     }
 
     /**
+     * Create a PortalHost at this location in the DOM.
+     * The PortalHost renders its portal children via fw-each, escaping the
+     * current component's CSS stacking context.
+     * @param {string} id - Unique identifier for this portal host
+     * @returns {Child|Component} The PortalHost reference (place in template as ((varName)))
+     */
+    createPortalHost(id) {
+        return this.createChild('FuseWire/PortalHost', id);
+    }
+
+    /**
+     * Create a child that renders in a PortalHost instead of this component's DOM.
+     * The returned reference is a PortalChild proxy — it lives in this component's
+     * tree (for lifecycle and events) but the real child renders in the PortalHost.
+     * @param {string} name - Component name (e.g. 'Cart/Modal')
+     * @param {string} id - Instance id
+     * @param {ComponentVars} [vars] - Initial vars for the real child
+     * @param {string} [portalHostId='default'] - ID of the target PortalHost
+     * @returns {Child|Component} PortalChild proxy reference (place in template as ((varName)))
+     */
+    createPortalChild(name, id, vars, portalHostId) {
+        return this.createChild('FuseWire/PortalChild', `${name}-${id}-portal`, {
+            targetName: name,
+            targetId: id,
+            targetVars: vars || {},
+            portalHostId: portalHostId || 'default',
+        });
+    }
+
+    /**
      * Declare a library dependency to be loaded in parallel with child templates.
      * Non-blocking — the framework starts loading the module immediately.
      * Access the loaded module later via library() in hydrate(), which returns
@@ -843,5 +873,189 @@ export class ErrorBoundary extends Component {
      */
     routeState() {
         return {};
+    }
+}
+
+/**
+ * Built-in root wrapper component.
+ * Created automatically by reactor.start() to wrap the user's app component
+ * and the default PortalHost. The user never interacts with this directly.
+ */
+export class Root extends Component {
+    static componentName = 'FuseWire/Root';
+
+    /** @type {Child|Component} */
+    app;
+
+    /** @type {Child|Component} */
+    portal;
+
+    /**
+     * Pass-through for routing — the router walks through to reach the app.
+     * @returns {Object<string, string>} Empty object (structural pass-through)
+     */
+    routeState() {
+        return {};
+    }
+}
+
+/**
+ * Built-in portal host component.
+ * Renders portal children via fw-each. Registers itself with the Reactor
+ * so PortalChild instances can connect by ID. Intercepts child events via
+ * wildcard on('*') and wraps them as fw-portal-event for PortalChild to unpack.
+ *
+ * PortalHost subtrees are excluded from broadcast tree walks to prevent
+ * double-delivery — broadcasts reach portal children via PortalChild forwarding.
+ */
+export class PortalHost extends Component {
+    static componentName = 'FuseWire/PortalHost';
+
+    /** @type {Array<Child|Component>} */
+    children = [];
+
+    /**
+     * Register this host with the reactor so PortalChild instances can find it.
+     */
+    async init() {
+        this[REACTOR].registerPortalHost(this[COMPONENT_ID].id, this);
+    }
+
+    /**
+     * Add a child component to render in this portal.
+     * Subscribes to all child events via wildcard and wraps them as
+     * fw-portal-event so PortalChild can forward them to the logical parent.
+     * @param {string} name - Component name (e.g. 'Cart/Modal')
+     * @param {string} id - Instance id
+     * @param {ComponentVars} vars - Initial vars for the child
+     * @returns {Child|Component} The child reference
+     */
+    addChild(name, id, vars) {
+        const child = this.createChild(name, id, vars);
+        this.children.push(child);
+
+        // Intercept ALL events from this child and wrap them
+        child.on('*', (eventName, ...args) => {
+            this.emit('fw-portal-event', {
+                childCode: child.componentCode,
+                eventName,
+                args,
+            });
+        });
+
+        this.react();
+        return child;
+    }
+
+    /**
+     * Remove a child by component code.
+     * Called by PortalChild.destroy() to clean up the real child.
+     * @param {string} childCode - Component code to remove (e.g. 'Cart/Modal#main')
+     */
+    removeChild(childCode) {
+        this.children = this.children.filter((c) => c.componentCode !== childCode);
+        this.react();
+    }
+
+    /**
+     * Broadcast an event to a specific child's subtree.
+     * Called by PortalChild to forward broadcasts from the main tree.
+     * @param {string} childCode - Target child component code
+     * @param {string} eventName - Event name to broadcast
+     * @param {Array.<*>} args - Event arguments
+     */
+    broadcastToChild(childCode, eventName, args) {
+        const child = this.children.find((c) => c.componentCode === childCode);
+        if (child instanceof Component) {
+            child.broadcast(eventName, ...args);
+        }
+    }
+
+    /**
+     * Unregister from the reactor on destruction.
+     */
+    destroy() {
+        this[REACTOR].unregisterPortalHost(this[COMPONENT_ID].id);
+    }
+
+    /**
+     * Pass-through for routing — PortalHost does not contribute URL state.
+     * @returns {Object<string, string>} Empty object (structural pass-through)
+     */
+    routeState() {
+        return {};
+    }
+}
+
+/**
+ * Built-in portal child proxy component.
+ * Lives in the requesting component's tree with an empty template.
+ * Connects to a PortalHost by ID (via the Reactor) and forwards events
+ * bidirectionally: child emissions are unpacked from fw-portal-event,
+ * broadcasts are forwarded via host.broadcastToChild().
+ */
+export class PortalChild extends Component {
+    static componentName = 'FuseWire/PortalChild';
+
+    /** @type {string} */
+    targetName;
+
+    /** @type {string} */
+    targetId;
+
+    /** @type {ComponentVars} */
+    targetVars;
+
+    /** @type {string} */
+    portalHostId;
+
+    /** @type {string} */
+    #childCode;
+
+    /**
+     * Connect to the PortalHost and request creation of the real child.
+     * Subscribes to fw-portal-event on the host and re-emits matching
+     * events on this component so the parent's .on() handlers fire.
+     */
+    async init() {
+        const host = await this[REACTOR].getPortalHost(this.portalHostId);
+
+        const childRef = host.addChild(this.targetName, this.targetId, this.targetVars);
+        this.#childCode = childRef.componentCode;
+
+        // Forward wrapped events from PortalHost → re-emit on self
+        host.on('fw-portal-event', (evt) => {
+            if (evt.childCode === this.#childCode) {
+                this.emit(evt.eventName, ...evt.args);
+            }
+        });
+    }
+
+    /**
+     * Clean up the real child from the PortalHost.
+     */
+    destroy() {
+        const host = this[REACTOR].getPortalHostSync(this.portalHostId);
+        host.removeChild(this.#childCode);
+    }
+
+    /**
+     * Get the component code of the real child in the PortalHost.
+     * Used by _broadcastToEntry for forwarding broadcasts.
+     * @returns {string} The real child's component code
+     */
+    getChildCode() {
+        return this.#childCode;
+    }
+
+    /**
+     * Get the real child Component instance from the PortalHost.
+     * Returns null if the child has not been mounted yet.
+     * @returns {Component|null} The real child instance
+     */
+    getChild() {
+        const host = this[REACTOR].getPortalHostSync(this.portalHostId);
+        const child = host.children.find((c) => c.componentCode === this.#childCode);
+        return child instanceof Component ? child : null;
     }
 }

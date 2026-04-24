@@ -1,6 +1,6 @@
 import { ComponentNotFoundError } from './errors/error-hierarchy.js';
 import { ComponentId, toCssName } from './component-id.js';
-import { Child, Lazy, ErrorBoundary } from './component.js';
+import { Child, Lazy, ErrorBoundary, Root, PortalHost, PortalChild } from './component.js';
 import { Component } from './component.js';
 import { LogMessage } from './log-message.js';
 import { compileTemplate } from './template-compiler.js';
@@ -108,6 +108,48 @@ export class InstanceRegistry {
         this._templateStore.setCompiled(
             'FuseWire/ErrorBoundary',
             compileTemplate('((child))', '', this._appName),
+        );
+
+        this.registerComponent('FuseWire/Root', Root);
+        this._templateStore.set('FuseWire/Root', {
+            version: 'builtin',
+            htmlCode: '((app))((portal))',
+            cssCode: '',
+            jsCode: '',
+            fetchedAt: 0,
+            etags: { html: '', css: '', js: '' },
+        });
+        this._templateStore.setCompiled(
+            'FuseWire/Root',
+            compileTemplate('((app))((portal))', '', this._appName),
+        );
+
+        this.registerComponent('FuseWire/PortalHost', PortalHost);
+        this._templateStore.set('FuseWire/PortalHost', {
+            version: 'builtin',
+            htmlCode: '<div fw-each="child in children">((child))</div>',
+            cssCode: '',
+            jsCode: '',
+            fetchedAt: 0,
+            etags: { html: '', css: '', js: '' },
+        });
+        this._templateStore.setCompiled(
+            'FuseWire/PortalHost',
+            compileTemplate('<div fw-each="child in children">((child))</div>', '', this._appName),
+        );
+
+        this.registerComponent('FuseWire/PortalChild', PortalChild);
+        this._templateStore.set('FuseWire/PortalChild', {
+            version: 'builtin',
+            htmlCode: '',
+            cssCode: '',
+            jsCode: '',
+            fetchedAt: 0,
+            etags: { html: '', css: '', js: '' },
+        });
+        this._templateStore.setCompiled(
+            'FuseWire/PortalChild',
+            compileTemplate('', '', this._appName),
         );
     }
 
@@ -454,9 +496,40 @@ export class InstanceRegistry {
         // Global vars (registered via reactor.registerGlobal) are merged at lower
         // priority — component vars override on name collision.
         const vars = { ...this._reactor.globalVars, ...collectVars(instance) };
+
+        // For PortalChild children not referenced in the template, inject
+        // mount points into the compiled template's render output. This way
+        // the morph sees them on every render — same pipeline as all children.
+        // Only PortalChild is injected: other children (e.g. ErrorBoundary
+        // internals) must NOT get auto-injected mount points.
+        const originalRender = compiled.render.bind(compiled);
+        const patchedCompiled = {
+            ...compiled,
+            /**
+             * Render with injected mount points for unreferenced PortalChild vars
+             * @param {import('./template-compiler.js').ComponentVars} v - Component variables
+             * @param {ComponentId} cid - Component instance ID
+             * @param {import('./template-compiler.js').TemplateConstants} c - Template constants
+             * @returns {string} Rendered HTML
+             */
+            render(v, cid, c) {
+                let html = originalRender(v, cid, c);
+                for (const key of Object.keys(instance)) {
+                    const val = instance[key];
+                    if (!(val instanceof Child) || val.componentName !== 'FuseWire/PortalChild')
+                        continue;
+                    const childCode = new ComponentId(val.componentName, val.componentId || '')
+                        .code;
+                    if (html.includes(`data-fusewire-id="${childCode}"`)) continue;
+                    html += `<fw-mount id="${childCode}" data-fusewire-id="${childCode}" data-fusewire-parent-id="${cid.code}"></fw-mount>`;
+                }
+                return html;
+            },
+        };
+
         const mountPoints = this._renderer.render(
             container,
-            compiled,
+            patchedCompiled,
             vars,
             componentId,
             constants,
@@ -465,6 +538,23 @@ export class InstanceRegistry {
         // Auto-mount child components found in mount points
         for (const mountPoint of mountPoints) {
             await this._mountChild(mountPoint, instance, declarations);
+        }
+
+        // Detect eagerly-created children that were never mounted.
+        // This means createChild() was called but the template has no ((varName))
+        // mount point — the child is silently orphaned with no events, no hydration,
+        // and no parent link. This is always a developer mistake.
+        // Framework built-in components (FuseWire/*) are excluded because they
+        // manage their own children internally (e.g. ErrorBoundary holds a
+        // fallback child that is only mounted when an error occurs).
+        if (!componentId.name.startsWith('FuseWire/')) {
+            for (const [, decl] of declarations) {
+                if (decl instanceof Child && decl._creationPromise && !decl._replaced) {
+                    throw new Error(
+                        `Component "${componentId.code}": child "${decl.toComponentId().code}" was created via createChild() but not referenced in the template. The child will not be mounted.`,
+                    );
+                }
+            }
         }
 
         // Remove orphaned children (component cleanup — containers already detached above)
@@ -1091,6 +1181,11 @@ export class InstanceRegistry {
      */
     _broadcastToEntry(entry, eventName, args) {
         const { instance } = entry;
+
+        // PortalHost subtrees are excluded — broadcasts reach portal children
+        // only via PortalChild forwarding to prevent double-delivery
+        if (instance instanceof PortalHost) return;
+
         let stopped = false;
         if (instance[EVENTS]) {
             const result = instance[EVENTS].emitBroadcast(eventName, ...args);
@@ -1100,6 +1195,15 @@ export class InstanceRegistry {
             stopped = result.stopped;
         }
         if (stopped) return;
+
+        // Forward broadcast through PortalChild bridge to the real child
+        if (instance instanceof PortalChild) {
+            const host = this._reactor.getPortalHostSync(instance.portalHostId);
+            if (host) {
+                host.broadcastToChild(instance.getChildCode(), eventName, args);
+            }
+        }
+
         if (entry.children) {
             for (const [childCode] of entry.children) {
                 const childEntry = this._instances.get(childCode);

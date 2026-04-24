@@ -107,6 +107,13 @@ export class Reactor {
         // than component-local vars. Configured at construction time via config.globalVars.
         /** @type {ComponentVars} */
         this._globalVars = { ...config.globalVars };
+
+        // Portal host registry — PortalHost components register themselves here
+        // so PortalChild instances can find them by ID.
+        /** @type {Map<string, import('./component.js').PortalHost>} */
+        this._portalHosts = new Map();
+        /** @type {Map<string, Array<{resolve: function(import('./component.js').PortalHost): void}>>} */
+        this._pendingPortalRequests = new Map();
     }
 
     /**
@@ -271,7 +278,13 @@ export class Reactor {
             container.appendChild(renderContainer);
         }
 
-        const ref = new Child(componentName, id, vars);
+        // Wrap user's app in FuseWire/Root which provides the default PortalHost
+        const appRef = new Child(componentName, id, vars);
+        const portalRef = new Child('FuseWire/PortalHost', 'default');
+        const rootRef = new Child('FuseWire/Root', 'root', {
+            app: appRef,
+            portal: portalRef,
+        });
 
         // Consume the root route segment from the router (if configured).
         // This passes URL state to the root component's init() so it can
@@ -281,10 +294,12 @@ export class Reactor {
             routeSegment = this.router.consumeRootSegment();
         }
 
-        // Create instance via registry (resolves class, init, render, afterRender)
-        const instance = await this._instanceRegistry.createFromReference(ref, renderContainer, {
-            routeSegment,
-        });
+        // Create the root wrapper (which creates app + default portal as children)
+        const rootInstance = await this._instanceRegistry.createFromReference(
+            rootRef,
+            renderContainer,
+            { routeSegment },
+        );
 
         // Mark initial load as complete so the router stops consuming segments
         if (this.router) {
@@ -297,9 +312,65 @@ export class Reactor {
         }
 
         // Ensure reactor is attached (also set by create() if registry has reactor ref)
-        instance[REACTOR] = this;
+        rootInstance[REACTOR] = this;
 
-        return instance;
+        // Return the user's app instance (Root is transparent).
+        // Root.app starts as a Child reference but the framework replaces it
+        // with the real Component during mount — safe to cast.
+        return /** @type {import('./component.js').Component} */ (
+            /** @type {import('./component.js').Root} */ (rootInstance).app
+        );
+    }
+
+    /**
+     * Register a PortalHost so PortalChild instances can find it by ID.
+     * Drains any pending requests waiting for this host.
+     * Called by PortalHost.init().
+     * @param {string} id - Unique portal host identifier
+     * @param {import('./component.js').PortalHost} host - The PortalHost instance
+     */
+    registerPortalHost(id, host) {
+        this._portalHosts.set(id, host);
+        const pending = this._pendingPortalRequests.get(id);
+        if (pending) {
+            for (const { resolve } of pending) resolve(host);
+            this._pendingPortalRequests.delete(id);
+        }
+    }
+
+    /**
+     * Unregister a PortalHost. Called by PortalHost.destroy().
+     * @param {string} id - Portal host identifier to remove
+     */
+    unregisterPortalHost(id) {
+        this._portalHosts.delete(id);
+    }
+
+    /**
+     * Get a PortalHost by ID, waiting for it if not yet registered.
+     * Returns a Promise that resolves when the host registers itself.
+     * @param {string} id - Portal host identifier
+     * @returns {Promise<import('./component.js').PortalHost>} The PortalHost instance
+     */
+    getPortalHost(id) {
+        const host = this._portalHosts.get(id);
+        if (host) return Promise.resolve(host);
+
+        return new Promise((resolve) => {
+            const list = this._pendingPortalRequests.get(id) || [];
+            list.push({ resolve });
+            this._pendingPortalRequests.set(id, list);
+        });
+    }
+
+    /**
+     * Get a PortalHost by ID synchronously.
+     * Used in destroy paths where the host must exist.
+     * @param {string} id - Portal host identifier
+     * @returns {import('./component.js').PortalHost|undefined} The PortalHost instance
+     */
+    getPortalHostSync(id) {
+        return this._portalHosts.get(id);
     }
 
     /**

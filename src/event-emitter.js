@@ -1,6 +1,10 @@
 /**
  * Lightweight event emitter used as a per-component pub/sub service.
  *
+ * Supports wildcard subscriptions: `on('*', handler)` receives every event
+ * with `(eventName, ...args)`. Wildcard handlers are observers — they cannot
+ * stop broadcast propagation.
+ *
  * The InstanceRegistry calls `clear()` after the component's destroy hook
  * to release all handler references.
  */
@@ -15,8 +19,10 @@ export class EventEmitter {
 
     /**
      * Subscribe to an event.
+     * Pass `'*'` as eventName to receive every event — the handler is called
+     * with `(eventName, ...originalArgs)` for each emission.
      * Returns an unsubscribe function; call it to remove this handler early.
-     * @param {string} eventName - Event name to listen for
+     * @param {string} eventName - Event name to listen for, or `'*'` for all events
      * @param {function(...*): (void|false)} handler - Callback invoked when the event fires
      * @returns {function(): void} Unsubscribe function
      */
@@ -38,14 +44,26 @@ export class EventEmitter {
      * @returns {Array.<Error>} Errors thrown by handlers, in call order
      */
     emit(eventName, ...args) {
-        const handlers = this._handlers.get(eventName);
-        if (!handlers) return [];
         const errors = [];
-        for (const handler of handlers) {
-            try {
-                handler(...args);
-            } catch (err) {
-                errors.push(err);
+        const handlers = this._handlers.get(eventName);
+        if (handlers) {
+            for (const handler of handlers) {
+                try {
+                    handler(...args);
+                } catch (err) {
+                    errors.push(err);
+                }
+            }
+        }
+        // Wildcard handlers receive (eventName, ...args)
+        const wildcards = this._handlers.get('*');
+        if (wildcards) {
+            for (const handler of wildcards) {
+                try {
+                    handler(eventName, ...args);
+                } catch (err) {
+                    errors.push(err);
+                }
             }
         }
         return errors;
@@ -61,15 +79,27 @@ export class EventEmitter {
      * @returns {{errors: Array.<Error>, stopped: boolean}} Errors and whether propagation was stopped
      */
     emitBroadcast(eventName, ...args) {
-        const handlers = this._handlers.get(eventName);
-        if (!handlers) return { errors: [], stopped: false };
         const errors = [];
         let stopped = false;
-        for (const handler of handlers) {
-            try {
-                if (handler(...args) === false) stopped = true;
-            } catch (err) {
-                errors.push(err);
+        const handlers = this._handlers.get(eventName);
+        if (handlers) {
+            for (const handler of handlers) {
+                try {
+                    if (handler(...args) === false) stopped = true;
+                } catch (err) {
+                    errors.push(err);
+                }
+            }
+        }
+        // Wildcard handlers are observers — their return value is ignored
+        const wildcards = this._handlers.get('*');
+        if (wildcards) {
+            for (const handler of wildcards) {
+                try {
+                    handler(eventName, ...args);
+                } catch (err) {
+                    errors.push(err);
+                }
             }
         }
         return { errors, stopped };

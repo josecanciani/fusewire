@@ -4,6 +4,7 @@ import { Component, ErrorBoundary } from '../src/component.js';
 import { ComponentId } from '../src/component-id.js';
 import { Reactor } from '../src/reactor.js';
 import { JSDOM } from 'jsdom';
+import { StrictConsole } from './strict-console.js';
 
 class Parent extends Component {
     errorCount = 0;
@@ -65,7 +66,9 @@ class FallbackComponent extends Component {
 let testCounter = 0;
 
 async function setupTestEnvironment(failId, failingHtmlCode) {
+    const strictConsole = new StrictConsole();
     const reactor = new Reactor(`testapp-error-${++testCounter}`, {
+        console: strictConsole,
         morphFunction: (container, htmlString) => {
             if (container && htmlString) {
                 container.innerHTML = htmlString;
@@ -78,8 +81,6 @@ async function setupTestEnvironment(failId, failingHtmlCode) {
     reactor.instanceRegistry.registerComponent('FailComponent', FailComponent);
     reactor.instanceRegistry.registerComponent('FallbackComponent', FallbackComponent);
     reactor.instanceRegistry.registerComponent('FuseWire/ErrorBoundary', ErrorBoundary);
-
-    reactor.console.error = () => { }; // suppress error logs
 
     reactor.instanceRegistry._templateStore.set('Parent', {
         htmlCode: '<div class="parent">((boundary)) <button id="recreate-btn" onclick="((this)).recreateChild()">Recreate</button></div>',
@@ -111,7 +112,7 @@ async function setupTestEnvironment(failId, failingHtmlCode) {
 
     const container = document.createElement('div');
 
-    return { reactor, container, dom };
+    return { reactor, container, dom, strictConsole };
 }
 
 describe('ErrorBoundary complete flow', () => {
