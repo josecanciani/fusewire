@@ -697,6 +697,65 @@ describe('InstanceRegistry', () => {
             const compiled = templateStore.getCompiled('TestComponent');
             assert.ok(compiled !== null);
         });
+
+        describe('eager child validation', () => {
+            class EagerParent extends Component {
+                async init() {
+                    // Create an eager child that starts background creation immediately
+                    this.myChild = this.createChild('ChildComponent', 'child1', {});
+                }
+            }
+
+            beforeEach(() => {
+                registry.registerComponent('ChildComponent', TestComponent);
+                registry.registerComponent('EagerParent', EagerParent);
+                
+                templateStore.set('ChildComponent', {
+                    htmlCode: '<div>Child</div>',
+                    cssCode: '',
+                    version: 'v1'
+                });
+            });
+
+            it('throws error if eager child is entirely missing from template', async () => {
+                templateStore.set('EagerParent', {
+                    // Oops, forgot to include ((myChild))
+                    htmlCode: '<div>No child here</div>',
+                    cssCode: '',
+                    version: 'v1'
+                });
+
+                const componentId = new ComponentId('EagerParent', 'parent1');
+                
+                await assert.rejects(
+                    async () => {
+                        await registry.create(componentId, EagerParent, {}, container);
+                    },
+                    (err) => {
+                        assert.ok(err instanceof Error);
+                        assert.match(err.message, /was created via createChild\(\) but not referenced in the template/);
+                        return true;
+                    }
+                );
+            });
+
+            it('does not throw error if eager child is hidden by fw-if', async () => {
+                templateStore.set('EagerParent', {
+                    // Child is in the template, but intentionally hidden
+                    htmlCode: '<div><div fw-if="false">((myChild))</div></div>',
+                    cssCode: '',
+                    version: 'v1'
+                });
+
+                const componentId = new ComponentId('EagerParent', 'parent2');
+                
+                // Should successfully create and render without throwing
+                await registry.create(componentId, EagerParent, {}, container);
+                
+                // The container should not contain the child because fw-if is false
+                assert.ok(!container.innerHTML.includes('fw-mount'));
+            });
+        });
     });
 
     describe('has()', () => {
