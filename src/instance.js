@@ -113,7 +113,7 @@ export class InstanceRegistry {
         this.registerComponent('FuseWire/Root', Root);
         this._templateStore.set('FuseWire/Root', {
             version: 'builtin',
-            htmlCode: '((app))((portal))',
+            htmlCode: '((portal))((app))',
             cssCode: '',
             jsCode: '',
             fetchedAt: 0,
@@ -121,7 +121,7 @@ export class InstanceRegistry {
         });
         this._templateStore.setCompiled(
             'FuseWire/Root',
-            compileTemplate('((app))((portal))', '', this._appName),
+            compileTemplate('((portal))((app))', '', this._appName),
         );
 
         this.registerComponent('FuseWire/PortalHost', PortalHost);
