@@ -46,6 +46,7 @@ export class Reactor {
         this._rootContainer = null;
         this._defaultConsole = config.console ?? globalThis.console;
         this._enableDefaultConsole = config.enableDefaultConsole ?? false;
+        /** @type {any[]} */
         this._attachedConsoles = [];
         /** @type {ConsoleLike} */
         this._console = this._buildConsoleMultiplexer();
@@ -200,7 +201,7 @@ export class Reactor {
         if (this._events) {
             for (const err of this._events.emit(eventName, ...args)) {
                 this._console.error(
-                    `broadcast('${eventName}') reactor listener threw: ${err.message}`,
+                    `broadcast('${eventName}') reactor listener threw: ${/** @type {Error} */ (err).message}`,
                 );
             }
         }
@@ -246,11 +247,11 @@ export class Reactor {
                 for (const c of attached) c.warn(...args);
             },
             /**
-             * Forwarding utility
+             * Forwarding utility (errors always logged to default console)
              * @param {...*} args - Error arguments
              */
             error(...args) {
-                if (enabled) defaultConsole.error(...args);
+                defaultConsole.error(...args);
                 for (const c of attached) c.error(...args);
             },
         };

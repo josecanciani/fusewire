@@ -38,9 +38,13 @@ export class Home extends Component {
     /** @type {import('./Header.js').Header} */
     headerComponent = null;
 
+    /** @type {{cancel(): void, size: number} | null} */
     #rightPaneResizeState = null;
+    /** @type {{cancel(): void, size: number} | null} */
     #consoleResizeState = null;
+    /** @type {function(MouseEvent, HTMLElement, object): {cancel(): void, size: number} | null} */
     #startHorizontalResize = null;
+    /** @type {function(MouseEvent, HTMLElement, object): {cancel(): void, size: number} | null} */
     #startVerticalResize = null;
     /** @type {boolean} */
     sidebarHidden = false;
@@ -69,10 +73,6 @@ export class Home extends Component {
             })
         );
         this.tagFilterComponent.on('change', (tags) => this.filterByTag(tags));
-
-        this.consoleComponent = /** @type {import('../Console/Panel.js').Panel} */ (
-            this.createChild('Console/Panel', 'console', { logs: [] })
-        );
 
         if (routeSegment) {
             const title = routeSegment.getString('demo');
@@ -225,6 +225,9 @@ export class Home extends Component {
             this.editorComponent.on('activeFileChanged', (id) =>
                 this.sidebarComponent.highlightFile(id),
             );
+            this.consoleComponent = /** @type {import('../Console/Panel.js').Panel} */ (
+                this.createChild('Console/Panel', 'console', { logs: [] })
+            );
         }
 
         return true;
@@ -284,7 +287,7 @@ export class Home extends Component {
             );
             this.react();
         } catch (err) {
-            this.console.error(`Run failed: ${err.message}`);
+            this.console.error(`Run failed: ${/** @type {Error} */ (err).message}`);
         }
     }
 
@@ -322,6 +325,7 @@ export class Home extends Component {
         this.demoComponent = null;
         this.sidebarComponent = null;
         this.editorComponent = null;
+        this.consoleComponent = null;
         this.demos.forEach((d) => {
             d.activeClass = '';
         });
