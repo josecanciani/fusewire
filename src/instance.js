@@ -548,8 +548,15 @@ export class InstanceRegistry {
         // manage their own children internally (e.g. ErrorBoundary holds a
         // fallback child that is only mounted when an error occurs).
         if (!componentId.name.startsWith('FuseWire/')) {
-            for (const [, decl] of declarations) {
+            for (const [childCode, decl] of declarations) {
                 if (decl instanceof Child && decl._creationPromise && !decl._replaced) {
+                    // Check if the component was intentionally hidden by an fw-if condition.
+                    // If the original template contains the placeholder, it's valid.
+                    const varName = this._findVarNameForCode(instance, childCode);
+                    if (varName && template.htmlCode.includes(`((${varName}))`)) {
+                        continue; // Hidden by conditional rendering, this is fine
+                    }
+
                     throw new Error(
                         `Component "${componentId.code}": child "${decl.toComponentId().code}" was created via createChild() but not referenced in the template. The child will not be mounted.`,
                     );
