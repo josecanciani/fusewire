@@ -55,7 +55,7 @@ lib/fusewire/
 
 ## Testing Strategy
 
-In regular development flow, you should just use `npm test`. This will handle the fast tests, including all linters, formatting checks, and quick unit tests. 
+In regular development flow, you should just use `npm test`. This will handle the fast tests, including all linters, formatting checks, and quick unit tests.
 
 When your change is ready and you are finishing your work, end with a `npm run test:all` to also run the slow tests (like `test:browser` for Playwright tests, and `test:performance` for performance-focused tests).
 
@@ -72,14 +72,14 @@ npm test
 
 ### 2. Slow Tests (`npm run test:browser` / `npm run test:performance`)
 - **Browser (`test:browser`):** Validates DOM morphing in real browser (Chromium via Playwright). Run when making changes to morphing logic (`renderer.js`).
-- **Performance (`test:performance`):** Evaluates framework overhead. Files must use the `.performance-test.js` extension so they aren't executed during the fast step. 
+- **Performance (`test:performance`):** Evaluates framework overhead. Files must use the `.performance-test.js` extension so they aren't executed during the fast step.
 
 ### 3. Run All (`npm run test:all`)
 ```bash
 npm run test:all
 ```
 - Runs `test`, then `test:browser`, then `test:performance`
-- **Use for:** Final validation before committing. 
+- **Use for:** Final validation before committing.
 
 **Note on Node tests:** JSDOM doesn't fully emulate the `Document` constructor required for morphing, so overlapping Playwright tests assert those behaviors.
 
@@ -115,6 +115,7 @@ npm run test:all
 - **No hardcoded duplicates:** Never repeat a value that is already stored in a variable or derived from code. If a path, name, or label appears in log messages, error messages, or comments, reference the variable — don't hardcode the string a second time.
 - **No defensive fallbacks:** Do not use optional chaining (`?.`), ternary fallbacks (`x ? x.prop : ''`), `|| defaultValue`, or silent early returns to mask values that should always be present. If state is required, access it directly and let the error surface. Defensive fallbacks hide bugs. Legitimate uses: public lookup methods returning null for missing keys, optional function parameters with defaults, and API boundaries where input is untrusted.
 - Enforced via oxfmt configuration and automated tests
+- **No CSS class names in JavaScript:** JS files must never contain CSS class names or visual styling strings. Components should expose semantic data properties (booleans, enums, counts) and let the HTML template decide which CSS classes to apply. For example, a dot indicator should expose `isActive: true` — not `cssClass: 'bg-primary'`. The template uses `fw-if` or similar directives to branch styling based on the semantic value. This keeps the separation of concerns clean: JS owns data, HTML owns structure and class assignment, CSS owns visual presentation.
 
 ## JSDoc Documentation
 
@@ -366,6 +367,34 @@ afterRender() {
     if (lastLog) lastLog.scrollIntoView({ block: 'end', behavior: 'instant' });
 }
 ```
+
+### Portals (modals, overlays, toasts)
+
+Use `createPortalChild()` when a child component needs to render at the top of the DOM hierarchy (e.g., modals, toasts, overlays) to escape CSS stacking contexts:
+
+```javascript
+async init() {
+    this.modal = this.createPortalChild('Cart/Modal', 'main', { items: [] });
+    this.modal.on('closed', () => this.onModalClosed());
+}
+```
+
+The child renders in the default `PortalHost` (at the root level), but events and lifecycle work as if it were a normal child. When the parent is destroyed, the portal child is cleaned up automatically.
+
+For custom placement, any component can create a `PortalHost`:
+
+```javascript
+this.sidebarPortal = this.createPortalHost('sidebar');
+this.widget = this.createPortalChild('Widget', 'main', {}, 'sidebar');
+```
+
+Key rules:
+- Broadcasts propagate through PortalChild bridges — PortalHost subtrees are skipped to prevent double-delivery
+- PortalHost and PortalChild are built-in components (like Lazy and ErrorBoundary)
+- The framework auto-creates a `FuseWire/Root` wrapper with a default PortalHost — no setup needed
+- Portal children do not need `((varName))` in the parent template — they render in the PortalHost, not in the parent's DOM
+
+See [docs/portals.md](docs/portals.md) for the full design.
 
 ## Component Checks (Reusable Validation)
 

@@ -99,6 +99,45 @@ Private helper methods also use `#`:
 The rule of thumb: if the template needs to know about it, it's a var. If it's
 bookkeeping for the component's own logic, it's private.
 
+### No CSS class names in JavaScript
+
+JS files must **never** contain CSS class names or visual styling strings. Vars
+and loop items should expose **semantic data** (booleans, enums, counts) and let
+the HTML template decide which CSS classes to apply.
+
+```javascript
+// WRONG: JS decides styling
+#buildDots() {
+    this.dots = this.images.map((_, i) => ({
+        cssClass: i === this.activeIndex ? 'bg-primary' : 'bg-secondary opacity-50',
+        index: i,
+    }));
+}
+```
+
+```javascript
+// RIGHT: JS exposes semantic state
+#buildDots() {
+    this.dots = this.images.map((_, i) => ({
+        isActive: i === this.activeIndex,
+        index: i,
+    }));
+}
+```
+
+The template uses `fw-if` to branch styling based on the semantic value:
+
+```html
+<div fw-each="dot in dots">
+    <div fw-if="dot.isActive" class="dot dot-active"></div>
+    <div fw-if="!dot.isActive" class="dot dot-inactive cursor-pointer"
+         onclick="((this)).goTo(((dot.index)))"></div>
+</div>
+```
+
+This keeps the separation clean: **JS owns data, HTML owns structure and class
+assignment, CSS owns visual presentation.**
+
 ---
 
 ## Lifecycle hooks
@@ -191,7 +230,7 @@ async init() {
 The template places the child via `((logs))` (or the specific var name). The
 engine auto-mounts it — no manual wiring needed.
 
-### Modals and overlays
+### Modals, overlays, and portals
 
 `createChild()` nests the child DOM physically inside the parent's subtree.
 This means child components inherit the parent's CSS stacking context. A modal
@@ -199,8 +238,38 @@ or overlay spawned deep inside a list component (e.g., inside a `ProductCard`)
 will be trapped under the parent's `z-index` and cannot overlay the full page
 as intended.
 
-Spawn page-level modals and overlays at the root component (e.g., `Home`) so
-they sit at the top of the stacking context hierarchy.
+Use `createPortalChild()` to render a child in the **default PortalHost**
+(at the top of the DOM hierarchy) while keeping the logical parent-child
+relationship for events, lifecycle, and cleanup:
+
+```javascript
+async init() {
+    // The modal renders at the root DOM level, not inside ProductCard
+    this.modal = this.createPortalChild('Cart/Modal', 'main', { items: this.items });
+
+    // Events work normally — the PortalChild forwards them
+    this.modal.on('closed', () => this.onModalClosed());
+    this.modal.on('checkout', (items) => this.onCheckout(items));
+}
+```
+
+Portal children do not need `((modal))` in the parent's template — they render
+in the PortalHost, not in the parent's DOM. When `ProductCard` is destroyed,
+the portal child and its real component in the PortalHost are cleaned up
+automatically.
+
+For custom placement, create a PortalHost anywhere in the tree:
+
+```javascript
+// In a layout component
+this.sidebarPortal = this.createPortalHost('sidebar');
+
+// In any descendant — render into the sidebar portal
+this.widget = this.createPortalChild('StatusWidget', 'main', {}, 'sidebar');
+```
+
+See [docs/portals.md](../../docs/portals.md) for the full design.
+
 
 ### Subscribing to child events (buffered references)
 
