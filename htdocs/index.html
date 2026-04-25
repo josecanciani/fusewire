@@ -13,7 +13,8 @@
     <script type="importmap">
         {
             "imports": {
-                "idiomorph": "/node_modules/idiomorph/dist/idiomorph.esm.js"
+                "idiomorph": "./node_modules/idiomorph/dist/idiomorph.esm.js",
+                "/js/": "./js/"
             }
         }
     </script>
@@ -27,7 +28,7 @@
         } from './js/reactor.js';
 
         const reactor = new Reactor('playground', {
-            basePath: new URL('/components', window.location.origin).href,
+            basePath: new URL('./components', window.location.href).href,
         });
 
         await reactor.start(document.getElementById('app'), 'Playground/Home', 'main', {

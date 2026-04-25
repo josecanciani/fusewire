@@ -9,3 +9,5 @@ declare module './src/component.js' {
         [key: symbol]: any;
     }
 }
+
+declare module 'idiomorph';

@@ -251,8 +251,9 @@ export class Home extends Component {
                 const version = await templateStore.computeHash(htmlCode + cssCode);
                 templateStore.set(componentName, { version, htmlCode, cssCode });
                 // Absolute paths like '/js/...' don't resolve from blob URLs,
-                // so rewrite them to full URLs using the current origin.
-                const resolvedJs = jsCode.replace(/(from\s+['"])\//g, `$1${location.origin}/`);
+                // so rewrite them to full URLs using the current page's base URL.
+                const baseUrl = new URL('./', window.location.href).href;
+                const resolvedJs = jsCode.replace(/(from\s+['"])\//g, `$1${baseUrl}`);
                 const blob = new Blob([resolvedJs], { type: 'text/javascript' });
                 const blobUrl = URL.createObjectURL(blob);
                 try {

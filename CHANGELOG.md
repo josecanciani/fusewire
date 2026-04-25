@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-04-25
+### Added
+- Created `AGENTS.md` in parser directory explaining the generated parser workaround.
+
+### Changed
+- Refactored `idiomorph` loading to use ES Module import maps instead of vendoring the library inside `src/`.
+- Updated GitHub Pages deployment action to explicitly enable pages and correctly serve `idiomorph` from node modules.
+- Re-added `fusewire-expr.d.ts` localized type override to prevent TypeScript performance crashes when analyzing Jison output.
+
 ## [1.0.1] - 2026-04-25
 ### Added
 - New AST-based template expression parser with nested ternaries and strict syntax validation.
@@ -39,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed JS-in-HTML inline execution possibilities to strictly enforce declarative JS state truth.
 
-[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.0.1...main
+[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.0.2...main
+[1.0.2]: https://github.com/josecanciani/fusewire/compare/1.0.1...1.0.2
 [1.0.1]: https://github.com/josecanciani/fusewire/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/josecanciani/fusewire/releases/tag/1.0.0
