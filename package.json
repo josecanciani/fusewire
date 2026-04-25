@@ -69,7 +69,8 @@
         "html-check": "html-validate 'htdocs/**/*.html'",
         "jsdoc-check": "eslint src/ htdocs/",
         "typecheck": "npm run build:types",
-        "build:types": "tsc -p tsconfig.build.json"
+        "build:types": "tsc -p tsconfig.build.json",
+        "changelog": "changelog --url https://github.com/josecanciani/fusewire --head main --no-v-prefix"
     },
     "devDependencies": {
         "@playwright/test": "^1.58.2",
@@ -80,6 +81,7 @@
         "http-server": "^14.1.1",
         "js-beautify": "^1.15.4",
         "jsdom": "^29.0.1",
+        "keep-a-changelog": "^3.0.2",
         "oxfmt": "^0.41.0",
         "oxlint": "^1.56.0",
         "typescript": "^6.0.2"
