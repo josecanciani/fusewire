@@ -1,6 +1,6 @@
 {
     "name": "@fusewire/client",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "FuseWire client-side component framework",
     "type": "module",
     "main": "./src/reactor.js",
@@ -70,6 +70,7 @@
         "jsdoc-check": "eslint src/ htdocs/",
         "typecheck": "npm run build:types",
         "build:types": "tsc -p tsconfig.build.json",
+        "build:parser": "node scripts/build-parser.js",
         "changelog": "changelog --url https://github.com/josecanciani/fusewire --head main --no-v-prefix"
     },
     "devDependencies": {
@@ -79,6 +80,7 @@
         "express": "^5.2.1",
         "html-validate": "^10.11.2",
         "http-server": "^14.1.1",
+        "jison": "^0.4.18",
         "js-beautify": "^1.15.4",
         "jsdom": "^29.0.1",
         "keep-a-changelog": "^3.0.2",

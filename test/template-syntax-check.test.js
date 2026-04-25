@@ -31,7 +31,7 @@ describe('template-syntax check', () => {
         
         assert.strictEqual(violations.length, 1);
         assert.match(violations[0].message, /invalid fw-if syntax: "step === 1"/);
-        assert.match(violations[0].message, /Do not use spaces, comparison operators/);
+        assert.match(violations[0].message, /It does NOT evaluate JavaScript expressions like === or >/);
     });
 
     it('passes for valid fw-if syntax', () => {

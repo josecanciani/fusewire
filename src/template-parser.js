@@ -56,7 +56,7 @@ export const DIRECTIVE_REGEX =
  * Use with the global flag for iterative matching.
  * @type {RegExp}
  */
-export const INTERPOLATION_REGEX = new RegExp(`\\(\\((${VAR_PATH})\\)\\)`, 'g');
+export const INTERPOLATION_REGEX = /\(\(([^()]*)\)\)/g;
 
 /**
  * Find the position of the matching closing tag, accounting for nesting.

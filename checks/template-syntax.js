@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { FW_EACH_SYNTAX, extractOpeningTags, findMatchingClose, VAR_PATH } from '../src/template-parser.js';
+import { extractOpeningTags, findMatchingClose } from '../src/template-parser.js';
+import fusewireExpr from '../src/parser/fusewire-expr.js';
 
 export const name = 'template-syntax';
 
@@ -61,32 +62,35 @@ export function check(componentDir, _config) {
             // Rule 1: fw-each expression must match "item in collection"
             if (eachAttr && eachAttr.value) {
                 const expr = eachAttr.value;
-                if (!FW_EACH_SYNTAX.test(expr)) {
+                try {
+                    const ast = fusewireExpr.parse(expr.trim());
+                    if (ast.type !== 'ForEach') {
+                        throw new Error('Expression is not a ForEach loop');
+                    }
+                } catch (e) {
                     violations.push({
                         file,
                         message:
                             `${label}:${line} <${tag}> has invalid fw-each syntax: "${expr}"\n` +
-                            'fw-each requires the format: fw-each="itemName in collectionPath"\n' +
-                            '  - itemName must be a simple identifier (letters, digits, underscores)\n' +
-                            '  - collectionPath must be a var name, optionally with dots (e.g. "user.posts")\n' +
-                            '  - $ prefixes, spaces in names, and special characters are not allowed\n' +
-                            'Fix: correct the expression to match the required format.',
+                            `Parser error: ${e.message}\n` +
+                            'fw-each requires the format: fw-each="itemName in collectionPath"',
                     });
                 }
             }
 
-            // Rule 3: fw-if expression must be a simple variable path, no JS expressions
+            // Rule 3: fw-if expression must be valid
             if (ifAttr && ifAttr.value) {
                 const expr = ifAttr.value.trim();
-                const isValidIf = new RegExp(`^!?${VAR_PATH}$`).test(expr);
-                if (!isValidIf) {
+                try {
+                    fusewireExpr.parse(expr);
+                } catch (e) {
                     violations.push({
                         file,
                         message:
                             `${label}:${line} <${tag}> has invalid fw-if syntax: "${expr}"\n` +
-                            'fw-if only accepts boolean variable paths (e.g., "isVisible", "!user.isLoggedIn", "$hasItems").\n' +
-                            'It does NOT evaluate JavaScript expressions. Do not use spaces, comparison operators (===, >), or function calls.\n' +
-                            'Fix: expose a boolean getter in your JS component (e.g., get isStep1() { return this.step === 1; }) and use that.',
+                            `Parser error: ${e.message}\n` +
+                            'fw-if only accepts boolean variable paths (e.g., "isVisible", "!user.isLoggedIn").\n' +
+                            'It does NOT evaluate JavaScript expressions like === or >.',
                     });
                 }
             }
@@ -121,6 +125,29 @@ export function check(componentDir, _config) {
                                 `Fix: add the missing </${tag}> closing tag.`,
                         });
                     }
+                }
+            }
+        }
+
+        // Rule 4: Interpolations must be valid expressions
+        const linesContent = content.split('\n');
+        for (let i = 0; i < linesContent.length; i++) {
+            const lineNum = i + 1;
+            const lineContent = linesContent[i];
+            const regex = /\(\((.*?)\)\)/g;
+            let match;
+            while ((match = regex.exec(lineContent)) !== null) {
+                const path = match[1].trim();
+                if (!path || path === 'this' || path === 'componentId' || path === 'componentName' || path === 'componentVersion') continue;
+                try {
+                    fusewireExpr.parse(path);
+                } catch (e) {
+                    violations.push({
+                        file,
+                        message:
+                            `${label}:${lineNum} interpolation has invalid syntax: "((${path}))"\n` +
+                            `Parser error: ${e.message}`,
+                    });
                 }
             }
         }

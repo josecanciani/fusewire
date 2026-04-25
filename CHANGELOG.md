@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-04-25
+### Added
+- New AST-based template expression parser with nested ternaries and strict syntax validation.
+
+### Removed
+- Deprecated regex-based expression evaluation in favor of the formal Jison AST parser.
+- Removed JS-in-HTML inline execution possibilities to strictly enforce declarative JS state truth.
+
 ## [1.0.0] - 2026-04-25
 ### Added
 - URL navigation and history router.
@@ -31,5 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed JS-in-HTML inline execution possibilities to strictly enforce declarative JS state truth.
 
-[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.0.0...main
+[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.0.1...main
+[1.0.1]: https://github.com/josecanciani/fusewire/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/josecanciani/fusewire/releases/tag/1.0.0

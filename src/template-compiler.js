@@ -1,12 +1,8 @@
 import { ComponentId } from './component-id.js';
 import { Child } from './component.js';
 import { Component } from './component.js';
-import {
-    FW_EACH_SYNTAX,
-    DIRECTIVE_REGEX,
-    INTERPOLATION_REGEX,
-    findMatchingClose,
-} from './template-parser.js';
+import { DIRECTIVE_REGEX, INTERPOLATION_REGEX, findMatchingClose } from './template-parser.js';
+import fusewireExpr from './parser/fusewire-expr.js';
 
 /** @typedef {import('./component.js').ComponentVars} ComponentVars */
 /** @typedef {import('./component.js').VarValue} VarValue */
@@ -51,6 +47,42 @@ function getPropertyValue(data, path) {
  */
 function isComponent(value) {
     return value instanceof Child || value instanceof Component;
+}
+
+/**
+ * @typedef ASTNode
+ * @property {string} type
+ * @property {string} [value]
+ * @property {ASTNode} [expr]
+ * @property {ASTNode} [condition]
+ * @property {ASTNode} [trueExpr]
+ * @property {ASTNode} [falseExpr]
+ * @property {ASTNode} [item]
+ * @property {ASTNode} [list]
+ */
+
+/**
+ * Evaluate an AST node against component variables
+ * @param {ASTNode} ast - AST node
+ * @param {ComponentVars} vars - Component variables
+ * @returns {VarValue|Array<VarValue>|undefined} Evaluated value
+ */
+function evaluateAST(ast, vars) {
+    if (!ast) return undefined;
+    switch (ast.type) {
+        case 'VarPath':
+            return getPropertyValue(vars, ast.value);
+        case 'String':
+            return ast.value;
+        case 'Negation':
+            return !evaluateAST(ast.expr, vars);
+        case 'Ternary':
+            return evaluateAST(ast.condition, vars)
+                ? evaluateAST(ast.trueExpr, vars)
+                : evaluateAST(ast.falseExpr, vars);
+        default:
+            return undefined;
+    }
 }
 
 /**
@@ -178,7 +210,17 @@ function interpolateText(text, vars, componentId, constants) {
         } else if (path === 'componentVersion') {
             value = escapeHtml(constants.version || '', inTag);
         } else {
-            const rawValue = getPropertyValue(vars, path);
+            let rawValue;
+            try {
+                const ast = fusewireExpr.parse(path);
+                rawValue = evaluateAST(ast, vars);
+            } catch (e) {
+                console.warn(
+                    `Template interpolation syntax error in "${path}": ${/** @type {Error} */ (e).message}`,
+                );
+                rawValue = undefined;
+            }
+
             if (rawValue === undefined || rawValue === null) {
                 value = '';
             } else if (isComponent(rawValue)) {
@@ -275,7 +317,17 @@ function processDirectives(html, vars, componentId, constants) {
             }
 
             const condition = expr;
-            const value = getPropertyValue(vars, condition.trim());
+            let value;
+            try {
+                const ast = fusewireExpr.parse(condition.trim());
+                value = evaluateAST(ast, vars);
+            } catch (e) {
+                console.warn(
+                    `fw-if syntax error in "${condition}": ${/** @type {Error} */ (e).message}`,
+                );
+                value = false;
+            }
+
             let replacement;
 
             if (!value) {
@@ -290,9 +342,19 @@ function processDirectives(html, vars, componentId, constants) {
             result = result.substring(0, match.index) + replacement + result.substring(elementEnd);
         } else if (directive === 'fw-each') {
             const loopExpr = expr;
-            const loopMatch = loopExpr.match(FW_EACH_SYNTAX);
-            if (!loopMatch) {
-                console.warn(`Invalid fw-each syntax: ${loopExpr}`);
+            let itemName, collectionPath;
+            try {
+                const ast = fusewireExpr.parse(loopExpr.trim());
+                if (ast.type === 'ForEach') {
+                    itemName = ast.item.value;
+                    collectionPath = ast.list.value;
+                } else {
+                    throw new Error('Expected ForEach syntax');
+                }
+            } catch (e) {
+                console.warn(
+                    `Invalid fw-each syntax: ${loopExpr}. ${/** @type {Error} */ (e).message}`,
+                );
                 const attrs = (beforeAttrs + ' ' + afterAttrs).trim();
                 const openTag = attrs ? `<${tag} ${attrs}>` : `<${tag}>`;
                 const replacement = `${openTag}${content}${closeTag}`;
@@ -301,7 +363,6 @@ function processDirectives(html, vars, componentId, constants) {
                 continue;
             }
 
-            const [, itemName, collectionPath] = loopMatch;
             const collection = getPropertyValue(vars, collectionPath);
 
             let replacement = '';
