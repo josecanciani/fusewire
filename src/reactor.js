@@ -5,7 +5,7 @@ import { FuseWire } from './fusewire.js';
 import { TemplateStore } from './template-store.js';
 import { InstanceRegistry } from './instance.js';
 import { Renderer } from './renderer.js';
-import { Idiomorph } from './lib/idiomorph/idiomorph.esm.js';
+import { Idiomorph } from 'idiomorph';
 import { ComponentNotFoundError } from './errors/error-hierarchy.js';
 import { Persistence } from './persistence.js';
 import { StateSerializer } from './state-serializer.js';

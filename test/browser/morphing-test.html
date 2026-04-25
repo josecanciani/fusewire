@@ -3,12 +3,19 @@
 <head>
     <meta charset="utf-8">
     <title>FuseWire Morphing Test</title>
+    <script type="importmap">
+        {
+            "imports": {
+                "idiomorph": "/node_modules/idiomorph/dist/idiomorph.esm.js"
+            }
+        }
+    </script>
 </head>
 <body>
     <div id="container"></div>
     
     <script type="module">
-        import { Idiomorph } from '/node_modules/idiomorph/dist/idiomorph.esm.js';
+        import { Idiomorph } from 'idiomorph';
         
         // Simple Renderer implementation for testing
         class Renderer {

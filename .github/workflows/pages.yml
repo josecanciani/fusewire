@@ -38,6 +38,8 @@ jobs:
           cp -r htdocs/* public/
           mkdir -p public/js
           cp -r src/* public/js/
+          mkdir -p public/node_modules/idiomorph
+          cp -r node_modules/idiomorph/* public/node_modules/idiomorph/
           
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
