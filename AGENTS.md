@@ -180,17 +180,36 @@ Never call `this.react()` inside `init()`, `hydrate()`, or `afterRender()` — t
 
 ## Component Patterns
 
-### Data drives the UI
+### Data drives the UI (Declarative Paradigm)
 
-The core principle of FuseWire is: **you manage data, the template manages the UI**. Never manually add/remove DOM elements, toggle visibility, or manage UI state in JS. Instead, set vars and call `this.react()`. The template decides what to render based on those vars.
+The core principle of FuseWire is: **you manage data, the template manages the UI**.
+Manipulating the DOM imperatively breaks the declarative paradigm of FuseWire (and reactivity in general). JavaScript state must be the single source of truth, and the framework is responsible for reflecting it in the HTML.
+
+Never manually add/remove DOM elements, toggle visibility, or dynamically modify classes directly in the DOM. **The biggest reason for this is that any subsequent reaction will trigger an HTML re-render, and your manual DOM modifications will be completely wiped out because they are not defined in the component's state.** Instead, update state variables in JavaScript and call `this.react()`, which makes the HTML re-render.
 
 ```javascript
-// WRONG: manually toggling UI
+// WRONG: manually toggling UI or modifying classes imperatively
 this.componentContainer.querySelector('.details').style.display = 'block';
+this.componentContainer.querySelector('.btn').classList.add('active');
 
 // RIGHT: set a property, let the template handle it
 this.showDetails = true;
+this.isBtnActive = true;
 this.react();
+```
+
+**Calculated Variables ($ getters):**
+FuseWire supports calculated vars (JS getters starting with `$`). These allow you to work declaratively in the JS class, defining state-derived truths and avoiding duplicating these sources of truth in the HTML templates with complex conditional operators.
+Since `fw-if` does not support JS expressions, you should use `$getters` to expose derived booleans to the template.
+
+```javascript
+// JS Class
+get $isStep1() { return this.step === 1; }
+get $hasItems() { return this.items.length > 0; }
+```
+```html
+<!-- HTML Template -->
+<div fw-if="$isStep1">...</div>
 ```
 
 ### fw-if and fw-each: nesting support

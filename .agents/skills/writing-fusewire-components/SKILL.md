@@ -58,6 +58,9 @@ export class Line extends Component {
 > makes the component's contract clearer.
 
 **Autocalculated variables** are derived state defined via class getters. To make a getter available to the template, **it must be prefixed with `$`**. The framework auto-evaluates these `$` getters during render, eliminating the need to manually sync derived state in `update()` or `init()`.
+
+FuseWire supports calculated vars (JS getters starting with `$`) which allow you to work declaratively in the JS class, defining state-derived truths, and avoiding duplicating these sources of truth in the HTML templates with complex conditional operators.
+
 ```javascript
 export class Line extends Component {
     count = 5;
@@ -101,12 +104,18 @@ bookkeeping for the component's own logic, it's private.
 
 ### No CSS class names in JavaScript
 
+**Manipular el DOM de manera imperativa rompe todo el paradigma declarativo de FuseWire (y reactividad en general). El estado de JavaScript debe ser la única fuente de la verdad, y el framework debe encargarse de plasmarlo en el HTML.**
+
+So, don't dynamically modify classes directly in the DOM. **The biggest reason for this is that any subsequent reaction will trigger an HTML re-render, and your manual DOM modifications will be completely wiped out because they are not defined in the component's state.** Instead, you need to call methods that update state in JavaScript, and that in turn makes the HTML reload (via `this.react()`).
+
 JS files must **never** contain CSS class names or visual styling strings. Vars
 and loop items should expose **semantic data** (booleans, enums, counts) and let
 the HTML template decide which CSS classes to apply.
 
 ```javascript
-// WRONG: JS decides styling
+// WRONG: Imperative DOM manipulation or JS deciding styling
+this.componentContainer.querySelector('.dot').classList.add('bg-primary');
+
 #buildDots() {
     this.dots = this.images.map((_, i) => ({
         cssClass: i === this.activeIndex ? 'bg-primary' : 'bg-secondary opacity-50',
@@ -116,7 +125,7 @@ the HTML template decide which CSS classes to apply.
 ```
 
 ```javascript
-// RIGHT: JS exposes semantic state
+// RIGHT: JS exposes semantic state declaratively
 #buildDots() {
     this.dots = this.images.map((_, i) => ({
         isActive: i === this.activeIndex,
