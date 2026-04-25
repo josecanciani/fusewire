@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { FW_EACH_SYNTAX, extractOpeningTags, findMatchingClose } from '../src/template-parser.js';
+import { FW_EACH_SYNTAX, extractOpeningTags, findMatchingClose, VAR_PATH } from '../src/template-parser.js';
 
 export const name = 'template-syntax';
 
@@ -71,6 +71,22 @@ export function check(componentDir, _config) {
                             '  - collectionPath must be a var name, optionally with dots (e.g. "user.posts")\n' +
                             '  - $ prefixes, spaces in names, and special characters are not allowed\n' +
                             'Fix: correct the expression to match the required format.',
+                    });
+                }
+            }
+
+            // Rule 3: fw-if expression must be a simple variable path, no JS expressions
+            if (ifAttr && ifAttr.value) {
+                const expr = ifAttr.value.trim();
+                const isValidIf = new RegExp(`^!?${VAR_PATH}$`).test(expr);
+                if (!isValidIf) {
+                    violations.push({
+                        file,
+                        message:
+                            `${label}:${line} <${tag}> has invalid fw-if syntax: "${expr}"\n` +
+                            'fw-if only accepts boolean variable paths (e.g., "isVisible", "!user.isLoggedIn", "$hasItems").\n' +
+                            'It does NOT evaluate JavaScript expressions. Do not use spaces, comparison operators (===, >), or function calls.\n' +
+                            'Fix: expose a boolean getter in your JS component (e.g., get isStep1() { return this.step === 1; }) and use that.',
                     });
                 }
             }
