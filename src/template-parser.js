@@ -45,7 +45,7 @@ export const FW_EACH_SYNTAX = new RegExp(`^\\s*(${VAR_NAME})\\s+in\\s+(${VAR_PAT
  * @type {RegExp}
  */
 export const DIRECTIVE_REGEX =
-    /<(\w+)([^>]*?)\s+(fw-if|fw-each)=[\x22']([^\x22']+)[\x22']([^>]*)>/i;
+    /<(\w+)((?:[^"'>]|"[^"]*"|'[^']*')*?)\s+(fw-if|fw-each)=[\x22']([^\x22']+)[\x22']((?:[^"'>]|"[^"]*"|'[^']*')*)>/i;
 
 /**
  * Regex that matches a ((...)) interpolation placeholder.  The capture group
@@ -114,7 +114,7 @@ export function findMatchingClose(html, tagName, startIndex) {
  */
 export function extractOpeningTags(html) {
     const tags = [];
-    const tagRegex = /<(\w+)((?:\s+[^>]*?)?)>/gs;
+    const tagRegex = /<(\w+)((?:\s+(?:[^"'>]|"[^"]*"|'[^']*')*?)?)>/gs;
     let match;
     while ((match = tagRegex.exec(html)) !== null) {
         const tagName = match[1];
@@ -125,7 +125,11 @@ export function extractOpeningTags(html) {
         const attrRegex = /\s+([\w-]+)(?:=["']([^"']*)["'])?/g;
         let attrMatch;
         while ((attrMatch = attrRegex.exec(attrString)) !== null) {
-            attrs.push({ name: attrMatch[1], pos: attrMatch.index, value: attrMatch[2] ?? '' });
+            attrs.push({
+                name: attrMatch[1],
+                pos: attrMatch.index,
+                value: attrMatch[2] ?? '',
+            });
         }
 
         if (attrs.length > 0) {

@@ -1,10 +1,10 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readFileSync, readdirSync } from "node:fs";
+import { join, relative } from "node:path";
 
-export const name = 'var-jsdoc';
+export const name = "var-jsdoc";
 
 // Types that are too generic — these should be replaced with specific types.
-const FORBIDDEN_TYPES = new Set(['Object', 'Function', 'Any', '*']);
+const FORBIDDEN_TYPES = new Set(["Object", "Function", "Any", "*"]);
 
 /**
  * Recursively find all .js files under a directory tree.
@@ -19,9 +19,9 @@ function findComponentFiles(dir, rootDir = dir) {
         const fullPath = join(dir, entry.name);
         if (entry.isDirectory()) {
             files.push(...findComponentFiles(fullPath, rootDir));
-        } else if (entry.name.endsWith('.js')) {
-            const name = entry.name.replace('.js', '');
-            const relDir = relative(rootDir, dir).replaceAll('\\', '/');
+        } else if (entry.name.endsWith(".js")) {
+            const name = entry.name.replace(".js", "");
+            const relDir = relative(rootDir, dir).replaceAll("\\", "/");
             const componentName = relDir ? `${relDir}/${name}` : name;
             files.push({ jsPath: fullPath, label: name, componentName });
         }
@@ -44,7 +44,7 @@ function findComponentFiles(dir, rootDir = dir) {
  */
 function extractClassFields(classBody) {
     const fields = [];
-    const lines = classBody.split('\n');
+    const lines = classBody.split("\n");
     let depth = 0;
 
     for (let i = 0; i < lines.length; i++) {
@@ -55,24 +55,38 @@ function extractClassFields(classBody) {
         const closes = (line.match(/\}/g) ?? []).length;
 
         if (depth === 0 && trimmed.length > 0) {
-            if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+            if (
+                trimmed.startsWith("//") ||
+                trimmed.startsWith("/*") ||
+                trimmed.startsWith("*")
+            ) {
                 // comment line
-            } else if (trimmed.startsWith('static ')) {
+            } else if (trimmed.startsWith("static ")) {
                 // static field or method
-            } else if (trimmed.startsWith('get ') || trimmed.startsWith('set ')) {
+            } else if (
+                trimmed.startsWith("get ") ||
+                trimmed.startsWith("set ")
+            ) {
                 // getter/setter
-            } else if (trimmed.startsWith('async ')) {
+            } else if (trimmed.startsWith("async ")) {
                 // async method
-            } else if (trimmed.startsWith('constructor')) {
+            } else if (trimmed.startsWith("constructor")) {
                 // constructor
-            } else if (trimmed.includes('(')) {
+            } else if (trimmed.includes("(")) {
                 // method declaration
             } else {
                 const fieldMatch = trimmed.match(/^([a-zA-Z$][\w$]*)\s*[=;]/);
                 if (fieldMatch) {
                     const fieldName = fieldMatch[1];
-                    if (!fieldName.startsWith('_') && !fieldName.startsWith('#')) {
-                        fields.push({ name: fieldName, line: i, lineContent: line });
+                    if (
+                        !fieldName.startsWith("_") &&
+                        !fieldName.startsWith("#")
+                    ) {
+                        fields.push({
+                            name: fieldName,
+                            line: i,
+                            lineContent: line,
+                        });
                     }
                 }
             }
@@ -95,11 +109,18 @@ function extractClassFields(classBody) {
 function findTypeAnnotation(lines, fieldLine) {
     for (let i = fieldLine - 1; i >= 0 && i >= fieldLine - 5; i--) {
         const trimmed = lines[i].trim();
-        const singleLineMatch = trimmed.match(/\/\*\*\s*@type\s*\{([^}]+)\}\s*\*\//);
+        const singleLineMatch = trimmed.match(
+            /\/\*\*\s*@type\s*\{([^}]+)\}\s*\*\//,
+        );
         if (singleLineMatch) return singleLineMatch[1];
         const typeLineMatch = trimmed.match(/@type\s*\{([^}]+)\}/);
         if (typeLineMatch) return typeLineMatch[1];
-        if (trimmed && !trimmed.startsWith('*') && !trimmed.startsWith('/**') && !trimmed.startsWith('//')) {
+        if (
+            trimmed &&
+            !trimmed.startsWith("*") &&
+            !trimmed.startsWith("/**") &&
+            !trimmed.startsWith("//")
+        ) {
             break;
         }
     }
@@ -115,10 +136,14 @@ function findTypeAnnotation(lines, fieldLine) {
  */
 function extractTypeTokens(typeExpr) {
     let inner = typeExpr;
-    const arrayMatch = inner.match(/^Array\.<(.+)>$/) || inner.match(/^Array<(.+)>$/);
+    const arrayMatch =
+        inner.match(/^Array\.<(.+)>$/) || inner.match(/^Array<(.+)>$/);
     if (arrayMatch) inner = arrayMatch[1];
-    if (inner.startsWith('?')) inner = inner.slice(1);
-    return inner.split('|').map((t) => t.trim()).filter(Boolean);
+    if (inner.startsWith("?")) inner = inner.slice(1);
+    return inner
+        .split("|")
+        .map((t) => t.trim())
+        .filter(Boolean);
 }
 
 /**
@@ -131,10 +156,13 @@ function validateVarType(typeExpr) {
     const tokens = extractTypeTokens(typeExpr);
     for (const token of tokens) {
         if (FORBIDDEN_TYPES.has(token)) {
-            return { valid: false, reason: `forbidden generic type "${token}" — use a specific type` };
+            return {
+                valid: false,
+                reason: `forbidden generic type "${token}" — use a specific type`,
+            };
         }
     }
-    return { valid: true, reason: '' };
+    return { valid: true, reason: "" };
 }
 
 /**
@@ -145,20 +173,22 @@ function validateVarType(typeExpr) {
  */
 function findComponentClasses(source) {
     const classes = [];
-    const lines = source.split('\n');
+    const lines = source.split("\n");
 
     for (let i = 0; i < lines.length; i++) {
         const trimmed = lines[i].trimStart();
-        const classMatch = trimmed.match(/^(?:export\s+)?class\s+(\w+)\s+extends\s+(\w+)/);
+        const classMatch = trimmed.match(
+            /^(?:export\s+)?class\s+(\w+)\s+extends\s+(\w+)/,
+        );
         if (!classMatch) continue;
 
         const className = classMatch[1];
 
-        let braceStart = lines[i].indexOf('{');
+        let braceStart = lines[i].indexOf("{");
         let startLine = i;
         if (braceStart === -1) {
             for (let j = i + 1; j < lines.length; j++) {
-                if (lines[j].includes('{')) {
+                if (lines[j].includes("{")) {
                     startLine = j;
                     braceStart = 0;
                     break;
@@ -195,7 +225,7 @@ function findComponentClasses(source) {
 
         classes.push({
             className,
-            classBody: bodyLines.join('\n'),
+            classBody: bodyLines.join("\n"),
             bodyStartLine,
         });
     }
@@ -203,14 +233,51 @@ function findComponentClasses(source) {
 }
 
 /**
+ * Extract getter declarations from a class body in source code.
+ * @param {string} classBody - Source code of the class body
+ * @returns {Array.<{name: string, line: number}>} Getter declarations
+ */
+function extractGetters(classBody) {
+    const getters = [];
+    const lines = classBody.split("\n");
+    let depth = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trimStart();
+        const opens = (line.match(/\{/g) ?? []).length;
+        const closes = (line.match(/\}/g) ?? []).length;
+
+        if (depth === 0 && trimmed.startsWith("get ")) {
+            const match = trimmed.match(/^get\s+([\w$]+)\s*\(/);
+            if (match) {
+                const name = match[1];
+                if (!name.startsWith("_") && !name.startsWith("#")) {
+                    getters.push({ name, line: i });
+                }
+            }
+        }
+
+        depth += opens;
+        depth -= closes;
+        if (depth < 0) depth = 0;
+    }
+    return getters;
+}
+
+/**
  * Check that every public class field in component JS files has a valid
  * JSDoc @type annotation.
  *
- * Two rules per component class:
+ * Rules per component class:
  *
  *   Rule 1 — Every public class field must have a @type annotation.
  *
  *   Rule 2 — The type must not use forbidden generic types (Object, Function, Any, *).
+ *
+ *   Rule 3 — All public getters must start with $ (convention for calculated variables).
+ *
+ *   Rule 4 — All public class fields must NOT start with $ (this prefix is reserved for getters).
  *
  * @param {string} componentDir - Absolute path to the component directory to scan
  * @param {import('./index.js').CheckConfig} _config - Project-level configuration (unused by this check)
@@ -221,13 +288,18 @@ export function check(componentDir, _config) {
     const violations = [];
 
     for (const { jsPath } of files) {
-        const source = readFileSync(jsPath, 'utf-8');
+        const source = readFileSync(jsPath, "utf-8");
         const label = relative(componentDir, jsPath);
         const componentClasses = findComponentClasses(source);
 
-        for (const { className, classBody, bodyStartLine } of componentClasses) {
+        for (const {
+            className,
+            classBody,
+            bodyStartLine,
+        } of componentClasses) {
             const fields = extractClassFields(classBody);
-            const bodyLines = classBody.split('\n');
+            const getters = extractGetters(classBody);
+            const bodyLines = classBody.split("\n");
 
             // Rule 1: missing @type
             const missingType = [];
@@ -244,10 +316,10 @@ export function check(componentDir, _config) {
                     file: jsPath,
                     message:
                         `${label}: ${className} has public class fields without @type JSDoc:\n` +
-                        missingType.map((v) => `  ${v}`).join('\n') +
-                        '\n\nFix: add /** @type {X} */ before each field declaration.\n' +
-                        'Valid types: string, number, boolean, null, Component, Child,\n' +
-                        'specific component class names, ScalarObject, Array.<Type>, or unions of these.',
+                        missingType.map((v) => `  ${v}`).join("\n") +
+                        "\n\nFix: add /** @type {X} */ before each field declaration.\n" +
+                        "Valid types: string, number, boolean, null, Component, Child,\n" +
+                        "specific component class names, ScalarObject, Array.<Type>, or unions of these.",
                 });
             }
 
@@ -268,7 +340,47 @@ export function check(componentDir, _config) {
                     file: jsPath,
                     message:
                         `${label}: ${className} has @type annotations with invalid types:\n` +
-                        invalidType.map((v) => `  ${v}`).join('\n'),
+                        invalidType.map((v) => `  ${v}`).join("\n"),
+                });
+            }
+
+            // Rule 3: getter prefix convention
+            const invalidGetters = [];
+            for (const getter of getters) {
+                if (!getter.name.startsWith("$")) {
+                    invalidGetters.push(
+                        `getter "${getter.name}" (line ${bodyStartLine + getter.line}) must start with $`,
+                    );
+                }
+            }
+            if (invalidGetters.length > 0) {
+                violations.push({
+                    file: jsPath,
+                    message:
+                        `${label}: ${className} has public getters without the required "$" prefix:\n` +
+                        invalidGetters.map((v) => `  ${v}`).join("\n") +
+                        "\n\nFix: rename them to start with $ (e.g. get $isVisible() { ... }).\n" +
+                        "This convention distinguishes calculated component variables from global variables.",
+                });
+            }
+
+            // Rule 4: field prefix convention
+            const invalidFields = [];
+            for (const field of fields) {
+                if (field.name.startsWith("$")) {
+                    invalidFields.push(
+                        `field "${field.name}" (line ${bodyStartLine + field.line}) must NOT start with $`,
+                    );
+                }
+            }
+            if (invalidFields.length > 0) {
+                violations.push({
+                    file: jsPath,
+                    message:
+                        `${label}: ${className} has public class fields starting with "$" (reserved for getters):\n` +
+                        invalidFields.map((v) => `  ${v}`).join("\n") +
+                        "\n\nFix: rename them to remove the $ prefix.\n" +
+                        "The $ prefix is strictly reserved for calculated component variables (getters).",
                 });
             }
         }

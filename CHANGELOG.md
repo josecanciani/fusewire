@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- New `template-vars` quality check to ensure all variables used in HTML templates are defined as public members in the component's JS file.
+- Enforced `$` prefix convention for calculated variables: public getters must start with `$`, and public class fields must not.
+- Added regression tests for `>` operator handling in `fw-if` directives.
+
+### Changed
+- Enhanced component check runner to display the total number of components inspected during a run.
+
+### Fixed
+- Fixed a bug in the template parser where `>` characters inside quoted attribute values would prematurely terminate tag matching, causing syntax errors to be ignored by quality checks.
+- Fixed lint errors in `src/history-router.js` by standardizing on single quotes for imports.
+
 ## [1.0.2] - 2026-04-25
 ### Added
 - Created `AGENTS.md` in parser directory explaining the generated parser workaround.

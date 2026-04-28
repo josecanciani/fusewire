@@ -115,6 +115,17 @@ export class HistoryRouter {
     }
 
     /**
+     * Peek at the next available initial-load segment without consuming it.
+     * Used by layout components to drive child selection during first load.
+     * @returns {RouteSegment|null} Next segment or null
+     */
+    peekSegment() {
+        if (this.#initialCursor < 0) return null;
+        if (this.#initialCursor >= this.#initialSegments.length) return null;
+        return this.#initialSegments[this.#initialCursor];
+    }
+
+    /**
      * Try to consume the next initial-load segment matching a route key.
      * Used during tree construction: the registry calls this for each child
      * being created, passing the child's route key (var name on the parent).
@@ -168,11 +179,18 @@ export class HistoryRouter {
         for (const rootCode of registry._roots) {
             const rootEntry = registry._instances.get(rootCode);
             if (!rootEntry) continue;
+
             const state = rootEntry.instance.routeState();
             if (state === false) continue;
 
-            if (segIndex < segments.length && this.#hasRouteProperties(state)) {
-                result.set(rootCode, segments[segIndex++]);
+            if (segIndex < segments.length) {
+                if (this.#hasRouteProperties(state)) {
+                    // Routed: consume the segment
+                    result.set(rootCode, segments[segIndex++]);
+                } else {
+                    // Pass-through: peek the segment so the layout can switch branches
+                    result.set(rootCode, segments[segIndex]);
+                }
             }
 
             // Stack: each frame tracks a component's remaining routed children.
@@ -195,6 +213,11 @@ export class HistoryRouter {
                             result.set(childCode, segment);
                             const childEntry = registry._instances.get(childCode);
                             if (childEntry) {
+                                const childState = childEntry.instance.routeState();
+                                if (this.#hasRouteProperties(childState)) {
+                                    // Child consumed the segment
+                                    segIndex++;
+                                }
                                 stack.push({
                                     code: childCode,
                                     remaining: new Map(this.#getChildRouteMap(childEntry)),
@@ -207,8 +230,13 @@ export class HistoryRouter {
                     stack.pop();
                 }
 
-                segIndex++;
-                if (!matched) continue;
+                if (!matched) {
+                    segIndex++; // Skip unmatched segment
+                }
+                if (stack.length === 0 && segIndex < segments.length) {
+                    // Start over with next root if segments remain
+                    break;
+                }
             }
         }
 

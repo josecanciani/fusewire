@@ -8,10 +8,10 @@
         </button>
         <button type="button" class="btn btn-sm btn-secondary" onclick="((this)).step()">&#8250; Step</button>
         <button type="button" class="btn btn-sm btn-outline-danger" onclick="((this)).reset()">&#8635; Reset</button>
-        <button fw-if="!showHelp" type="button" class="btn btn-sm btn-outline-info" onclick="((this)).toggleHelp()">
+        <button fw-if="!$showHelp" type="button" class="btn btn-sm btn-outline-info" onclick="((this)).toggleHelp()">
             ? Help
         </button>
-        <button fw-if="showHelp" type="button" class="btn btn-sm btn-info" onclick="((this)).toggleHelp()">
+        <button fw-if="$showHelp" type="button" class="btn btn-sm btn-info" onclick="((this)).toggleHelp()">
             &#10005; Close Help
         </button>
     </div>

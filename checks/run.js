@@ -24,23 +24,46 @@
  *   2 — usage error (missing arguments, bad paths)
  */
 
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { resolve, join } from 'node:path';
-import { runAllChecks } from './index.js';
+import { existsSync, readFileSync, statSync, readdirSync } from "node:fs";
+import { resolve, join } from "node:path";
+import { runAllChecks } from "./index.js";
 
 const arg1 = process.argv[2];
 const arg2 = process.argv[3];
 
 if (!arg1) {
-    console.error('Usage: fusewire-checks <componentDir> [componentName]');
-    console.error('');
-    console.error('  <componentDir>    Path to the root component directory');
-    console.error('  [componentName]   Optional component to check (e.g. "Console/Line")');
-    console.error('');
-    console.error('Examples:');
-    console.error('  node checks/run.js ./src/components');
-    console.error('  node checks/run.js ./src/components Console/Line');
+    console.error("Usage: fusewire-checks <componentDir> [componentName]");
+    console.error("");
+    console.error("  <componentDir>    Path to the root component directory");
+    console.error(
+        '  [componentName]   Optional component to check (e.g. "Console/Line")',
+    );
+    console.error("");
+    console.error("Examples:");
+    console.error("  node checks/run.js ./src/components");
+    console.error("  node checks/run.js ./src/components Console/Line");
     process.exit(2);
+}
+
+/**
+ * Recursively find all components (unique base names) in a directory.
+ * @param {string} dir - Directory to scan
+ * @returns {Set.<string>} Set of absolute paths to components (without extension)
+ */
+function findComponents(dir) {
+    const components = new Set();
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+        const fullPath = join(dir, entry.name);
+        if (entry.isDirectory()) {
+            const sub = findComponents(fullPath);
+            for (const s of sub) components.add(s);
+        } else if (entry.name.endsWith(".html") || entry.name.endsWith(".js")) {
+            const baseName = fullPath.replace(/\.(html|js)$/, "");
+            components.add(baseName);
+        }
+    }
+    return components;
 }
 
 /**
@@ -63,13 +86,21 @@ function resolveArgs() {
 
     // Two-argument form: <componentDir> <componentName>
     if (arg2) {
-        if (!existsSync(resolvedArg1) || !statSync(resolvedArg1).isDirectory()) {
+        if (
+            !existsSync(resolvedArg1) ||
+            !statSync(resolvedArg1).isDirectory()
+        ) {
             console.error(`Component directory not found: ${resolvedArg1}`);
             process.exit(2);
         }
         const componentPath = join(resolvedArg1, arg2);
-        if (!existsSync(`${componentPath}.html`) && !existsSync(`${componentPath}.js`)) {
-            console.error(`Component not found: ${arg2} (looked for ${componentPath}.html and ${componentPath}.js)`);
+        if (
+            !existsSync(`${componentPath}.html`) &&
+            !existsSync(`${componentPath}.js`)
+        ) {
+            console.error(
+                `Component not found: ${arg2} (looked for ${componentPath}.html and ${componentPath}.js)`,
+            );
             process.exit(2);
         }
         return { componentDir: resolvedArg1, componentName: arg2 };
@@ -82,7 +113,10 @@ function resolveArgs() {
 
     // Single argument, not a directory: treat as component path.
     // E.g. "./src/components/Console/Line" → dir="./src/components", name="Console/Line"
-    if (existsSync(`${resolvedArg1}.html`) || existsSync(`${resolvedArg1}.js`)) {
+    if (
+        existsSync(`${resolvedArg1}.html`) ||
+        existsSync(`${resolvedArg1}.js`)
+    ) {
         // Walk up to find the component root. The component root is the
         // deepest ancestor directory that is NOT a component namespace
         // (i.e. it contains subdirectories with component files).
@@ -91,15 +125,21 @@ function resolveArgs() {
         // know that reliably, use the component's grandparent. For deeply nested
         // components (A/B/C), this still works because we only use the root for
         // the registry and label computation.
-        const parts = resolvedArg1.split('/');
+        const parts = resolvedArg1.split("/");
         const fileName = parts.pop();
-        const parentDir = parts.join('/');
-        const grandparentDir = parts.slice(0, -1).join('/');
+        const parentDir = parts.join("/");
+        const grandparentDir = parts.slice(0, -1).join("/");
 
         // Try grandparent first (covers Namespace/Component pattern)
-        if (existsSync(grandparentDir) && statSync(grandparentDir).isDirectory()) {
-            const parentName = parentDir.split('/').pop();
-            return { componentDir: grandparentDir, componentName: `${parentName}/${fileName}` };
+        if (
+            existsSync(grandparentDir) &&
+            statSync(grandparentDir).isDirectory()
+        ) {
+            const parentName = parentDir.split("/").pop();
+            return {
+                componentDir: grandparentDir,
+                componentName: `${parentName}/${fileName}`,
+            };
         }
 
         // Fallback: component is at the root level (no namespace)
@@ -107,7 +147,9 @@ function resolveArgs() {
     }
 
     console.error(`Not found: ${resolvedArg1}`);
-    console.error('Argument must be a component directory or a component path (without extension).');
+    console.error(
+        "Argument must be a component directory or a component path (without extension).",
+    );
     process.exit(2);
 }
 
@@ -116,10 +158,10 @@ function resolveArgs() {
  * @returns {import('./index.js').CheckConfig} Config extracted from .fusewire.json
  */
 function readProjectConfig() {
-    const configPath = join(process.cwd(), '.fusewire.json');
+    const configPath = join(process.cwd(), ".fusewire.json");
     if (!existsSync(configPath)) return {};
 
-    const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+    const config = JSON.parse(readFileSync(configPath, "utf-8"));
     return {
         globalClasses: config.globalClasses ?? [],
         disabledChecks: config.disabledChecks ?? [],
@@ -139,16 +181,25 @@ async function main() {
     if (componentName) {
         const prefix = join(componentDir, componentName);
         for (const result of results) {
-            result.violations = result.violations.filter((v) => v.file.startsWith(prefix));
+            result.violations = result.violations.filter((v) =>
+                v.file.startsWith(prefix),
+            );
         }
     }
 
     const failures = results.filter((r) => r.violations.length > 0);
+    const componentCount = componentName
+        ? 1
+        : findComponents(componentDir).size;
 
     if (failures.length === 0) {
         const checkCount = results.length;
-        const scope = componentName ?? 'all components';
-        console.log(`All ${checkCount} checks passed (${scope}).`);
+        const scope = componentName ?? "all components";
+        const componentLabel =
+            componentCount === 1 ? "component" : "components";
+        console.log(
+            `All ${checkCount} checks passed across ${componentCount} ${componentLabel} (${scope}).`,
+        );
         process.exit(0);
     }
 
@@ -156,12 +207,18 @@ async function main() {
         console.error(`--- ${result.name} ---`);
         for (const v of result.violations) {
             console.error(v.message);
-            console.error('');
+            console.error("");
         }
     }
 
-    const violationCount = failures.reduce((sum, r) => sum + r.violations.length, 0);
-    console.error(`${violationCount} violation(s) found across ${failures.length} check(s).`);
+    const violationCount = failures.reduce(
+        (sum, r) => sum + r.violations.length,
+        0,
+    );
+    const componentLabel = componentCount === 1 ? "component" : "components";
+    console.error(
+        `${violationCount} violation(s) found across ${componentCount} ${componentLabel} and ${failures.length} check(s).`,
+    );
     process.exit(1);
 }
 

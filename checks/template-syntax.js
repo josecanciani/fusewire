@@ -1,9 +1,12 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative } from 'node:path';
-import { extractOpeningTags, findMatchingClose } from '../src/template-parser.js';
-import fusewireExpr from '../src/parser/fusewire-expr.js';
+import { readFileSync, readdirSync } from "node:fs";
+import { join, relative } from "node:path";
+import {
+    extractOpeningTags,
+    findMatchingClose,
+} from "../src/template-parser.js";
+import fusewireExpr from "../src/parser/fusewire-expr.js";
 
-export const name = 'template-syntax';
+export const name = "template-syntax";
 
 /**
  * Recursively find all .html files under a directory tree.
@@ -17,7 +20,7 @@ function findHtmlFiles(dir) {
         const fullPath = join(dir, entry.name);
         if (entry.isDirectory()) {
             files.push(...findHtmlFiles(fullPath));
-        } else if (entry.name.endsWith('.html')) {
+        } else if (entry.name.endsWith(".html")) {
             files.push(fullPath);
         }
     }
@@ -31,41 +34,43 @@ function findHtmlFiles(dir) {
  * (src/template-parser.js) so that build-time validation catches exactly the
  * same errors the compiler would encounter at runtime.
  *
- * Two rules:
+ * Rules:
  *
- *   Rule 1 — fw-each expression syntax: the value must follow the
- *   "item in collection" pattern. The item name must be a simple identifier
- *   ([a-zA-Z0-9_]). The collection path may use dot notation (e.g. "user.posts")
- *   but must not contain special characters like $.
+ *   Rule 1 — fw-each expression syntax: must follow "item in collection".
  *
- *   Rule 2 — Unclosed directive tags: elements with fw-if or fw-each must have
- *   a matching closing tag. An unclosed tag causes the runtime compiler to strip
- *   the directive silently, hiding the bug.
+ *   Rule 2 — Unclosed directive tags: elements with fw-if or fw-each must have matching closing tags.
  *
- * @param {string} componentDir - Absolute path to the component directory to scan
- * @param {import('./index.js').CheckConfig} _config - Project-level configuration (unused by this check)
- * @returns {Array.<import('./index.js').CheckViolation>} Violations found
+ *   Rule 3 — fw-if expression syntax: must be a valid FuseWire expression.
+ *
+ *   Rule 4 — Interpolation syntax: ((...)) must contain valid FuseWire expressions.
+ *
+ *   Rule 5 — Getter prefix convention: variables starting with show, is, or has
+ *           must have a $ prefix (e.g. $isVisible) to avoid confusion with globals.
+ *
+ * @param {string} componentDir - Absolute path to scan
+ * @param {import('./index.js').CheckConfig} _config - Config
+ * @returns {Array.<import('./index.js').CheckViolation>} Violations
  */
 export function check(componentDir, _config) {
     const htmlFiles = findHtmlFiles(componentDir);
     const violations = [];
 
     for (const file of htmlFiles) {
-        const content = readFileSync(file, 'utf-8');
+        const content = readFileSync(file, "utf-8");
         const label = relative(componentDir, file);
         const openingTags = extractOpeningTags(content);
 
         for (const { line, tag, attrs } of openingTags) {
-            const eachAttr = attrs.find((a) => a.name === 'fw-each');
-            const ifAttr = attrs.find((a) => a.name === 'fw-if');
+            const eachAttr = attrs.find((a) => a.name === "fw-each");
+            const ifAttr = attrs.find((a) => a.name === "fw-if");
 
             // Rule 1: fw-each expression must match "item in collection"
             if (eachAttr && eachAttr.value) {
                 const expr = eachAttr.value;
                 try {
                     const ast = fusewireExpr.parse(expr.trim());
-                    if (ast.type !== 'ForEach') {
-                        throw new Error('Expression is not a ForEach loop');
+                    if (ast.type !== "ForEach") {
+                        throw new Error("Expression is not a ForEach loop");
                     }
                 } catch (e) {
                     violations.push({
@@ -90,20 +95,31 @@ export function check(componentDir, _config) {
                             `${label}:${line} <${tag}> has invalid fw-if syntax: "${expr}"\n` +
                             `Parser error: ${e.message}\n` +
                             'fw-if only accepts boolean variable paths (e.g., "isVisible", "!user.isLoggedIn").\n' +
-                            'It does NOT evaluate JavaScript expressions like === or >.',
+                            "It does NOT evaluate JavaScript expressions like === or >.",
                     });
+                }
+
+                // Rule 5: Getters must start with $
+                const baseVar = expr.startsWith("!") ? expr.slice(1) : expr;
+                const pathParts = baseVar.split(".");
+                for (const part of pathParts) {
+                    if (/^(?:show|is|has)[A-Z]/.test(part)) {
+                        violations.push({
+                            file,
+                            message:
+                                `${label}:${line} <${tag} fw-if="${expr}"> uses a calculated variable "${part}" without the required "$" prefix.\n` +
+                                `Convention: all getters (calculated variables) used in templates must start with $ to avoid confusion with global variables.`,
+                        });
+                    }
                 }
             }
 
             // Rule 2: directive elements must have matching closing tags
             if (eachAttr || ifAttr) {
-                const directive = eachAttr ? 'fw-each' : 'fw-if';
-                const tagRegex = new RegExp(
-                    `<${tag}(?:\\s[^>]*)?>`,
-                    'gi',
-                );
+                const directive = eachAttr ? "fw-each" : "fw-if";
+                const tagRegex = new RegExp(`<${tag}(?:\\s[^>]*)?>`, "gi");
                 // Find the specific opening tag occurrence at this line
-                const lines = content.split('\n');
+                const lines = content.split("\n");
                 let charOffset = 0;
                 for (let i = 0; i < line - 1; i++) {
                     charOffset += lines[i].length + 1;
@@ -113,7 +129,11 @@ export function check(componentDir, _config) {
                 const tagMatch = tagRegex.exec(content);
                 if (tagMatch) {
                     const contentStart = tagMatch.index + tagMatch[0].length;
-                    const closeIndex = findMatchingClose(content, tag, contentStart);
+                    const closeIndex = findMatchingClose(
+                        content,
+                        tag,
+                        contentStart,
+                    );
                     if (closeIndex === -1) {
                         violations.push({
                             file,
@@ -121,7 +141,7 @@ export function check(componentDir, _config) {
                                 `${label}:${line} <${tag} ${directive}="..."> has no matching closing tag.\n` +
                                 `The template compiler requires a </${tag}> for every <${tag}> with a directive.\n` +
                                 `An unclosed tag causes the compiler to silently strip the ${directive} directive,\n` +
-                                'which hides the bug until runtime.\n' +
+                                "which hides the bug until runtime.\n" +
                                 `Fix: add the missing </${tag}> closing tag.`,
                         });
                     }
@@ -130,7 +150,7 @@ export function check(componentDir, _config) {
         }
 
         // Rule 4: Interpolations must be valid expressions
-        const linesContent = content.split('\n');
+        const linesContent = content.split("\n");
         for (let i = 0; i < linesContent.length; i++) {
             const lineNum = i + 1;
             const lineContent = linesContent[i];
@@ -138,9 +158,29 @@ export function check(componentDir, _config) {
             let match;
             while ((match = regex.exec(lineContent)) !== null) {
                 const path = match[1].trim();
-                if (!path || path === 'this' || path === 'componentId' || path === 'componentName' || path === 'componentVersion') continue;
+                if (
+                    !path ||
+                    path === "this" ||
+                    path === "componentId" ||
+                    path === "componentName" ||
+                    path === "componentVersion"
+                )
+                    continue;
                 try {
                     fusewireExpr.parse(path);
+
+                    // Rule 5: Getters must start with $
+                    const pathParts = path.split(".");
+                    for (const part of pathParts) {
+                        if (/^(?:show|is|has)[A-Z]/.test(part)) {
+                            violations.push({
+                                file,
+                                message:
+                                    `${label}:${lineNum} interpolation "((${path}))" uses a calculated variable "${part}" without the required "$" prefix.\n` +
+                                    `Convention: all getters (calculated variables) used in templates must start with $ to avoid confusion with global variables.`,
+                            });
+                        }
+                    }
                 } catch (e) {
                     violations.push({
                         file,

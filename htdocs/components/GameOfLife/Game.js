@@ -1,4 +1,4 @@
-import { Component } from '/js/component.js';
+import { Component } from "/js/component.js";
 
 /**
  * Game of Life component. Manages the engine, cell grid, and UI sub-components.
@@ -9,7 +9,7 @@ export class Game extends Component {
     /** @type {Array.<import('./Alive.js').Alive|import('./Dead.js').Dead>} */
     cells = [];
     /** @type {boolean} */
-    showHelp = false;
+    #showHelp = false;
     /** @type {import('./Controls.js').Controls} */
     controls = null;
     /** @type {import('./Stats.js').Stats} */
@@ -32,23 +32,23 @@ export class Game extends Component {
      * Declare child components and wire control events.
      */
     async init() {
-        this.loadLibrary('GameOfLife/Engine');
+        this.loadLibrary("GameOfLife/Engine");
 
         this.controls = /** @type {import('./Controls.js').Controls} */ (
-            this.createChild('GameOfLife/Controls', 'controls', {})
+            this.createChild("GameOfLife/Controls", "controls", {})
         );
-        this.controls.on('play', () => this.#engine.play());
-        this.controls.on('pause', () => this.#engine.pause());
-        this.controls.on('step', () => this.#engine.step());
-        this.controls.on('reset', () => this.#engine.reset());
-        this.controls.on('speed', (level) => this.#engine.setSpeed(level));
-        this.controls.on('help', (show) => this.#setHelp(show));
+        this.controls.on("play", () => this.#engine.play());
+        this.controls.on("pause", () => this.#engine.pause());
+        this.controls.on("step", () => this.#engine.step());
+        this.controls.on("reset", () => this.#engine.reset());
+        this.controls.on("speed", (level) => this.#engine.setSpeed(level));
+        this.controls.on("help", (show) => this.#setHelp(show));
 
         this.stats = /** @type {import('./Stats.js').Stats} */ (
-            this.createChild('GameOfLife/Stats', 'stats', {})
+            this.createChild("GameOfLife/Stats", "stats", {})
         );
         this.help = /** @type {import('./Help.js').Help} */ (
-            this.createChild('GameOfLife/Help', 'help', {})
+            this.createChild("GameOfLife/Help", "help", {})
         );
     }
 
@@ -57,15 +57,19 @@ export class Game extends Component {
      */
     hydrate() {
         const Engine = /** @type {typeof import('./Engine.js').Engine} */ (
-            this.library('GameOfLife/Engine').Engine
+            this.library("GameOfLife/Engine").Engine
         );
         this.#engine = new Engine((grid, engineStats, done) => {
-            this.stats.update(/** @type {Record<string, number>} */ (engineStats));
+            this.stats.update(
+                /** @type {Record<string, number>} */ (engineStats),
+            );
             this.#syncCells(grid, done);
         });
 
-        const gridEl = this.querySelector('.grid');
-        this.#resizeObserver = new ResizeObserver(() => this.#debounceResize(gridEl));
+        const gridEl = this.querySelector(".grid");
+        this.#resizeObserver = new ResizeObserver(() =>
+            this.#debounceResize(gridEl),
+        );
         this.#resizeObserver.observe(gridEl);
     }
 
@@ -79,11 +83,19 @@ export class Game extends Component {
     }
 
     /**
+     * @type {boolean}
+     * Whether to show the help panel.
+     */
+    get $showHelp() {
+        return this.#showHelp;
+    }
+
+    /**
      * Update help panel visibility from controls
      * @param {boolean} show - Whether to show the help panel
      */
     #setHelp(show) {
-        this.showHelp = show;
+        this.#showHelp = show;
         this.react();
     }
 
@@ -164,7 +176,7 @@ export class Game extends Component {
                 for (let c = 0; c < grid[r].length; c++) {
                     cells.push(
                         this.createChild(
-                            grid[r][c] ? 'GameOfLife/Alive' : 'GameOfLife/Dead',
+                            grid[r][c] ? "GameOfLife/Alive" : "GameOfLife/Dead",
                             `${r}-${c}`,
                             {},
                         ),
@@ -178,7 +190,9 @@ export class Game extends Component {
             }
             this.#syncTimer = null;
             this.cells =
-                /** @type {Array.<import('./Alive.js').Alive|import('./Dead.js').Dead>} */ (cells);
+                /** @type {Array.<import('./Alive.js').Alive|import('./Dead.js').Dead>} */ (
+                    cells
+                );
             this.react();
             done();
             if (onComplete) {
