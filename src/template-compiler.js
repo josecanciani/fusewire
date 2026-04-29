@@ -4,11 +4,26 @@ import { Component } from './component.js';
 import { DIRECTIVE_REGEX, INTERPOLATION_REGEX, findMatchingClose } from './template-parser.js';
 import fusewireExpr from './parser/fusewire-expr.js';
 
-/** @typedef {import('./component.js').ComponentVars} ComponentVars */
-/** @typedef {import('./component.js').VarValue} VarValue */
-/** @typedef {import('./component.js').ComponentConstructor} ComponentConstructor */
-/** @typedef {{version?: string}} TemplateConstants */
-/** @typedef {{render: function(ComponentVars, ComponentId, TemplateConstants=): string, css: string}} CompiledTemplate */
+/**
+ * Map of variables passed to a component.
+ * @typedef {import('./component.js').ComponentVars} ComponentVars
+ */
+/**
+ * Any valid value that can be assigned to a component variable.
+ * @typedef {import('./component.js').VarValue} VarValue
+ */
+/**
+ * Class constructor for a Component.
+ * @typedef {import('./component.js').ComponentConstructor} ComponentConstructor
+ */
+/**
+ * Static constants evaluated during compilation (e.g. version).
+ * @typedef {{version?: string}} TemplateConstants
+ */
+/**
+ * A compiled component template representation.
+ * @typedef {{render: function(ComponentVars, ComponentId, TemplateConstants=): string, css: string}} CompiledTemplate
+ */
 
 /**
  * Extract property value from an object using dot notation
@@ -24,7 +39,10 @@ function getPropertyValue(data, path) {
     const cleanPath = isNegated ? path.slice(1) : path;
 
     const parts = cleanPath.split('.');
-    /** @type {VarValue|Array<VarValue>|ComponentVars|undefined} */
+    /**
+     * Iterative property value cursor.
+     * @type {VarValue|Array<VarValue>|ComponentVars|undefined}
+     */
     let value = data;
 
     for (const part of parts) {
@@ -32,7 +50,10 @@ function getPropertyValue(data, path) {
             return undefined;
         }
         value = /** @type {VarValue|Array<VarValue>|ComponentVars|undefined} */ (
-            /** @type {ComponentVars} */
+            /**
+             * Intermediate object cast.
+             * @type {ComponentVars}
+             */
             (value)[part]
         );
     }
@@ -50,6 +71,7 @@ function isComponent(value) {
 }
 
 /**
+ * Abstract Syntax Tree node returned by the expression parser.
  * @typedef ASTNode
  * @property {string} type
  * @property {string} [value]

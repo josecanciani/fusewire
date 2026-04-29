@@ -13,26 +13,50 @@
  *   - collectVars() needs no filtering — only string keys are component vars
  */
 
-/** @type {symbol} Component identity (ComponentId object) */
+/**
+ * Component identity (ComponentId object)
+ * @type {symbol}
+ */
 export const COMPONENT_ID = Symbol('componentId');
 
-/** @type {symbol} Shared registry entry ({ instance, container, parent, children }) */
+/**
+ * Shared registry entry ({ instance, container, parent, children })
+ * @type {symbol}
+ */
 export const REGISTRY_ENTRY = Symbol('registryEntry');
 
-/** @type {symbol} Pre-built console wrapper with component context */
+/**
+ * Pre-built console wrapper with component context
+ * @type {symbol}
+ */
 export const CONSOLE = Symbol('console');
 
-/** @type {symbol} Reactor reference (enables react(), console, etc.) */
+/**
+ * Reactor reference (enables react(), console, etc.)
+ * @type {symbol}
+ */
 export const REACTOR = Symbol('reactor');
 
-/** @type {symbol} Name of the active lifecycle hook, or null (guards react() during hooks) */
+/**
+ * Name of the active lifecycle hook, or null (guards react() during hooks)
+ * @type {symbol}
+ */
 export const LIFECYCLE_ACTIVE = Symbol('lifecycleActive');
 
-/** @type {symbol} Event handlers map for pub/sub (Map<string, Set<function>>) — cleared by InstanceRegistry on destroy */
+/**
+ * Event handlers map for pub/sub (Map<string, Set<function>>) — cleared by InstanceRegistry on destroy
+ * @type {symbol}
+ */
 export const EVENTS = Symbol('events');
 
-/** @type {symbol} Library loading state — Map<string, {promise, exportNames, module}> */
+/**
+ * Library loading state — Map<string, {promise, exportNames, module}>
+ * @type {symbol}
+ */
 export const LIBRARIES = Symbol('libraries');
 
-/** @type {symbol} Snapshot of routeState() defaults captured before init() — used by the router to omit unchanged values from the URL */
+/**
+ * Snapshot of routeState() defaults captured before init() — used by the router to omit unchanged values from the URL
+ * @type {symbol}
+ */
 export const ROUTE_DEFAULTS = Symbol('routeDefaults');

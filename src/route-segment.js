@@ -101,10 +101,16 @@ export class MinimalRouteEncoder extends RouteEncoder {
  * Segment format: `routeKey:prop1=value1;prop2=value2`
  */
 export class RouteSegment {
-    /** @type {string} */
+    /**
+     * The route key for this segment (e.g. "dashboard").
+     * @type {string}
+     */
     #key;
 
-    /** @type {Map.<string, string>} */
+    /**
+     * Raw key-value pairs parsed from the segment.
+     * @type {Map.<string, string>}
+     */
     #properties;
 
     /**
@@ -235,5 +241,8 @@ export class RouteSegment {
     }
 }
 
-/** @type {MinimalRouteEncoder} */
+/**
+ * Default URL-safe encoder used by RouteSegment stringification and parsing.
+ * @type {MinimalRouteEncoder}
+ */
 const defaultEncoder = new MinimalRouteEncoder();

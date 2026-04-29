@@ -1,30 +1,36 @@
-import { ComponentNotFoundError } from './errors/error-hierarchy.js';
-import { ComponentId, toCssName } from './component-id.js';
-import { Child, Lazy, ErrorBoundary, Root, PortalHost, PortalChild } from './component.js';
-import { Component } from './component.js';
-import { LogMessage } from './log-message.js';
-import { compileTemplate } from './template-compiler.js';
+import { ComponentId } from './component-id.js';
+import {
+    Component,
+    Child,
+    Lazy,
+    ErrorBoundary,
+    Root,
+    PortalHost,
+    PortalChild,
+} from './component.js';
 import {
     COMPONENT_ID,
     REGISTRY_ENTRY,
-    CONSOLE,
-    REACTOR,
     LIFECYCLE_ACTIVE,
     EVENTS,
-    LIBRARIES,
     ROUTE_DEFAULTS,
+    REACTOR,
+    CONSOLE,
+    LIBRARIES,
 } from './symbols.js';
-
-/** @typedef {import('./component.js').ComponentVars} ComponentVars */
-/** @typedef {import('./component.js').VarValue} VarValue */
-/** @typedef {import('./component.js').ComponentConstructor} ComponentConstructor */
+import { ComponentNotFoundError } from './errors/error-hierarchy.js';
+import { compileTemplate } from './template-compiler.js';
+import {
+    getComponentIdFromElement,
+    toCssName,
+} from './utils/dom-helpers.js';
 
 /**
- * Collect component vars from an instance's own properties.
- * Returns all own enumerable string-keyed properties. Framework state is stored
- * under Symbol keys (invisible to Object.keys), so no filtering is needed.
- * @param {Component} instance - Component instance
- * @returns {ComponentVars} Plain object with component vars
+ * Collect all public variables from a component instance.
+ * Variables are non-private (#) public class fields.
+ * Autocalculated getters (prefixed with $) are included.
+ * @param {import('./component.js').Component} instance - Component instance
+ * @returns {import('./component.js').ComponentVars} Map of variable names to values
  */
 export function collectVars(instance) {
     /** @type {ComponentVars} */
@@ -53,23 +59,23 @@ export function collectVars(instance) {
 }
 
 /**
- * InstanceRegistry manages component instances and their lifecycle.
- *
- * Responsibilities:
- * - Create/update/remove component instances
- * - Call lifecycle hooks (init, update, destroy)
- * - Coordinate rendering with Renderer
- * - Manage component tree (parent/child relationships)
- * - Resolve Child declarations to real Component instances
- * - Wire framework state via Symbol keys: COMPONENT_ID, REGISTRY_ENTRY, CONSOLE, REACTOR
- * - Apply initial vars onto instance (overriding class field defaults)
+ * Class constructor for a Component.
+ * @typedef {import('./component.js').ComponentConstructor} ComponentConstructor
+ */
+/**
+ * Variables map passed to a component.
+ * @typedef {import('./component.js').ComponentVars} ComponentVars
+ */
+
+/**
+ * InstanceRegistry - Manages component instances and their lifecycle
  */
 export class InstanceRegistry {
     /**
-     * Create a new InstanceRegistry.
-     * @param {import('./renderer.js').Renderer} renderer - The DOM renderer/morpher
-     * @param {import('./template-store.js').TemplateStore} templateStore - Component template store
-     * @param {string} appName - Built-in context prefix for component prefixes
+     * Create a new InstanceRegistry
+     * @param {import('./renderer.js').Renderer} renderer - The renderer instance
+     * @param {import('./template-store.js').TemplateStore} templateStore - The template store
+     * @param {string} appName - The application name
      * @param {import('./persistence.js').Persistence} [persistence] - Optional persistence layer
      */
     constructor(renderer, templateStore, appName, persistence = null) {
@@ -77,11 +83,30 @@ export class InstanceRegistry {
         this._templateStore = templateStore;
         this._appName = appName;
         this.persistence = persistence;
-        this._reactor = null; // Set by Reactor after construction
-        this._instances = new Map(); // componentId.code -> { instance, container, parent, children }
-        this._roots = new Set(); // codes of root components (no parent)
-        this._componentClasses = new Map(); // componentName -> ComponentConstructor (pre-registered)
 
+        /**
+         * Map of all active component instances keyed by component code.
+         * @type {Map<string, import('./symbols.js').RegistryEntry>}
+         */
+        this._instances = new Map();
+        /**
+         * Set of component codes representing the roots of the component tree.
+         * @type {Set<string>}
+         */
+        this._roots = new Set();
+        /**
+         * The reactor orchestrating this registry.
+         * @type {import('./reactor.js').Reactor|null}
+         */
+        this._reactor = null;
+
+        /**
+         * Map of pre-registered component constructors.
+         * @type {Map<string, ComponentConstructor>}
+         */
+        this._componentClasses = new Map();
+
+        // Register built-in components
         this.registerComponent('FuseWire/Lazy', Lazy);
         this._templateStore.set('FuseWire/Lazy', {
             version: 'builtin',
@@ -198,16 +223,10 @@ export class InstanceRegistry {
      *   - COMPONENT_ID    → ComponentId object (name, id, version, code)
      *   - REGISTRY_ENTRY  → shared entry object (container, parent) — same object stored in the registry
      *   - CONSOLE         → pre-built console wrapper with component context
-     *   - REACTOR         → Reactor reference
-     *
-     * If the Reactor's state store contains saved state for this component code,
-     * the framework automatically restores scalar vars and recreates child
-     * component references before calling init(previousState).
-     *
-     * @param {ComponentId} componentId - Component identifier
-     * @param {ComponentConstructor} ComponentClass - Component class constructor
-     * @param {ComponentVars} vars - Initial vars
-     * @param {HTMLElement} container - DOM container
+     * @param {ComponentId} componentId - Unique component identifier
+     * @param {ComponentConstructor} ComponentClass - The component class constructor
+     * @param {ComponentVars} vars - Initial component variables
+     * @param {HTMLElement} container - DOM container element
      * @param {{deferHydration?: boolean, routeSegment?: import('./route-segment.js').RouteSegment}} options - Creation options
      * @returns {Promise<Component>} The created instance
      */
@@ -325,7 +344,7 @@ export class InstanceRegistry {
 
     /**
      * Get an existing instance
-     * @param {ComponentId|string} componentId - Component identifier or code string (e.g., "Counter#main")
+     * @param {ComponentId|string} componentId - Component identifier or code string (e.g., 'Counter#main')
      * @returns {Component|null} The component instance or null if not found
      */
     get(componentId) {
@@ -576,16 +595,11 @@ export class InstanceRegistry {
     }
 
     /**
-     * Auto-mount a child component into its mount point.
-     * Handles three cases:
-     *   1. Eagerly created child (has _creationPromise) — await and attach
-     *   2. Existing child from previous render — update container, re-render
-     *   3. New child without eager creation — create from declaration
+     * Mount or update a child component at a mount point.
      * @private
-     * @param {HTMLElement} mountPoint - Mount point element with data-fusewire-id
-     * @param {Component} parentInstance - Parent component instance
-     * @param {Map<string, Component|Child>} declarations - Pre-built declaration index for O(1) lookup
-     * @returns {Promise<void>}
+     * @param {HTMLElement} mountPoint - The <fw-mount> element
+     * @param {Component} parentInstance - The parent component
+     * @param {Map<string, Child>} declarations - Child declarations collected from vars
      */
     async _mountChild(mountPoint, parentInstance, declarations) {
         const childCode = mountPoint.getAttribute('data-fusewire-id');

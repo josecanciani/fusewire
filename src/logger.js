@@ -8,7 +8,10 @@ export class Logger {
      * Create a new Logger instance with console output enabled.
      */
     constructor() {
-        /** @type {any[]} */
+        /** 
+         * List of registered log handler functions.
+         * @type {any[]} 
+         */
         this._handlers = [];
         this._useConsole = true;
     }

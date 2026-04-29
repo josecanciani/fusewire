@@ -73,3 +73,13 @@ export function getComponentIdFromElement(element) {
         return null;
     }
 }
+
+/**
+ * Convert a component name to a CSS-safe identifier.
+ * Replaces '/' (used in directory-based names like 'Basics/Counter') with '_'.
+ * @param {string} name - Component name
+ * @returns {string} CSS-safe name
+ */
+export function toCssName(name) {
+    return name.replaceAll('/', '_');
+}

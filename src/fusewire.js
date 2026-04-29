@@ -1,5 +1,11 @@
-/** @typedef {import('./reactor.js').Reactor} Reactor */
-/** @typedef {import('./component.js').Component} Component */
+/** 
+ * Reactor instance orchestrating a specific app.
+ * @typedef {import('./reactor.js').Reactor} Reactor 
+ */
+/** 
+ * Base Component class.
+ * @typedef {import('./component.js').Component} Component 
+ */
 
 /**
  * FuseWire - Global registry for managing Reactor instances and components

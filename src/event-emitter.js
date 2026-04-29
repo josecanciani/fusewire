@@ -13,7 +13,10 @@ export class EventEmitter {
      * Create a new EventEmitter.
      */
     constructor() {
-        /** @type {Map<string, Set<function(...*): (void|false)>>} */
+        /** 
+         * Map of event names to a set of handler functions. 
+         * @type {Map<string, Set<function(...*): (void|false)>>} 
+         */
         this._handlers = new Map();
     }
 

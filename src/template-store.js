@@ -1,6 +1,10 @@
-/** @typedef {import('./template-compiler.js').CompiledTemplate} CompiledTemplate */
+/**
+ * A compiled component template representation.
+ * @typedef {import('./template-compiler.js').CompiledTemplate} CompiledTemplate
+ */
 
 /**
+ * Raw template data fetched from the network.
  * @typedef {{
  *   version: string,
  *   htmlCode: string,

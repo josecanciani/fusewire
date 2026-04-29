@@ -11,16 +11,32 @@ import {
 } from './symbols.js';
 
 /**
+ * Configuration options for child components.
  * @typedef {{
  *   fallback?: string
  * }} ChildOptions
  */
 
-/** @typedef {string|number|boolean|null} Scalar */
-/** @typedef {{[key: string]: Scalar|Array.<Scalar>|Object<string, *>}} ScalarObject */
-/** @typedef {Scalar|ScalarObject|Component|Child} VarValue */
-/** @typedef {{[key: string]: (VarValue|Array<VarValue>)}} ComponentVars */
-/** @typedef {{new(): Component, componentName: string}} ComponentConstructor */
+/**
+ * Primitive data types that can be directly mapped to DOM attributes or state serialization.
+ * @typedef {string|number|boolean|null} Scalar
+ */
+/**
+ * Represents a plain object containing only Scalar values, Arrays of Scalars, or nested ScalarObjects.
+ * @typedef {{[key: string]: Scalar|Array.<Scalar>|Object<string, *>}} ScalarObject
+ */
+/**
+ * Represents any valid value type that can be assigned to a component variable.
+ * @typedef {Scalar|ScalarObject|Component|Child} VarValue
+ */
+/**
+ * A dictionary of key-value pairs assigned to a component.
+ * @typedef {{[key: string]: (VarValue|Array<VarValue>)}} ComponentVars
+ */
+/**
+ * A class constructor that instantiates a Component.
+ * @typedef {{new(): Component, componentName: string}} ComponentConstructor
+ */
 
 /**
  * Base class for all FuseWire components.
@@ -606,7 +622,10 @@ export class Child {
         this.vars = vars;
         this._options = options;
         this._listeners = new Map();
-        /** @type {any[]} */
+        /** 
+         * Buffered events emitted during eager creation before mounting.
+         * @type {any[]} 
+         */
         this._bufferedEvents = [];
         this._realInstance = null;
         this._replaced = false;
@@ -792,13 +811,22 @@ export class Child {
 export class Lazy extends Component {
     static componentName = 'FuseWire/Lazy';
 
-    /** @type {Child} */
+    /** 
+     * The currently rendered child (switches from placeholder to lazyChild).
+     * @type {Child} 
+     */
     child;
 
-    /** @type {Child} */
+    /** 
+     * The heavy child component being loaded in the background.
+     * @type {Child} 
+     */
     lazyChild;
 
-    /** @type {Child} */
+    /** 
+     * The temporary placeholder shown while lazyChild is loading.
+     * @type {Child} 
+     */
     placeholderChild;
 
     /**
@@ -843,13 +871,22 @@ export class Lazy extends Component {
 export class ErrorBoundary extends Component {
     static componentName = 'FuseWire/ErrorBoundary';
 
-    /** @type {Child|Component} */
+    /** 
+     * The currently rendered child (switches from target to fallback on error).
+     * @type {Child|Component} 
+     */
     child;
 
-    /** @type {Child} */
+    /** 
+     * The primary child component being protected.
+     * @type {Child} 
+     */
     targetChild;
 
-    /** @type {Child} */
+    /** 
+     * The component shown when targetChild emits fw-error.
+     * @type {Child} 
+     */
     fallbackChild;
 
     /**
@@ -890,10 +927,16 @@ export class ErrorBoundary extends Component {
 export class Root extends Component {
     static componentName = 'FuseWire/Root';
 
-    /** @type {Child|Component} */
+    /** 
+     * The main application component.
+     * @type {Child|Component} 
+     */
     app;
 
-    /** @type {Child|Component} */
+    /** 
+     * The framework's default portal host.
+     * @type {Child|Component} 
+     */
     portal;
 
     /**
@@ -917,7 +960,10 @@ export class Root extends Component {
 export class PortalHost extends Component {
     static componentName = 'FuseWire/PortalHost';
 
-    /** @type {Array<Child|Component>} */
+    /** 
+     * The list of children currently rendered in this portal.
+     * @type {Array<Child|Component>} 
+     */
     children = [];
 
     /**
@@ -1003,22 +1049,40 @@ export class PortalHost extends Component {
 export class PortalChild extends Component {
     static componentName = 'FuseWire/PortalChild';
 
-    /** @type {string} */
+    /** 
+     * Component name of the child to render in the portal (e.g. 'Modal').
+     * @type {string} 
+     */
     targetName;
 
-    /** @type {string} */
+    /** 
+     * Instance id for the portal child.
+     * @type {string} 
+     */
     targetId;
 
-    /** @type {ComponentVars} */
+    /** 
+     * Initial variables to pass to the portal child.
+     * @type {ComponentVars} 
+     */
     targetVars;
 
-    /** @type {string} */
+    /** 
+     * The ID of the PortalHost where this child should be rendered.
+     * @type {string} 
+     */
     portalHostId;
 
-    /** @type {string} */
+    /** 
+     * The internal component code string for tracking.
+     * @type {string} 
+     */
     #childCode;
 
-    /** @type {Component} */
+    /** 
+     * The actual component instance rendered in the host.
+     * @type {Component} 
+     */
     #realChild;
 
     /**

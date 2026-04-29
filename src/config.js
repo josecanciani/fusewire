@@ -1,5 +1,11 @@
-/** @typedef {{enabled?: boolean, level?: string}} LoggingConfig */
-/** @typedef {{fusewireTags?: Array<string>, logging?: LoggingConfig}} FuseWireConfig */
+/**
+ * Configuration options for the internal logger.
+ * @typedef {{enabled?: boolean, level?: string}} LoggingConfig
+ */
+/**
+ * Root configuration object for the FuseWire framework.
+ * @typedef {{fusewireTags?: Array<string>, logging?: LoggingConfig}} FuseWireConfig
+ */
 
 /**
  * FuseWire Client Configuration

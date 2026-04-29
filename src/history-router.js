@@ -4,7 +4,10 @@ import { Child } from './component.js';
 import { COMPONENT_ID, ROUTE_DEFAULTS } from './symbols.js';
 import { HashUrlService } from './url-service.js';
 
-/** @typedef {{urlService?: import('./url-service.js').UrlService, routeEncoder?: import('./route-segment.js').RouteEncoder}} HistoryRouterConfig */
+/** 
+ * Configuration options for the HistoryRouter.
+ * @typedef {{urlService?: import('./url-service.js').UrlService, routeEncoder?: import('./route-segment.js').RouteEncoder}} HistoryRouterConfig 
+ */
 
 /**
  * History-based router for FuseWire.
@@ -38,13 +41,22 @@ import { HashUrlService } from './url-service.js';
  * });
  */
 export class HistoryRouter {
-    /** @type {import('./reactor.js').Reactor} */
+    /** 
+     * The Reactor instance this router is attached to.
+     * @type {import('./reactor.js').Reactor} 
+     */
     #reactor;
 
-    /** @type {import('./url-service.js').UrlService} */
+    /** 
+     * The service responsible for reading, writing, and listening to URL changes.
+     * @type {import('./url-service.js').UrlService} 
+     */
     #urlService;
 
-    /** @type {import('./route-segment.js').RouteEncoder} */
+    /** 
+     * The encoder responsible for serializing and deserializing segment values.
+     * @type {import('./route-segment.js').RouteEncoder} 
+     */
     #routeEncoder;
 
     /**
@@ -308,7 +320,10 @@ export class HistoryRouter {
      * @returns {string} Full URL path (e.g. "/dashboard:id=123/table:id=10")
      */
     #serialize() {
-        /** @type {string[]} */
+        /** 
+         * Accumulator for serialized string segments.
+         * @type {string[]} 
+         */
         const parts = [];
         const registry = this.#reactor.instanceRegistry;
         for (const rootCode of registry._roots || []) {
@@ -333,7 +348,10 @@ export class HistoryRouter {
         if (this.#hasRouteProperties(state)) {
             // Filter out properties that still match their pre-init defaults
             const defaults = entry.instance[ROUTE_DEFAULTS];
-            /** @type {Record<string, any>} */
+            /** 
+             * State object containing only properties that have changed from their defaults.
+             * @type {Record<string, any>} 
+             */
             const filtered = {};
             for (const [key, value] of Object.entries(state)) {
                 if (!defaults || value !== defaults[key]) {

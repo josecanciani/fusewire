@@ -5,17 +5,29 @@ import { FuseWire } from './fusewire.js';
 import { TemplateStore } from './template-store.js';
 import { InstanceRegistry } from './instance.js';
 import { Renderer } from './renderer.js';
-import { Idiomorph } from 'idiomorph';
+import { Idiomorph } from './vendor/idiomorph.js';
 import { ComponentNotFoundError } from './errors/error-hierarchy.js';
 import { Persistence } from './persistence.js';
 import { StateSerializer } from './state-serializer.js';
 import { HistoryRouter } from './history-router.js';
 import { REACTOR, LIFECYCLE_ACTIVE, LIBRARIES } from './symbols.js';
 
-/** @typedef {import('./component.js').ComponentVars} ComponentVars */
-/** @typedef {{log: function(...*): void, warn: function(...*): void, error: function(...*): void}} ConsoleLike */
-/** @typedef {{stringify: function(ComponentVars): string, parse: function(string): ComponentVars}} SerializerLike */
-/** @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: function(HTMLElement, string, Object<string, *>=): void, instanceRegistry?: InstanceRegistry, basePath?: string, globalVars?: ComponentVars, enableDefaultConsole?: boolean, persistence?: Persistence, serializer?: SerializerLike, router?: import('./history-router.js').HistoryRouter|null}} ReactorConfig */
+/** 
+ * Map of variables passed to a component.
+ * @typedef {import('./component.js').ComponentVars} ComponentVars 
+ */
+/** 
+ * Interface for a logger/console object.
+ * @typedef {{log: function(...*): void, warn: function(...*): void, error: function(...*): void}} ConsoleLike 
+ */
+/** 
+ * Interface for a custom state serializer.
+ * @typedef {{stringify: function(ComponentVars): string, parse: function(string): ComponentVars}} SerializerLike 
+ */
+/** 
+ * Reactor configuration options.
+ * @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: function(HTMLElement, string, Object<string, *>=): void, instanceRegistry?: InstanceRegistry, basePath?: string, globalVars?: ComponentVars, enableDefaultConsole?: boolean, persistence?: Persistence, serializer?: SerializerLike, router?: import('./history-router.js').HistoryRouter|null}} ReactorConfig 
+ */
 
 /**
  * Reactor - Orchestrator for CSR_ONLY mode
@@ -46,17 +58,29 @@ export class Reactor {
         this._rootContainer = null;
         this._defaultConsole = config.console ?? globalThis.console;
         this._enableDefaultConsole = config.enableDefaultConsole ?? false;
-        /** @type {any[]} */
+        /** 
+         * List of attached UI consoles receiving logs.
+         * @type {any[]} 
+         */
         this._attachedConsoles = [];
-        /** @type {ConsoleLike} */
+        /** 
+         * The active console multiplexer for this reactor.
+         * @type {ConsoleLike} 
+         */
         this._console = this._buildConsoleMultiplexer();
 
         // Render queue — serializes all react() calls so only one render chain
         // runs at a time. Keyed by component code for O(1) dedup.
-        /** @type {Map<string, {id: ComponentId, mode: string}>} */
+        /** 
+         * Map of queued render tasks.
+         * @type {Map<string, {id: ComponentId, mode: string}>} 
+         */
         this._queue = new Map();
         this._draining = false;
-        /** @type {Promise<void>} */
+        /** 
+         * Promise resolving when the current queue drain completes.
+         * @type {Promise<void>} 
+         */
         this._drainPromise = Promise.resolve();
 
         // Auto-create dependencies if not provided

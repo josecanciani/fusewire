@@ -1,10 +1,12 @@
 /**
+ * Interface for a state serializer capable of converting component vars to/from strings.
  * @typedef {Object<string, *>} SerializerLike
  * @property {function(import('./component.js').ComponentVars): string} stringify - Convert vars object to a string
  * @property {function(string): import('./component.js').ComponentVars} parse - Convert string back to a vars object
  */
 
 /**
+ * Envelope containing a component's serialized state and optional extra state.
  * @typedef {Object<string, *>} StateEnvelope
  * @property {string} vars - Serialized component state variables
  * @property {object|null} extraState - Additional opaque data returned by destroy()
@@ -17,7 +19,10 @@
  * required to swap down to IndexedDB + Web Workers seamlessly.
  */
 export class Persistence {
-    /** @type {Map<string, StateEnvelope>} */
+    /** 
+     * Internal memory store for serialized state envelopes.
+     * @type {Map<string, StateEnvelope>} 
+     */
     #store;
 
     /**

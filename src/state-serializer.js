@@ -1,6 +1,7 @@
 import { Component, Child } from './component.js';
 
 /**
+ * Variables map passed to a component.
  * @typedef {import('./component.js').ComponentVars} ComponentVars
  */
 

@@ -1,9 +1,18 @@
 import { findChildMountPoints, isMountPoint } from './utils/dom-helpers.js';
 import { toCssName } from './component-id.js';
 
-/** @typedef {import('./template-compiler.js').CompiledTemplate} CompiledTemplate */
-/** @typedef {import('./template-compiler.js').TemplateConstants} TemplateConstants */
-/** @typedef {import('./component.js').ComponentVars} ComponentVars */
+/**
+ * A compiled component template representation.
+ * @typedef {import('./template-compiler.js').CompiledTemplate} CompiledTemplate
+ */
+/**
+ * Static constants derived during template compilation.
+ * @typedef {import('./template-compiler.js').TemplateConstants} TemplateConstants
+ */
+/**
+ * Variables map passed to a component.
+ * @typedef {import('./component.js').ComponentVars} ComponentVars
+ */
 
 /**
  * Renderer - Applies compiled templates to DOM using morphing
@@ -172,7 +181,10 @@ export class Renderer {
         const containers = temp.querySelectorAll('[data-fusewire-each]');
         for (const eachContainer of containers) {
             const name = eachContainer.getAttribute('data-fusewire-each');
-            /** @type {Array<{id: string, parentId: string}>} */
+            /**
+             * Extracted component mount point declarations.
+             * @type {Array<{id: string, parentId: string}>}
+             */
             const mountPoints = [];
             for (const child of eachContainer.children) {
                 const id = child.getAttribute('data-fusewire-id');
