@@ -7,6 +7,7 @@ import {
     Root,
     PortalHost,
     PortalChild,
+    KeepAlive,
 } from './component.js';
 import {
     COMPONENT_ID,
@@ -20,10 +21,7 @@ import {
 } from './symbols.js';
 import { ComponentNotFoundError } from './errors/error-hierarchy.js';
 import { compileTemplate } from './template-compiler.js';
-import {
-    getComponentIdFromElement,
-    toCssName,
-} from './utils/dom-helpers.js';
+import { getComponentIdFromElement, toCssName } from './utils/dom-helpers.js';
 
 /**
  * Collect all public variables from a component instance.
@@ -33,24 +31,16 @@ import {
  * @returns {import('./component.js').ComponentVars} Map of variable names to values
  */
 export function collectVars(instance) {
-    /** @type {ComponentVars} */
     const vars = {};
-    // 1. Collect standard public class variables
     for (const key of Object.keys(instance)) {
         vars[key] = instance[key];
     }
-    // 2. Discover autocalculated getters (convention: start with $) on the component prototype chain
+    // Collect $ getters
     let proto = Object.getPrototypeOf(instance);
-    // Since Component.prototype instanceof Component is false, this elegantly boundaries the scan
-    while (proto instanceof Component) {
-        const props = Object.getOwnPropertyNames(proto);
-        for (const key of props) {
-            // Only consider properties starting with $ that haven't been shadowed
-            if (key.startsWith('$') && !(key in vars)) {
-                const descriptor = Object.getOwnPropertyDescriptor(proto, key);
-                if (descriptor && typeof descriptor.get === 'function') {
-                    vars[key] = instance[key];
-                }
+    while (proto && proto !== Object.prototype) {
+        for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(proto))) {
+            if (key.startsWith('$') && typeof descriptor.get === 'function') {
+                vars[key] = instance[key];
             }
         }
         proto = Object.getPrototypeOf(proto);
@@ -78,7 +68,7 @@ export class InstanceRegistry {
      * @param {string} appName - The application name
      * @param {import('./persistence.js').Persistence} [persistence] - Optional persistence layer
      */
-    constructor(renderer, templateStore, appName, persistence = null) {
+    constructor(renderer, templateStore, appName, persistence) {
         this._renderer = renderer;
         this._templateStore = templateStore;
         this._appName = appName;
@@ -111,10 +101,6 @@ export class InstanceRegistry {
         this._templateStore.set('FuseWire/Lazy', {
             version: 'builtin',
             htmlCode: '((child))',
-            cssCode: '',
-            jsCode: '',
-            fetchedAt: 0,
-            etags: { html: '', css: '', js: '' },
         });
         this._templateStore.setCompiled(
             'FuseWire/Lazy',
@@ -125,10 +111,6 @@ export class InstanceRegistry {
         this._templateStore.set('FuseWire/ErrorBoundary', {
             version: 'builtin',
             htmlCode: '((child))',
-            cssCode: '',
-            jsCode: '',
-            fetchedAt: 0,
-            etags: { html: '', css: '', js: '' },
         });
         this._templateStore.setCompiled(
             'FuseWire/ErrorBoundary',
@@ -139,10 +121,6 @@ export class InstanceRegistry {
         this._templateStore.set('FuseWire/Root', {
             version: 'builtin',
             htmlCode: '((portal))((app))',
-            cssCode: '',
-            jsCode: '',
-            fetchedAt: 0,
-            etags: { html: '', css: '', js: '' },
         });
         this._templateStore.setCompiled(
             'FuseWire/Root',
@@ -153,10 +131,6 @@ export class InstanceRegistry {
         this._templateStore.set('FuseWire/PortalHost', {
             version: 'builtin',
             htmlCode: '<div fw-each="child in children">((child))</div>',
-            cssCode: '',
-            jsCode: '',
-            fetchedAt: 0,
-            etags: { html: '', css: '', js: '' },
         });
         this._templateStore.setCompiled(
             'FuseWire/PortalHost',
@@ -167,10 +141,6 @@ export class InstanceRegistry {
         this._templateStore.set('FuseWire/PortalChild', {
             version: 'builtin',
             htmlCode: '',
-            cssCode: '',
-            jsCode: '',
-            fetchedAt: 0,
-            etags: { html: '', css: '', js: '' },
         });
         this._templateStore.setCompiled(
             'FuseWire/PortalChild',
@@ -247,28 +217,53 @@ export class InstanceRegistry {
 
         const instance = new ComponentClass();
 
+        // Snapshot static route defaults before state restoration and init().
+        // By capturing the baseline before init(), any dynamic state loaded from
+        // a datasource inside init() will correctly register as a deviation from
+        // the default and be serialized into the URL. The router omits unchanged properties.
+        const routeState = instance.routeState();
+        if (routeState && typeof routeState === 'object') {
+            instance[ROUTE_DEFAULTS] = { ...routeState };
+
+            // ARCHITECTURAL ENHANCEMENT: If this is a pass-through layout (routeState is {}),
+            // it should get a peek at the next segment in the path so it can
+            // decide which routed child to instantiate.
+            if (
+                Object.keys(routeState).length === 0 &&
+                !routeSegment &&
+                this._reactor &&
+                this._reactor.router
+            ) {
+                routeSegment = this._reactor.router.peekSegment();
+            }
+        }
+
         // Check state store for previously captured state
         let previousState = null;
-        const savedState = this.persistence.load(code);
+        if (this.persistence) {
+            const savedState = this.persistence.load(code);
 
-        if (savedState) {
-            // Restore state from store — envelope vars are already natively explicitly parsed by persistence
-            const restoredVars = savedState.vars;
+            if (savedState) {
+                // Restore state from store — envelope vars are already natively explicitly parsed by persistence
+                const restoredVars = savedState.vars;
 
-            // Filter out autocalculated getters ($ prefix) to prevent setter TypeErrors
-            for (const key of Object.keys(restoredVars)) {
-                if (key.startsWith('$')) {
-                    delete restoredVars[key];
+                // Filter out autocalculated getters ($ prefix) to prevent setter TypeErrors
+                for (const key of Object.keys(restoredVars)) {
+                    if (key.startsWith('$')) {
+                        delete restoredVars[key];
+                    }
                 }
+
+                Object.assign(instance, restoredVars);
+                previousState = savedState.extraState;
+
+                // Remove consumed state so it doesn't restore again on next create
+                this.persistence.delete(code);
+            } else {
+                // Fresh mount — use provided vars
+                Object.assign(instance, vars);
             }
-
-            Object.assign(instance, restoredVars);
-            previousState = savedState.extraState;
-
-            // Remove consumed state so it doesn't restore again on next create
-            this.persistence.delete(code);
         } else {
-            // Fresh mount — use provided vars
             Object.assign(instance, vars);
         }
 
@@ -294,14 +289,6 @@ export class InstanceRegistry {
 
         // LIFECYCLE_ACTIVE stays set throughout creation to prevent premature react()
         try {
-            // Snapshot route defaults before init() — init may apply URL values
-            // that would overwrite the original defaults. The router compares
-            // current state against this snapshot to omit unchanged properties.
-            const routeDefaults = instance.routeState();
-            if (routeDefaults && typeof routeDefaults === 'object') {
-                instance[ROUTE_DEFAULTS] = { ...routeDefaults };
-            }
-
             // Call init hook — pass previousState and routeSegment so the component
             // can skip fetches and restore from URL state on first render
             instance[LIFECYCLE_ACTIVE] = 'init';
@@ -354,6 +341,16 @@ export class InstanceRegistry {
     }
 
     /**
+     * Check if a component is registered
+     * @param {ComponentId|string} componentId - Component identifier or code string
+     * @returns {boolean} True if the component exists in the registry
+     */
+    has(componentId) {
+        const code = typeof componentId === 'string' ? componentId : componentId.code;
+        return this._instances.has(code);
+    }
+
+    /**
      * Update an existing instance with new vars (server-side flow).
      * Uses Component.update() with react=false because this method
      * handles rendering explicitly.
@@ -382,8 +379,10 @@ export class InstanceRegistry {
             await this.render(componentId);
 
             // Call afterRender hook
-            instance[LIFECYCLE_ACTIVE] = 'afterRender';
-            instance.afterRender();
+            if (!entry.needsHydration) {
+                instance[LIFECYCLE_ACTIVE] = 'afterRender';
+                instance.afterRender();
+            }
         } finally {
             instance[LIFECYCLE_ACTIVE] = null;
         }
@@ -412,15 +411,15 @@ export class InstanceRegistry {
         }
 
         const { instance, container } = entry;
-
-        // Snapshot public vars before destroy
         const vars = collectVars(instance);
 
         // Call destroy hook — capture return value as extra state
         const extraState = instance.destroy() || null;
 
         // Store captured state in the Reactor's persistence module
-        this.persistence.save(code, { vars, extraState });
+        if (this.persistence) {
+            this.persistence.save(code, { vars, extraState });
+        }
 
         // Clear event subscriptions so handlers don't keep parent instances alive
         if (instance[EVENTS]) instance[EVENTS].clear();
@@ -493,6 +492,26 @@ export class InstanceRegistry {
         // Snapshot current child declarations from vars before rendering
         const { children: currentChildren, declarations } = this._collectChildComponents(instance);
 
+        // Replace new Child markers with live instances and replay events for ALL existing children,
+        // even if they are currently hidden from the template. This ensures their event listeners
+        // are correctly wired before any hydration or background processes emit events.
+        for (const [childCode, decl] of declarations) {
+            const existingChildEntry = this._instances.get(childCode);
+            // Only replace if the instance is fully initialized (eager creation is complete)
+            if (
+                existingChildEntry &&
+                decl instanceof Child &&
+                !decl._replaced &&
+                (!decl._creationPromise ||
+                    existingChildEntry.instance[LIFECYCLE_ACTIVE] === null ||
+                    existingChildEntry.instance[LIFECYCLE_ACTIVE] === 'afterRender')
+            ) {
+                this._replaceRefInVars(instance, decl, existingChildEntry.instance);
+                decl._replayBufferedEvents(existingChildEntry.instance);
+                decl._replaced = true;
+            }
+        }
+
         // Detach mount-point containers of orphaned children before morphing.
         // Without this, idiomorph may soft-match an orphaned mount-point element
         // with unrelated new content and skip the morph (the beforeNodeMorphed
@@ -517,47 +536,20 @@ export class InstanceRegistry {
         const vars = { ...this._reactor.globalVars, ...collectVars(instance) };
 
         // For PortalChild children not referenced in the template, inject
-        // mount points into the compiled template's render output. This way
-        // the morph sees them on every render — same pipeline as all children.
-        // Only PortalChild is injected: other children (e.g. ErrorBoundary
-        // internals) must NOT get auto-injected mount points.
-        const originalRender = compiled.render.bind(compiled);
-        const patchedCompiled = {
-            ...compiled,
-            /**
-             * Render with injected mount points for unreferenced PortalChild vars
-             * @param {import('./template-compiler.js').ComponentVars} v - Component variables
-             * @param {ComponentId} cid - Component instance ID
-             * @param {import('./template-compiler.js').TemplateConstants} c - Template constants
-             * @returns {string} Rendered HTML
-             */
-            render(v, cid, c) {
-                let html = originalRender(v, cid, c);
-                for (const key of Object.keys(instance)) {
-                    const val = instance[key];
-                    if (!(val instanceof Child) || val.componentName !== 'FuseWire/PortalChild')
-                        continue;
-                    const childCode = new ComponentId(val.componentName, val.componentId || '')
-                        .code;
-                    if (html.includes(`data-fusewire-id="${childCode}"`)) continue;
-                    html += `<fw-mount id="${childCode}" data-fusewire-id="${childCode}" data-fusewire-parent-id="${cid.code}"></fw-mount>`;
-                }
-                return html;
-            },
-        };
+        // their mount points into the variables so the template engine
+        // can find them if they use generic portals.
+        // (In Phase 1, portals are handled explicitly by PortalHost).
 
-        const mountPoints = this._renderer.render(
+        const childMountPoints = this._renderer.render(
             container,
-            patchedCompiled,
+            compiled,
             vars,
             componentId,
             constants,
         );
 
-        // Auto-mount child components found in mount points
-        for (const mountPoint of mountPoints) {
-            await this._mountChild(mountPoint, instance, declarations);
-        }
+        // Update entry with discovered child mapping
+        entry.children = currentChildren;
 
         // Detect eagerly-created children that were never mounted.
         // This means createChild() was called but the template has no ((varName))
@@ -571,8 +563,21 @@ export class InstanceRegistry {
                 if (decl instanceof Child && decl._creationPromise && !decl._replaced) {
                     // Check if the component was intentionally hidden by an fw-if condition.
                     // If the original template contains the placeholder, it's valid.
-                    const varName = this._findVarNameForCode(instance, childCode);
-                    if (varName && template.htmlCode.includes(`((${varName}))`)) {
+                    let varName = null;
+                    for (const key of Object.keys(instance)) {
+                        if (
+                            instance[key] === decl ||
+                            (Array.isArray(instance[key]) && instance[key].includes(decl))
+                        ) {
+                            varName = key;
+                            break;
+                        }
+                    }
+                    if (
+                        varName &&
+                        (template.htmlCode.includes(`((${varName}))`) ||
+                            template.htmlCode.match(new RegExp(`\\b${varName}\\b`)))
+                    ) {
                         continue; // Hidden by conditional rendering, this is fine
                     }
 
@@ -583,15 +588,17 @@ export class InstanceRegistry {
             }
         }
 
-        // Remove orphaned children (component cleanup — containers already detached above)
+        // Recursively mount/update children at discovered mount points
+        for (const mountPoint of childMountPoints) {
+            await this._mountChild(mountPoint, instance, declarations);
+        }
+
+        // Clean up orphaned component instances that were removed from the template/vars
         for (const [childCode, childId] of previousChildren) {
-            if (!currentChildren.has(childCode) && this.has(childId)) {
+            if (!currentChildren.has(childCode)) {
                 this.remove(childId);
             }
         }
-
-        // Track current children for next render cycle
-        entry.children = currentChildren;
     }
 
     /**
@@ -602,161 +609,115 @@ export class InstanceRegistry {
      * @param {Map<string, Child>} declarations - Child declarations collected from vars
      */
     async _mountChild(mountPoint, parentInstance, declarations) {
-        const childCode = mountPoint.getAttribute('data-fusewire-id');
-        const childId = ComponentId.fromCode(childCode);
+        const childId = getComponentIdFromElement(mountPoint);
+        if (!childId) return;
+
+        const childCode = childId.code;
+        const ref = declarations.get(childCode) || null;
 
         // Check for an eagerly-created child (reference with _creationPromise)
-        const decl = declarations.get(childCode) || null;
-
-        if (decl instanceof Child && decl._creationPromise) {
-            return await this._attachEagerChild(mountPoint, parentInstance, decl, childId);
+        // This must run BEFORE the existingEntry check because eager creation
+        // inserts partial entries into the registry synchronously to support recursive resolution.
+        if (ref instanceof Child && ref._creationPromise) {
+            return await this._attachEagerChild(ref, mountPoint, parentInstance);
         }
 
-        if (this.has(childId)) {
-            // Child already exists — update container reference if morphing replaced the element.
-            // If the container is the same DOM node (preserved by morph), skip the re-render:
-            // the child's DOM is already in place and the child manages its own updates via react().
-            const entry = this._instances.get(childId.code);
-            if (entry.container !== mountPoint) {
-                entry.container = mountPoint;
-                mountPoint.classList.add(toCssName(childId.name));
+        // If child already exists, just update its container and re-render.
+        const existingEntry = this._instances.get(childCode);
+        if (existingEntry) {
+            if (existingEntry.container !== mountPoint) {
+                // DOM Teleportation: Physically move nodes from the old detached/orphaned container
+                // to the new live mount point to preserve third-party state (CodeMirror, Canvas, etc.)
+                mountPoint.innerHTML = '';
+                const detached = existingEntry.container;
+                while (detached.firstChild) {
+                    mountPoint.appendChild(detached.firstChild);
+                }
+
+                existingEntry.container = mountPoint;
+                existingEntry.parent = parentInstance;
+
+                const cssName = toCssName(childId.name);
+                if (!mountPoint.classList.contains(cssName)) {
+                    mountPoint.classList.add(cssName);
+                }
+
+                // Re-hydrate the subtree to update container references for deeply nested children
+                // whose mount points just moved physically in the DOM tree.
+                await this._hydrateSubtree(childId);
+
+                // We intentionally skip this.render(childId) because the DOM is already intact.
+                // We just call afterRender to allow the component to readjust to its new layout context.
+                if (typeof existingEntry.instance.afterRender === 'function') {
+                    try {
+                        existingEntry.instance[LIFECYCLE_ACTIVE] = 'afterRender';
+                        existingEntry.instance.afterRender();
+                    } catch (error) {
+                        const handled = existingEntry.instance.emitCancellable('fw-error', {
+                            error,
+                            failedComponent: childId.name,
+                        });
+                        if (!handled) {
+                            throw error;
+                        }
+                    } finally {
+                        existingEntry.instance[LIFECYCLE_ACTIVE] = null;
+                    }
+                }
+            } else {
                 await this.render(childId);
+                if (existingEntry.needsHydration) {
+                    await this._hydrateSubtree(childId);
+                }
             }
             return;
         }
 
-        // Find matching child declaration in parent's vars
-        if (!decl) {
+        // Fresh child — must have a declaration in parent's vars
+        if (!ref) {
             throw new Error(
-                `Mount point for "${childId.code}" found in DOM but no matching declaration in parent vars`,
+                `Child component ${childCode} not found in variables of ${parentInstance.componentCode}`,
             );
         }
 
-        const parentEntry = this._instances.get(parentInstance[COMPONENT_ID].code);
-        const parentDeferred = parentEntry.needsHydration;
-
-        // Try to consume a route segment from the router for this child.
-        // The route key is the var name on the parent that holds this child reference.
-        let routeSegment = null;
-        if (this._reactor.router) {
-            const varName = this._findVarNameForCode(parentInstance, childCode);
-            if (varName) {
-                routeSegment = this._reactor.router.consumeSegment(varName);
-            }
-        }
-
-        let childInstance;
         try {
-            if (decl instanceof Child) {
-                childInstance = await this.createFromReference(decl, mountPoint, {
-                    deferHydration: parentDeferred,
-                    routeSegment,
-                });
-                this._replaceRefInVars(parentInstance, decl, childInstance);
-                decl._replayBufferedEvents(childInstance);
-                decl._replaced = true;
-            } else {
-                // Legacy: Component instance used as declaration
-                childInstance = await this.create(
-                    childId,
-                    /** @type {ComponentConstructor} */ (decl.constructor),
-                    collectVars(decl),
-                    mountPoint,
-                    { deferHydration: parentDeferred },
-                );
-                decl[REACTOR] = this._reactor;
-                decl[COMPONENT_ID] = childId;
-            }
-        } catch (error) {
-            let handled = false;
-            if (decl instanceof Child) {
-                handled = decl._emitBuffered('fw-error', {
-                    error,
-                    failedComponent: decl.componentName,
-                });
-            }
-            if (handled) {
-                return;
-            }
-            throw error;
-        }
-        // Set parent on the child's registry entry and remove from roots
-        const childInstanceCode = childInstance[COMPONENT_ID].code;
-        this._instances.get(childInstanceCode).parent = parentInstance;
-        this._roots.delete(childInstanceCode);
-    }
-
-    /**
-     * Attach an eagerly-created child whose creation was started by startEagerCreation().
-     * Awaits the creation promise, transfers DOM from the detached container into
-     * the mount point, replays buffered events, and hydrates the subtree if the
-     * parent is in the document.
-     * @private
-     * @param {HTMLElement} mountPoint - Mount point element in parent's DOM
-     * @param {Component} parentInstance - Parent component instance
-     * @param {Child} decl - The child reference with _creationPromise
-     * @param {ComponentId} childId - Child component identity
-     * @returns {Promise<void>}
-     */
-    async _attachEagerChild(mountPoint, parentInstance, decl, childId) {
-        const parentEntry = this._instances.get(parentInstance[COMPONENT_ID].code);
-        const parentDeferred = parentEntry.needsHydration;
-
-        let childInstance;
-        try {
-            childInstance = await decl._creationPromise;
-
-            // Deliver route segment to eagerly-created child before DOM transfer.
-            // The child init'd with null routeSegment; if the router has a matching
-            // segment, we update + re-render into the detached container so the user
-            // never sees default state.
-            if (this._reactor.router) {
-                const varName = this._findVarNameForCode(parentInstance, childId.code);
-                if (varName) {
-                    const segment = this._reactor.router.consumeSegment(varName);
-                    if (segment && childInstance.routeState() !== false) {
-                        childInstance.update({}, false, segment);
-                        await this.render(childInstance[COMPONENT_ID]);
+            let routeSegment = null;
+            if (this._reactor && this._reactor.router) {
+                let routeKey = null;
+                for (const key of Object.keys(parentInstance)) {
+                    const val = parentInstance[key];
+                    if (val === ref || (Array.isArray(val) && val.includes(ref))) {
+                        routeKey = key;
+                        break;
                     }
+                }
+                if (routeKey) {
+                    routeSegment = this._reactor.router.consumeSegment(routeKey);
                 }
             }
 
-            // Transfer rendered DOM from detached container into the real mount point
-            const detached = decl._detachedContainer;
-            while (detached.firstChild) {
-                mountPoint.appendChild(detached.firstChild);
+            // Eager creation was NOT started (not called during init/update)
+            // Perform synchronous creation and mount
+            const childInstance = await this.createFromReference(ref, mountPoint, { routeSegment });
+            this._replaceRefInVars(parentInstance, ref, childInstance);
+            if (ref instanceof Child) {
+                ref._replayBufferedEvents(childInstance);
+                ref._replaced = true;
             }
-
-            // Update registry entry's container to the real mount point
-            const childEntry = this._instances.get(childInstance[COMPONENT_ID].code);
-            childEntry.container = mountPoint;
-            mountPoint.classList.add(toCssName(childId.name));
-
-            // Replace reference with real instance in parent vars, replay events
-            this._replaceRefInVars(parentInstance, decl, childInstance);
-            decl._replayBufferedEvents(childInstance);
-            decl._replaced = true;
-
-            // Set parent
-            childEntry.parent = parentInstance;
-            this._roots.delete(childInstance[COMPONENT_ID].code);
-
-            // Hydrate the subtree if the parent is in the document (not deferred)
-            if (!parentDeferred) {
-                await this._hydrateSubtree(childInstance[COMPONENT_ID]);
+            const newlyCreatedEntry = this._instances.get(childInstance.componentCode);
+            if (newlyCreatedEntry) {
+                newlyCreatedEntry.parent = parentInstance;
             }
+            this._roots.delete(childInstance.componentCode);
         } catch (error) {
-            // Clean up instance if it failed during hydration
-            if (childInstance) {
-                this.remove(childInstance[COMPONENT_ID]);
+            let handled = false;
+            if (ref instanceof Child) {
+                handled = ref._emitBuffered('fw-error', {
+                    error,
+                    failedComponent: ref.componentName,
+                });
             }
-            const handled = decl._emitBuffered('fw-error', {
-                error,
-                failedComponent: childId.name,
-            });
-            if (handled) {
-                return;
-            }
+            if (handled) return;
             throw error;
         }
     }
@@ -773,11 +734,6 @@ export class InstanceRegistry {
      */
     startEagerCreation(ref) {
         const code = new ComponentId(ref.componentName, ref.componentId || '').code;
-
-        // If explicitly requested via createChild, force fresh state
-        if (this.persistence && this.persistence.has(code)) {
-            this.persistence.delete(code);
-        }
 
         // If the component already exists in the registry (e.g. re-render with
         // same children), skip eager creation — _mountChild will re-render it.
@@ -806,13 +762,99 @@ export class InstanceRegistry {
     async _eagerCreate(ref, container) {
         const code = new ComponentId(ref.componentName, ref.componentId || '').code;
         try {
-            return await this.createFromReference(ref, container, { deferHydration: true });
+            return await this.createFromReference(ref, container, {
+                deferHydration: true,
+            });
         } catch (error) {
             // Clean up partial instance from registry
             if (this._instances.has(code)) {
                 this._instances.delete(code);
                 this._roots.delete(code);
             }
+            throw error;
+        }
+    }
+
+    /**
+     * Attach an eagerly-created child whose creation was started by startEagerCreation().
+     * Transfers the DOM from the detached container to the mount point and
+     * completes the hydration/afterRender lifecycle.
+     * @private
+     * @param {Child} ref - Component reference
+     * @param {HTMLElement} mountPoint - The <fw-mount> element in the document
+     * @param {Component} parentInstance - The parent component
+     */
+    async _attachEagerChild(ref, mountPoint, parentInstance) {
+        let childInstance;
+        try {
+            // Wait for creation pipeline (init + render) to complete
+            childInstance = await ref._creationPromise;
+            const code = childInstance.componentCode;
+            const entry = this._instances.get(code);
+
+            // Update registry entry with real parent and document container
+            if (entry) {
+                entry.parent = parentInstance;
+                entry.container = mountPoint;
+            }
+
+            // Deliver initial route segment if present (before DOM transfer)
+            if (this._reactor && this._reactor.router) {
+                let routeKey = null;
+                for (const key of Object.keys(parentInstance)) {
+                    const val = parentInstance[key];
+                    // Also check childInstance in case _replaceRefInVars was already called
+                    if (
+                        val === ref ||
+                        val === childInstance ||
+                        (Array.isArray(val) && (val.includes(ref) || val.includes(childInstance)))
+                    ) {
+                        routeKey = key;
+                        break;
+                    }
+                }
+                if (routeKey) {
+                    const segment = this._reactor.router.consumeSegment(routeKey);
+                    if (segment) {
+                        // update() won't call afterRender because entry.needsHydration is true
+                        await this.update(childInstance[COMPONENT_ID], {}, segment);
+                    }
+                }
+            }
+
+            const childId = ComponentId.fromCode(code);
+            mountPoint.classList.add(toCssName(childId.name));
+
+            // Replace reference in parent's vars with real instance
+            this._replaceRefInVars(parentInstance, ref, childInstance);
+            ref._replayBufferedEvents(childInstance);
+            ref._replaced = true;
+            this._roots.delete(code);
+
+            // Transfer rendered DOM from detached container into the real mount point.
+            // We MUST use physical node transfer (appendChild) instead of innerHTML
+            // because deeply-nested eager children already have their registry
+            // entry.container pointing to these specific DOM nodes. Using innerHTML
+            // would destroy those nodes and create new ones, leaving the children
+            // permanently detached from the document.
+            mountPoint.innerHTML = '';
+            const detached = ref._detachedContainer;
+            while (detached.firstChild) {
+                mountPoint.appendChild(detached.firstChild);
+            }
+
+            // Resume lifecycle (bottom-up)
+            await this._hydrateSubtree(childId);
+        } catch (error) {
+            // Clean up instance if it failed during hydration
+            if (childInstance) {
+                this.remove(childInstance[COMPONENT_ID]);
+            }
+            const handled = ref._emitBuffered('fw-error', {
+                error,
+                failedComponent: ref.componentName,
+            });
+            if (handled) return;
             throw error;
         }
     }
@@ -835,20 +877,29 @@ export class InstanceRegistry {
             for (const [childCode] of entry.children) {
                 const childEntry = this._instances.get(childCode);
                 if (childEntry) {
-                    await this._hydrateSubtree(ComponentId.fromCode(childCode));
+                    const escapedId = childEntry.instance.componentId.replace(/["\\]/g, '\\$&');
+                    const escapedParent = componentId.code.replace(/["\\]/g, '\\$&');
+                    const selector = `[data-fusewire-id="${escapedId}"][data-fusewire-parent-id="${escapedParent}"]`;
+                    const newContainer = entry.container.querySelector(selector);
+                    if (newContainer) {
+                        childEntry.container = /** @type {HTMLElement} */ (newContainer);
+                    }
+                    await this._hydrateSubtree(childEntry.instance[COMPONENT_ID]);
                 }
             }
         }
 
-        // Hydrate this component if deferred
         if (entry.needsHydration) {
-            const instance = entry.instance;
+            const { instance } = entry;
             try {
+                // Call hydrate hook
                 instance[LIFECYCLE_ACTIVE] = 'hydrate';
                 instance.hydrate();
 
+                // Call afterRender hook
                 instance[LIFECYCLE_ACTIVE] = 'afterRender';
                 instance.afterRender();
+
                 entry.needsHydration = false;
                 instance[LIFECYCLE_ACTIVE] = null;
             } catch (error) {
@@ -864,85 +915,207 @@ export class InstanceRegistry {
             }
 
             if (!entry.needsHydration) {
-                // Component is fully mounted and ready
+                // Notify listeners that component is ready
                 instance.emit('fw-ready', instance);
             }
         }
     }
 
     /**
-     * Search a component instance's own properties for a child declaration matching the given ID
+     * Search component vars for a Child reference and replace it with
+     * the real Component instance.
      * @private
-     * @param {Component} instance - Parent component instance
-     * @param {ComponentId} childId - Child component ID to match
-     * @returns {Component|Child|null} Matching declaration or null
+     * @param {Component} parentInstance - Parent instance whose vars to search
+     * @param {Child} ref - Reference to find
+     * @param {Component} instance - Real instance to replace with
      */
-    _findChildDeclaration(instance, childId) {
-        for (const key of Object.keys(instance)) {
-            const value = instance[key];
-            if (this._matchesChildId(value, childId)) {
-                return /** @type {Component|Child} */ (value);
-            }
-            if (Array.isArray(value)) {
-                for (const item of value) {
-                    if (this._matchesChildId(item, childId)) {
-                        return /** @type {Component|Child} */ (item);
-                    }
+    _replaceRefInVars(parentInstance, ref, instance) {
+        for (const key of Object.keys(parentInstance)) {
+            const value = parentInstance[key];
+            if (value === ref) {
+                parentInstance[key] = instance;
+                ref._replaced = true;
+            } else if (Array.isArray(value)) {
+                const index = value.indexOf(ref);
+                if (index !== -1) {
+                    value[index] = instance;
+                    ref._replaced = true;
                 }
             }
         }
-        return null;
     }
 
     /**
-     * Check if a value is a component declaration matching the given ID
+     * Collect all Child declarations from a component instance's variables.
+     * Used by render() to determine which children to mount/reconcile.
      * @private
-     * @param {VarValue|Array<VarValue>} value - Value to check
-     * @param {ComponentId} childId - Expected component ID
-     * @returns {boolean} True if value matches
+     * @param {Component} instance - The component instance to scan
+     * @returns {{children: Map<string, string>, declarations: Map<string, Child>}} Maps of componentCode to declaration
      */
-    _matchesChildId(value, childId) {
-        if (value instanceof Child) {
-            return value.componentName === childId.name && (value.componentId || '') === childId.id;
-        }
-        // Legacy: Component instance
-        const decl = /** @type {Component} */ (value);
-        return (
-            decl &&
-            typeof decl === 'object' &&
-            /** @type {ComponentConstructor} */ (decl.constructor).componentName === childId.name &&
-            (decl.componentId || '') === childId.id
-        );
-    }
+    _collectChildComponents(instance) {
+        /**
+         * Map of child component codes to ComponentId objects.
+         * @type {Map<string, ComponentId>}
+         */
+        const children = new Map(); // componentCode -> ComponentId
+        /**
+         * Map of child component codes to their Child/Component declarations.
+         * @type {Map<string, Child|Component>}
+         */
+        const declarations = new Map(); // componentCode -> Child|Component reference
 
-    /**
-     * Find the var name on a parent instance that holds a child with the given code.
-     * Scans string-keyed properties for Component/Child instances whose code matches.
-     * @private
-     * @param {Component} parentInstance - Parent component instance
-     * @param {string} childCode - Child component code to find (e.g. "Sidebar#main")
-     * @returns {string|null} Var name (property key) or null if not found
-     */
-    _findVarNameForCode(parentInstance, childCode) {
-        for (const key of Object.keys(parentInstance)) {
-            const value = parentInstance[key];
-            if (
-                (value instanceof Component || value instanceof Child) &&
-                value.componentCode === childCode
-            ) {
-                return key;
+        const addDecl = (value) => {
+            let name;
+            let id;
+            if (value instanceof Child) {
+                name = value.componentName;
+                id = value.componentId || '';
+            } else if (value instanceof Component) {
+                name = /** @type {ComponentConstructor} */ (value.constructor).componentName;
+                id = value.componentId || '';
+            } else {
+                return;
+            }
+            const compId = new ComponentId(name, id);
+            children.set(compId.code, compId);
+            declarations.set(compId.code, value);
+        };
+
+        const vars = collectVars(instance);
+        for (const value of Object.values(vars)) {
+            if (Array.isArray(value)) {
+                for (const item of value) {
+                    addDecl(item);
+                }
+            } else {
+                addDecl(value);
             }
         }
-        return null;
+        return { children, declarations };
+    }
+    /**
+     * Load the ES module for a component class.
+     * @private
+     * @param {string} componentName - Component name (e.g. 'Counter')
+     * @returns {Promise<ComponentConstructor>} The component class
+     */
+    async _loadComponentClass(componentName) {
+        // Return pre-registered class if available
+        const preRegistered = this._componentClasses.get(componentName);
+        if (preRegistered) return preRegistered;
+
+        if (!this._reactor) {
+            throw new Error(
+                `InstanceRegistry: Cannot load component ${componentName} - reactor not attached`,
+            );
+        }
+
+        const url = `${this._reactor.basePath}/${componentName}.js`;
+        try {
+            const module = await import(url);
+            // By convention, a component at 'A/B/MyComponent.js'
+            // exports 'class MyComponent'.
+            const className = componentName.split('/').pop();
+            const ComponentClass = module[className] || module.default;
+
+            if (!ComponentClass) {
+                throw new Error(`Component class ${className} not found in ${url}`);
+            }
+
+            // Stash for future name-based resolution
+            this.registerComponent(componentName, ComponentClass);
+            return ComponentClass;
+        } catch (error) {
+            throw new Error(
+                `Failed to load component class ${componentName} from ${url}: ${error.message}`,
+            );
+        }
     }
 
     /**
-     * Check if instance exists
+     * Build a component-scoped console wrapper.
+     * @private
      * @param {ComponentId} componentId - Component identifier
-     * @returns {boolean} True if instance exists in registry
+     * @returns {import('./reactor.js').ConsoleLike} Console-like object
      */
-    has(componentId) {
-        return this._instances.has(componentId.code);
+    _buildConsoleFor(componentId) {
+        const reactorConsole = this._reactor.console;
+        return {
+            log: (msg, ...args) => reactorConsole.log(`[${componentId.code}] ${msg}`, ...args),
+            warn: (msg, ...args) => reactorConsole.warn(`[${componentId.code}] ${msg}`, ...args),
+            error: (msg, ...args) => reactorConsole.error(`[${componentId.code}] ${msg}`, ...args),
+        };
+    }
+
+    /**
+     * Broadcast an event top-down through the component tree starting from root(s).
+     * Called by Reactor.broadcast() after reactor-level listeners have fired.
+     * Uses the cached _roots set for O(1) root lookup.
+     * @param {string} eventName - Event name to broadcast
+     * @param {Array.<*>} args - Arguments forwarded to each handler
+     */
+    broadcastFromRoots(eventName, args) {
+        for (const code of this._roots) {
+            this._broadcastToEntry(this._instances.get(code), eventName, args);
+        }
+    }
+
+    /**
+     * Broadcast an event top-down starting from a specific component and its children.
+     * Called by Component.broadcast() for subtree-scoped broadcasts.
+     * @param {ComponentId} componentId - Component to broadcast from
+     * @param {string} eventName - Event name to broadcast
+     * @param {Array.<*>} args - Arguments forwarded to each handler
+     */
+    broadcastFrom(componentId, eventName, args) {
+        const entry = this._instances.get(componentId.code);
+        if (entry) {
+            this._broadcastToEntry(entry, eventName, args);
+        }
+    }
+
+    /**
+     * Recursively broadcast an event to a single registry entry and its children.
+     * If any handler on the entry returns false, propagation stops for that subtree.
+     * @private
+     * @param {import('./symbols.js').RegistryEntry} entry - Registry entry
+     * @param {string} eventName - Event name to broadcast
+     * @param {Array.<*>} args - Arguments forwarded to each handler
+     */
+    _broadcastToEntry(entry, eventName, args) {
+        const { instance } = entry;
+        const { PortalHost, PortalChild } = this._reactor.instanceRegistry._getBuiltins();
+
+        // PortalHost subtrees are excluded — broadcasts reach portal children
+        // only via PortalChild forwarding to prevent double-delivery
+        if (PortalHost && instance instanceof PortalHost) return;
+
+        let stopped = false;
+        if (instance[EVENTS]) {
+            const result = instance[EVENTS].emitBroadcast(eventName, ...args);
+            for (const err of result.errors) {
+                instance[CONSOLE].error(`broadcast('${eventName}') listener threw: ${err.message}`);
+            }
+            stopped = result.stopped;
+        }
+        if (stopped) return;
+
+        // Forward broadcast through PortalChild bridge to the real child
+        if (PortalChild && instance instanceof PortalChild) {
+            const host = this._reactor.getPortalHostSync(instance.portalHostId);
+            if (host) {
+                host.broadcastToChild(instance.getChildCode(), eventName, args);
+            }
+        }
+
+        if (entry.children) {
+            for (const [childCode] of entry.children) {
+                const childEntry = this._instances.get(childCode);
+                if (childEntry) {
+                    this._broadcastToEntry(childEntry, eventName, args);
+                }
+            }
+        }
     }
 
     /**
@@ -998,240 +1171,15 @@ export class InstanceRegistry {
     }
 
     /**
-     * Build a pre-bound console wrapper for a component.
-     * The wrapper creates LogMessage objects with the component's identity
-     * and forwards them (plus any extra args) to the reactor's console
-     * multiplexer. Extra args are passed through for the native console
-     * but are NOT stored in the LogMessage (avoids object references).
+     * Helper to get built-in classes safely.
      * @private
-     * @param {ComponentId} componentId - Component identity
-     * @returns {import('./reactor.js').ConsoleLike} Console-like object
      */
-    _buildConsoleFor(componentId) {
-        const reactorConsole = this._reactor.console;
+    _getBuiltins() {
+        // This is a bit of a hack to avoid circular dependencies in this simplified ESM structure.
+        // In a full build system this would be handled differently.
         return {
-            /**
-             * Log a message to the wrapped console.
-             * @param {string} message - Base string
-             * @param {...*} args - Trailing params
-             * @returns {void}
-             */
-            log: (message, ...args) =>
-                reactorConsole.log(new LogMessage(componentId, message), ...args),
-            /**
-             * Log a warning to the wrapped console.
-             * @param {string} message - Base string
-             * @param {...*} args - Trailing params
-             * @returns {void}
-             */
-            warn: (message, ...args) =>
-                reactorConsole.warn(new LogMessage(componentId, message), ...args),
-            /**
-             * Log an error to the wrapped console.
-             * @param {string} message - Base string
-             * @param {...*} args - Trailing params
-             * @returns {void}
-             */
-            error: (message, ...args) =>
-                reactorConsole.error(new LogMessage(componentId, message), ...args),
+            PortalHost: globalThis.FuseWireBuiltins?.PortalHost,
+            PortalChild: globalThis.FuseWireBuiltins?.PortalChild,
         };
-    }
-
-    /**
-     * Load a component class by name.
-     * Checks pre-registered classes first, then falls back to dynamic import.
-     * @private
-     * @param {string} componentName - Component name (e.g., 'Counter', 'Basics/Counter')
-     * @returns {Promise<ComponentConstructor>} The component class constructor
-     */
-    async _loadComponentClass(componentName) {
-        if (this._componentClasses.has(componentName)) {
-            return this._componentClasses.get(componentName);
-        }
-
-        if (!this._reactor) {
-            throw new Error(
-                `Cannot load component "${componentName}": no reactor attached and class not pre-registered`,
-            );
-        }
-
-        const basePath = this._reactor.basePath;
-        const module = await import(`${basePath}/${componentName}.js`);
-
-        // Try named export matching the simple name, then the full name, then default
-        const simpleName = componentName.includes('/')
-            ? componentName.split('/').pop()
-            : componentName;
-        const ComponentClass = module[simpleName] || module[componentName] || module.default;
-
-        if (!ComponentClass || typeof ComponentClass !== 'function') {
-            throw new Error(
-                `Component class "${componentName}" not found in ${basePath}/${componentName}.js`,
-            );
-        }
-
-        // Set the canonical component name on the class
-        Object.defineProperty(ComponentClass, 'componentName', {
-            value: componentName,
-            configurable: true,
-        });
-
-        // Cache for future use
-        this._componentClasses.set(componentName, ComponentClass);
-        return ComponentClass;
-    }
-
-    /**
-     * Collect component declarations from an instance's own properties (top-level values and array items).
-     * Recognises both Child and legacy Component instances.
-     * Returns two maps: one for component identity (code -> ComponentId) and one
-     * for fast declaration lookup (code -> Component|Child).
-     * @private
-     * @param {Component} instance - Component instance
-     * @returns {{children: Map<string, ComponentId>, declarations: Map<string, Component|Child>}} Maps keyed by component code
-     */
-    _collectChildComponents(instance) {
-        const children = new Map();
-        const declarations = new Map();
-        for (const key of Object.keys(instance)) {
-            const value = instance[key];
-            this._collectIfComponent(/** @type {VarValue} */ (value), children, declarations);
-            if (Array.isArray(value)) {
-                for (const item of value) {
-                    this._collectIfComponent(item, children, declarations);
-                }
-            }
-        }
-        return { children, declarations };
-    }
-
-    /**
-     * If value is a component declaration, add its identity to the children map
-     * and store the declaration itself in the declarations map for O(1) lookup.
-     * @private
-     * @param {VarValue} value - Value to check
-     * @param {Map<string, ComponentId>} children - Map to add identity to
-     * @param {Map<string, Component|Child>} declarations - Map to add declaration to
-     */
-    _collectIfComponent(value, children, declarations) {
-        if (!this._isComponentDecl(value)) return;
-        let name;
-        let id;
-        if (value instanceof Child) {
-            name = value.componentName;
-            id = value.componentId || '';
-        } else {
-            const decl = /** @type {Component} */ (value);
-            name = /** @type {ComponentConstructor} */ (decl.constructor).componentName;
-            id = decl.componentId || '';
-        }
-        const componentId = new ComponentId(name, id);
-        children.set(componentId.code, componentId);
-        declarations.set(componentId.code, /** @type {Component|Child} */ (value));
-    }
-
-    /**
-     * Check if a value is a component declaration (Child or Component instance)
-     * @private
-     * @param {VarValue|Array<VarValue>} value - Value to check
-     * @returns {boolean} True if value is a component declaration
-     */
-    _isComponentDecl(value) {
-        return value instanceof Child || value instanceof Component;
-    }
-
-    /**
-     * Replace a Child with the real Component instance in the parent's
-     * own properties. Searches string-keyed properties and array items by identity (===).
-     * @private
-     * @param {Component} parentInstance - Parent component instance
-     * @param {Child} ref - The reference to replace
-     * @param {Component} childInstance - The real Component instance
-     */
-    _replaceRefInVars(parentInstance, ref, childInstance) {
-        for (const key of Object.keys(parentInstance)) {
-            const value = parentInstance[key];
-            if (value === ref) {
-                parentInstance[key] = childInstance;
-                return;
-            }
-            if (Array.isArray(value)) {
-                const idx = value.indexOf(ref);
-                if (idx !== -1) {
-                    value[idx] = childInstance;
-                    return;
-                }
-            }
-        }
-    }
-
-    /**
-     * Broadcast an event top-down through the component tree starting from root(s).
-     * Called by Reactor.broadcast() after reactor-level listeners have fired.
-     * Uses the cached _roots set for O(1) root lookup.
-     * @param {string} eventName - Event name to broadcast
-     * @param {Array.<*>} args - Arguments forwarded to each handler
-     */
-    broadcastFromRoots(eventName, args) {
-        for (const code of this._roots) {
-            this._broadcastToEntry(this._instances.get(code), eventName, args);
-        }
-    }
-
-    /**
-     * Broadcast an event top-down starting from a specific component and its children.
-     * Called by Component.broadcast() for subtree-scoped broadcasts.
-     * @param {ComponentId} componentId - Component to broadcast from
-     * @param {string} eventName - Event name to broadcast
-     * @param {Array.<*>} args - Arguments forwarded to each handler
-     */
-    broadcastFrom(componentId, eventName, args) {
-        const entry = this._instances.get(componentId.code);
-        if (entry) {
-            this._broadcastToEntry(entry, eventName, args);
-        }
-    }
-
-    /**
-     * Recursively broadcast an event to a single registry entry and its children.
-     * If any handler on the entry returns false, propagation stops for that subtree.
-     * @private
-     * @param {{instance: Component, container: HTMLElement, parent: Component|null, children: Map<string, ComponentId>|null}} entry - Registry entry
-     * @param {string} eventName - Event name to broadcast
-     * @param {Array.<*>} args - Arguments forwarded to each handler
-     */
-    _broadcastToEntry(entry, eventName, args) {
-        const { instance } = entry;
-
-        // PortalHost subtrees are excluded — broadcasts reach portal children
-        // only via PortalChild forwarding to prevent double-delivery
-        if (instance instanceof PortalHost) return;
-
-        let stopped = false;
-        if (instance[EVENTS]) {
-            const result = instance[EVENTS].emitBroadcast(eventName, ...args);
-            for (const err of result.errors) {
-                instance[CONSOLE].error(`broadcast('${eventName}') listener threw: ${err.message}`);
-            }
-            stopped = result.stopped;
-        }
-        if (stopped) return;
-
-        // Forward broadcast through PortalChild bridge to the real child
-        if (instance instanceof PortalChild) {
-            const host = this._reactor.getPortalHostSync(instance.portalHostId);
-            if (host) {
-                host.broadcastToChild(instance.getChildCode(), eventName, args);
-            }
-        }
-
-        if (entry.children) {
-            for (const [childCode] of entry.children) {
-                const childEntry = this._instances.get(childCode);
-                if (childEntry) {
-                    this._broadcastToEntry(childEntry, eventName, args);
-                }
-            }
-        }
     }
 }
