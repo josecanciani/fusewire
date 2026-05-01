@@ -337,6 +337,28 @@ describe('Renderer', () => {
             assert.strictEqual(capturedCallback(eachContainer), false);
         });
 
+        it('beforeNodeMorphed returns false for fw-ignore elements', () => {
+            let capturedCallback;
+            const mockMorph = (target, html, options) => {
+                capturedCallback = options.callbacks.beforeNodeMorphed;
+                target.innerHTML = html;
+            };
+            const renderer = new Renderer(mockMorph, appName);
+            const compiledTemplate = {
+                render: () => '<div>Content</div>',
+                css: '',
+            };
+            const componentId = new ComponentId('Test', '1');
+
+            renderer.render(container, compiledTemplate, {}, componentId);
+            renderer.render(container, compiledTemplate, {}, componentId);
+
+            // Test: element with fw-ignore should be skipped
+            const ignoreContainer = document.createElement('div');
+            ignoreContainer.setAttribute('fw-ignore', '');
+            assert.strictEqual(capturedCallback(ignoreContainer), false);
+        });
+
         it('beforeNodeMorphed ignores non-element nodes', () => {
             let capturedCallback;
             const mockMorph = (target, html, options) => {

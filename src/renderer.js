@@ -1,5 +1,5 @@
-import { findChildMountPoints, isMountPoint } from './utils/dom-helpers.js';
-import { toCssName } from './component-id.js';
+import { findChildMountPoints, isMountPoint, toCssName } from './utils/dom-helpers.js';
+import { Idiomorph } from './vendor/idiomorph.js';
 
 /**
  * A compiled component template representation.
@@ -20,11 +20,11 @@ import { toCssName } from './component-id.js';
 export class Renderer {
     /**
      * Create a new Renderer
-     * @param {function(HTMLElement, string, Object<string, *>=): void} morphFunction - DOM morphing function (e.g., Idiomorph.morph)
-     * @param {string} appName - Application name for CSS scoping
+     * @param {function(HTMLElement, string, Object<string, *>=): void} [morphFunction] - DOM morphing function (defaults to vendored Idiomorph.morph)
+     * @param {string} [appName='default'] - Application name for CSS scoping
      */
     constructor(morphFunction, appName = 'default') {
-        this.morphFunction = morphFunction;
+        this.morphFunction = morphFunction || Idiomorph.morph;
         this._appName = appName;
         this._injectedCSS = new Set(); // Track which components have CSS injected
         this._injectMountPointCSS();
@@ -63,11 +63,13 @@ export class Renderer {
                      * @returns {boolean|void} Return false to prevent parsing
                      */
                     beforeNodeMorphed: (oldNode) => {
-                        if (
-                            oldNode.nodeType === 1 &&
-                            (isMountPoint(oldNode) || oldNode.hasAttribute('data-fusewire-each'))
-                        ) {
-                            return false;
+                        if (oldNode.nodeType === 1) {
+                            const isMp = isMountPoint(oldNode);
+                            const hasEach = oldNode.hasAttribute('data-fusewire-each');
+                            const isIgnored = oldNode.hasAttribute('fw-ignore');
+                            if (isMp || hasEach || isIgnored) {
+                                return false;
+                            }
                         }
                     },
                 },
