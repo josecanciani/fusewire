@@ -82,7 +82,7 @@ async init(previousState) {
 
 **When:** Called to merge new vars into the component
 **Type:** Synchronous
-**Purpose:** Merge vars, optionally trigger re-render; override for custom logic
+**Purpose:** Merge vars, optionally trigger re-render; override for custom logic or reacting to parent data pushes
 
 ```js
 update(newVars, react = true) {
@@ -97,10 +97,11 @@ update(newVars, react = true) {
 ```
 
 **Guidelines:**
-- Always call `super.update(newVars, react)` to apply the merge
-- Save any "before" values *before* calling `super.update()` if you need to compare
-- Default `react=true` triggers a re-render; the server-side flow passes `false`
-- Works polymorphically with `Child.update()` — parent code can call `child.update(...)` regardless of whether the child has been instantiated
+- **Data Down, Events Up:** Prefer pushing state down via `update()` over calling imperative methods on children.
+- Works polymorphically with `Child.update()` — parent code can safely push vars to a child via `child.update(...)` regardless of whether the child is still loading or fully instantiated, eliminating race conditions.
+- Always call `super.update(newVars, react)` to apply the merge.
+- Save any "before" values *before* calling `super.update()` if you need to compare.
+- Default `react=true` triggers a re-render; the server-side flow passes `false`.
 
 ---
 
@@ -143,9 +144,12 @@ hydrate() {
 
 ```js
 afterRender() {
-  // Scroll to latest log entry
-  const lastLog = this.querySelector('.console-panel-logs').lastElementChild;
-  if (lastLog) lastLog.scrollIntoView({ block: 'end', behavior: 'instant' });
+  // Scroll to latest log entry without shifting the whole page
+  const container = this.querySelector('.console-panel-logs');
+  if (container) {
+      const scrollParent = container.closest('.overflow-auto');
+      if (scrollParent) scrollParent.scrollTop = scrollParent.scrollHeight;
+  }
 }
 ```
 

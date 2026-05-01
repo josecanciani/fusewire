@@ -7,14 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added the `fw-ignore` template directive to instruct the DOM morphing engine to skip specific subtrees, safely preserving un-synced state for third-party libraries (like CodeMirror or Leaflet).
 - New `template-vars` quality check to ensure all variables used in HTML templates are defined as public members in the component's JS file.
 - Enforced `$` prefix convention for calculated variables: public getters must start with `$`, and public class fields must not.
 - Added regression tests for `>` operator handling in `fw-if` directives.
 
 ### Changed
+- Updated architectural documentation to formalize the "Data Down, Events Up" pattern for interacting with child components asynchronously via `update()`.
 - Enhanced component check runner to display the total number of components inspected during a run.
 
 ### Fixed
+- Fixed an unhandled Promise rejection crash that occurred when an eagerly-created child component threw an error before completing its initial render.
+- Fixed a rendering pipeline crash (`Cannot set properties of undefined`) caused when an ErrorBoundary intercepted a failed eager child.
+- Fixed a bug where hidden Keep-Alive components (`fw-if="false"`) would fail to receive buffered event listeners during state restoration.
 - Fixed a bug in the template parser where `>` characters inside quoted attribute values would prematurely terminate tag matching, causing syntax errors to be ignored by quality checks.
 - Fixed lint errors in `src/history-router.js` by standardizing on single quotes for imports.
 

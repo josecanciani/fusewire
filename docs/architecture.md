@@ -96,8 +96,31 @@ src/
 
 6. Destroy
    - Call destroy() hook
+   - Save extraState returned by destroy() to persistence layer
    - Remove from registry
    - Remove DOM element
+
+### Memory Management & Garbage Collection
+
+FuseWire employs an automated **Mark-and-Sweep** garbage collection strategy directly tied to the render cycle, eliminating the need for developers to manually destroy components or clean up the DOM.
+
+The framework strictly enforces that **JavaScript state is the single source of truth for component lifetimes.** 
+
+1. **Mark Phase:** During a component's render cycle, the `InstanceRegistry` scans all public class fields (vars) on the parent component to collect references to `Child` or `Component` objects. This forms the "current children" list.
+2. **Sweep Phase:** After patching the DOM, the registry compares the "current children" list against the list of children that existed during the *previous* render.
+3. **Teardown:** Any child component that was present in the previous render but is no longer referenced in the parent's variables is considered orphaned. The registry immediately:
+   - Synchronously invokes the orphaned component's `destroy()` hook.
+   - Recursively destroys all sub-components within its tree.
+   - Extracts its persistent state and caches it in `persistence.js`.
+   - Physically removes its DOM nodes from the document.
+   - Deletes its entry from the active instance registry, freeing the memory.
+
+To completely tear down a component, simply drop its reference in JavaScript and let the parent react:
+
+```javascript
+// The child will be garbage collected and unmounted after the next render
+this.myHeavyWidget = null;
+this.react();
 ```
 
 ### Rendering Flow
@@ -206,12 +229,14 @@ The `init()` hook is async, allowing components to:
 
 ### Polymorphic update()
 
-Both `Component` and `Child` expose an `update(newVars)` method. This lets parent code call `child.update({ badge: '2' })` regardless of whether the child has been instantiated:
+FuseWire strongly encourages a **"Data Down, Events Up"** reactive architecture. Instead of parents calling imperative methods on their children (e.g. `this.editor.loadFiles(...)`), parents should push state down using `update({ files: ... })`.
 
-- **Before mount**: The child is still a `Child`. `update()` shallow-merges vars locally; they will be used when the Component is created.
-- **After mount**: The framework replaces the reference in the parent's vars with the real `Component` instance. The same `update()` call now reaches `Component.update()`, which merges vars and triggers a re-render.
+Both `Component` and `Child` expose an `update(newVars)` method. This lets parent code call `child.update({ badge: '2' })` regardless of whether the child has been instantiated, completely eliminating race conditions during asynchronous loading:
 
-Subclasses can override `update()` for custom logic (validation, derived state) and must call `super.update(newVars, react)`.
+- **Before mount**: The child is still a lightweight `Child` placeholder. `update()` shallow-merges vars locally; they will be passed into the `Component`'s `init()` method as soon as the framework creates it.
+- **After mount**: The framework replaces the reference in the parent's vars with the real `Component` instance. The exact same `update()` call now reaches `Component.update()`, which merges vars and triggers a re-render.
+
+Subclasses can override `update()` for custom logic (validation, derived state, or reacting to parent data pushes) and must call `super.update(newVars, react)`.
 
 The `react` parameter (default `true`) controls whether the update triggers an immediate re-render. The server-side flow (`InstanceRegistry.update()`) passes `false` because it manages rendering explicitly.
 
