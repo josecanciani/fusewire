@@ -1,55 +1,79 @@
-import { Component } from "/js/component.js";
+import { Component } from '/js/component.js';
 
 /**
  * Game of Life component. Manages the engine, cell grid, and UI sub-components.
  */
 export class Game extends Component {
-    /** @type {number} */
+    /**
+     * Number of columns in the grid.
+     * @type {number}
+     */
     cols = 0;
-    /** @type {Array.<import('./Alive.js').Alive|import('./Dead.js').Dead>} */
+    /**
+     * Collection of rendered cell components.
+     * @type {Array.<import('./Alive.js').Alive|import('./Dead.js').Dead>}
+     */
     cells = [];
-    /** @type {boolean} */
+    /**
+     * Visibility state for the help overlay.
+     * @type {boolean}
+     */
     #showHelp = false;
-    /** @type {import('./Controls.js').Controls} */
+    /**
+     * The controls sub-component.
+     * @type {import('./Controls.js').Controls}
+     */
     controls = null;
-    /** @type {import('./Stats.js').Stats} */
+    /**
+     * The stats sub-component.
+     * @type {import('./Stats.js').Stats}
+     */
     stats = null;
-    /** @type {import('./Help.js').Help} */
+    /**
+     * The help sub-component.
+     * @type {import('./Help.js').Help}
+     */
     help = null;
 
-    /** @type {import('./Engine.js').Engine} */
+    /**
+     * The underlying game engine instance.
+     * @type {import('./Engine.js').Engine}
+     */
     #engine;
-    /** @type {ResizeObserver} */
+    /**
+     * Observer for window/container resizing.
+     * @type {ResizeObserver}
+     */
     #resizeObserver;
     #resizePending = false;
     #wasRunning = false;
-    /** @type {number|null} */
+    /**
+     * Timer for DOM synchronization batching.
+     * @type {number|null}
+     */
     #syncTimer = null;
-    /** @type {function(): void} */
+    /**
+     * Callback invoked after DOM synchronization completes.
+     * @type {function(): void}
+     */
     #onSyncComplete = null;
 
     /**
      * Declare child components and wire control events.
      */
     async init() {
-        this.loadLibrary("GameOfLife/Engine");
+        this.loadLibrary('GameOfLife/Engine');
 
-        this.controls = /** @type {import('./Controls.js').Controls} */ (
-            this.createChild("GameOfLife/Controls", "controls", {})
-        );
-        this.controls.on("play", () => this.#engine.play());
-        this.controls.on("pause", () => this.#engine.pause());
-        this.controls.on("step", () => this.#engine.step());
-        this.controls.on("reset", () => this.#engine.reset());
-        this.controls.on("speed", (level) => this.#engine.setSpeed(level));
-        this.controls.on("help", (show) => this.#setHelp(show));
+        this.controls = this.createChild('GameOfLife/Controls', 'controls', {});
+        this.controls.on('play', () => this.#engine.play());
+        this.controls.on('pause', () => this.#engine.pause());
+        this.controls.on('step', () => this.#engine.step());
+        this.controls.on('reset', () => this.#engine.reset());
+        this.controls.on('speed', (level) => this.#engine.setSpeed(level));
+        this.controls.on('help', (show) => this.#setHelp(show));
 
-        this.stats = /** @type {import('./Stats.js').Stats} */ (
-            this.createChild("GameOfLife/Stats", "stats", {})
-        );
-        this.help = /** @type {import('./Help.js').Help} */ (
-            this.createChild("GameOfLife/Help", "help", {})
-        );
+        this.stats = this.createChild('GameOfLife/Stats', 'stats', {});
+        this.help = this.createChild('GameOfLife/Help', 'help', {});
     }
 
     /**
@@ -57,19 +81,15 @@ export class Game extends Component {
      */
     hydrate() {
         const Engine = /** @type {typeof import('./Engine.js').Engine} */ (
-            this.library("GameOfLife/Engine").Engine
+            this.library('GameOfLife/Engine').Engine
         );
         this.#engine = new Engine((grid, engineStats, done) => {
-            this.stats.update(
-                /** @type {Record<string, number>} */ (engineStats),
-            );
+            this.stats.update(/** @type {Record<string, number>} */ (engineStats));
             this.#syncCells(grid, done);
         });
 
-        const gridEl = this.querySelector(".grid");
-        this.#resizeObserver = new ResizeObserver(() =>
-            this.#debounceResize(gridEl),
-        );
+        const gridEl = this.querySelector('.grid');
+        this.#resizeObserver = new ResizeObserver(() => this.#debounceResize(gridEl));
         this.#resizeObserver.observe(gridEl);
     }
 
@@ -83,8 +103,8 @@ export class Game extends Component {
     }
 
     /**
-     * @type {boolean}
      * Whether to show the help panel.
+     * @type {boolean}
      */
     get $showHelp() {
         return this.#showHelp;
@@ -162,7 +182,10 @@ export class Game extends Component {
         this.cols = grid[0].length;
         const onComplete = this.#onSyncComplete;
         this.#onSyncComplete = null;
-        /** @type {any[]} */
+        /**
+         * Intermediate accumulator for new cell instances during sync batching.
+         * @type {any[]}
+         */
         const cells = [];
         let currentRow = 0;
         const ROWS_PER_BATCH = 50;
@@ -176,7 +199,7 @@ export class Game extends Component {
                 for (let c = 0; c < grid[r].length; c++) {
                     cells.push(
                         this.createChild(
-                            grid[r][c] ? "GameOfLife/Alive" : "GameOfLife/Dead",
+                            grid[r][c] ? 'GameOfLife/Alive' : 'GameOfLife/Dead',
                             `${r}-${c}`,
                             {},
                         ),
@@ -190,9 +213,7 @@ export class Game extends Component {
             }
             this.#syncTimer = null;
             this.cells =
-                /** @type {Array.<import('./Alive.js').Alive|import('./Dead.js').Dead>} */ (
-                    cells
-                );
+                /** @type {Array.<import('./Alive.js').Alive|import('./Dead.js').Dead>} */ (cells);
             this.react();
             done();
             if (onComplete) {

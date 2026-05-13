@@ -8,9 +8,15 @@ import { Component } from '/js/component.js';
  * directly in the browser address bar — both stay in sync.
  */
 export class UrlDemo extends Component {
-    /** @type {string} */
+    /**
+     * message property.
+     * @type {string}
+     */
     message = 'Hello from the URL!';
-    /** @type {string} */
+    /**
+     * color property.
+     * @type {string}
+     */
     color = '#0d6efd';
 
     /**
@@ -24,6 +30,25 @@ export class UrlDemo extends Component {
             this.color = routeSegment.getString('color', this.color);
         }
         this.console.log('UrlDemo created — try editing the URL!');
+    }
+
+    /**
+     * Handle URL changes (browser back/forward or eager hydration).
+     * @param {import('/js/component.js').ComponentVars} newVars - Vars to merge
+     * @param {boolean} react - Whether to trigger a re-render
+     * @param {import('/js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
+     * @returns {Promise<void>} Resolves when the update is complete
+     */
+    async update(newVars, react = true, routeSegment = null) {
+        if (routeSegment) {
+            if (!('message' in newVars)) {
+                newVars.message = routeSegment.getString('message', this.message);
+            }
+            if (!('color' in newVars)) {
+                newVars.color = routeSegment.getString('color', this.color);
+            }
+        }
+        return super.update(newVars, react, routeSegment);
     }
 
     /**

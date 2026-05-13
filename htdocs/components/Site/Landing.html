@@ -1,0 +1,69 @@
+<div class="landing-page">
+    <header class="hero-section py-5 mb-5 border-bottom overflow-hidden position-relative">
+        <div class="grid-background position-absolute top-0 start-0 w-100 h-100"></div>
+        <div class="container py-5 position-relative">
+            <div class="row align-items-center">
+                <div class="col-lg-7">
+                    <h1 class="display-1 fw-bold mb-3">
+                        Wire your state <br />
+                        <span class="text-gradient">seamlessly.</span>
+                    </h1>
+                    <p class="lead fs-3 mb-5 text-secondary">
+                        A lightweight, declarative JavaScript framework for building reactive UIs with Vanilla CSS and zero boilerplate.
+                    </p>
+                    <div class="d-flex gap-3">
+                        <button type="button" class="btn btn-primary btn-lg px-4" onclick="((this)).goTo('docs')">
+                            Get Started
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-lg px-4" onclick="((this)).goTo('demo')">
+                            Try the Demo
+                        </button>
+                    </div>
+                </div>
+                <div class="col-lg-5 d-none d-lg-block">
+                    <div class="code-preview p-4 rounded-3 shadow-lg bg-dark text-light border border-secondary border-opacity-25">
+                        <pre class="m-0"><code><span class="text-info">export class</span> <span class="text-warning">Counter</span> <span class="text-info">extends</span> <span class="text-warning">Component</span> {
+    count = <span class="text-danger">0</span>;
+
+    <span class="text-success">increment</span>() {
+        <span class="text-info">this</span>.count++;
+        <span class="text-info">this</span>.<span class="text-success">react</span>();
+    }
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section class="features-section container py-5">
+        <div class="row g-4 text-center">
+            <div class="col-md-4">
+                <div class="p-4 h-100 rounded-3 bg-surface shadow-sm">
+                    <div class="feature-icon mb-3 fs-1 text-primary">⚡</div>
+                    <h3>Blazing Fast</h3>
+                    <p class="text-secondary">Direct DOM morphing without a virtual DOM overhead. Fast initial load and efficient updates.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="p-4 h-100 rounded-3 bg-surface shadow-sm">
+                    <div class="feature-icon mb-3 fs-1 text-primary">📦</div>
+                    <h3>Small Footprint</h3>
+                    <p class="text-secondary">Under 20KB minified. No heavy dependencies. Perfect for micro-frontends and small projects.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="p-4 h-100 rounded-3 bg-surface shadow-sm">
+                    <div class="feature-icon mb-3 fs-1 text-primary">🎨</div>
+                    <h3>Vanilla CSS</h3>
+                    <p class="text-secondary">Scoped styles using standard CSS. No CSS-in-JS complexity. Just the platform you know.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="container py-5 mt-5 border-top text-center text-secondary">
+        <p>&copy; 2026 FuseWire Project. Built with love and JavaScript.</p>
+        <p><a href="https://github.com/josecanciani/fusewire" class="text-decoration-none text-secondary" target="_blank">GitHub Repository</a></p>
+    </footer>
+</div>

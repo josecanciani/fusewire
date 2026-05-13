@@ -1,19 +1,21 @@
-import { Component } from "/js/component.js";
+import { Component } from '/js/component.js';
 
 /**
  * Demo component that intentionally throws errors in different lifecycle hooks based on its component ID prefix.
  */
 export class FailComponent extends Component {
-    /** @type {string|object} */
-    badVar =
-        "You should not be seeing this message, as this Component is meant to fail.";
+    /**
+     * A variable purposefully poisoned with an object during the render phase to trigger an error.
+     * @type {string|object}
+     */
+    badVar = 'You should not be seeing this message, as this Component is meant to fail.';
 
     /**
-     * @type {string}
      * The lifecycle stage at which this component is configured to fail.
+     * @type {string}
      */
     get $failAt() {
-        return this.componentId.split("-")[0];
+        return this.componentId.split('-')[0];
     }
 
     /**
@@ -22,13 +24,11 @@ export class FailComponent extends Component {
     async init() {
         const id = this.componentId;
 
-        if (id.startsWith("init")) {
-            throw new Error(
-                "This error was thrown intentionally inside init()",
-            );
+        if (id.startsWith('init')) {
+            throw new Error('This error was thrown intentionally inside init()');
         }
 
-        if (id.startsWith("render")) {
+        if (id.startsWith('render')) {
             this.badVar = {
                 /**
                  * Formatter for error message when object stringifies.
@@ -36,7 +36,7 @@ export class FailComponent extends Component {
                  */
                 toString() {
                     throw new Error(
-                        "This error was thrown intentionally during template rendering (via stringification)",
+                        'This error was thrown intentionally during template rendering (via stringification)',
                     );
                 },
             };
@@ -47,10 +47,8 @@ export class FailComponent extends Component {
      * Throw an error during hydrate if the component ID starts with 'hydrate'.
      */
     hydrate() {
-        if (this.componentId.startsWith("hydrate")) {
-            throw new Error(
-                "This error was thrown intentionally inside hydrate()",
-            );
+        if (this.componentId.startsWith('hydrate')) {
+            throw new Error('This error was thrown intentionally inside hydrate()');
         }
     }
 
@@ -58,10 +56,8 @@ export class FailComponent extends Component {
      * Throw an error during afterRender if the component ID starts with 'afterRender'.
      */
     afterRender() {
-        if (this.componentId.startsWith("afterRender")) {
-            throw new Error(
-                "This error was thrown intentionally inside afterRender()",
-            );
+        if (this.componentId.startsWith('afterRender')) {
+            throw new Error('This error was thrown intentionally inside afterRender()');
         }
     }
 }

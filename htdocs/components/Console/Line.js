@@ -1,17 +1,32 @@
 import { Component } from '/js/component.js';
 
 /**
- *
+ * Single log line rendered in the Console Panel.
  */
 export class Line extends Component {
-    /** @type {string} */
+    /**
+     * Log level (info, warn, error).
+     * @type {string}
+     */
     level = '';
-    /** @type {string} */
+    /**
+     * The log message content.
+     * @type {string}
+     */
     message = '';
-    /** @type {number} */
+    /**
+     * Duplicate message count badge.
+     * @type {number}
+     */
     badge = 0;
-    /** @type {string} */
+    /**
+     * The source component ID that emitted the log.
+     * @type {string}
+     */
     source = '';
-    /** @type {string} */
+    /**
+     * The formatted timestamp of the log event.
+     * @type {string}
+     */
     timestamp = '';
 }

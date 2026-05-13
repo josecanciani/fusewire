@@ -1,0 +1,20 @@
+<div class="container-fluid py-4">
+    <div class="row">
+        <aside class="col-md-3 col-lg-2 border-end docs-sidebar mb-4">
+            <nav class="nav flex-column sticky-top" style="top: 5rem;">
+                <h5 class="mb-3 px-3">Documentation</h5>
+                <div fw-each="item in $docsList">
+                    <a class="nav-link ((item.$activeClass)) cursor-pointer"
+                       onclick="((this)).selectDoc('((item.id))')">
+                        ((item.title))
+                    </a>
+                </div>
+            </nav>
+        </aside>
+        <main class="col-md-9 col-lg-10 px-md-5">
+            <div class="docs-content p-4 border rounded bg-body">
+                ((markdownViewer))
+            </div>
+        </main>
+    </div>
+</div>

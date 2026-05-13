@@ -1,5 +1,4 @@
 <div class="d-flex flex-column vh-100">
-    ((headerComponent))
     <section fw-if="!selectedDemo" class="container py-5 flex-grow-1 overflow-auto">
         <h1 class="mb-2">FuseWire Demos</h1>
         <p class="text-body-secondary">Pick a demo to explore</p>
@@ -22,7 +21,7 @@
                 </div>
             </div>
         </div>
-        <p fw-if="noResults" class="text-body-secondary mt-4">
+        <p fw-if="$noResults" class="text-body-secondary mt-4">
             No demos match the selected tag combination.
         </p>
     </section>
@@ -43,7 +42,7 @@
                             </svg>
                         </button>
                     </div>
-                    <div class="flex-grow-1 overflow-auto p-2 panel">((demoComponent))</div>
+                    <div class="flex-grow-1 overflow-auto p-2 panel d-flex flex-column">((demoComponent))</div>
                 </div>
                 <div class="resize-handle-y" onmousedown="((this)).startConsoleResize(event)"></div>
                 <div class="console-bar d-flex flex-column">

@@ -1,0 +1,77 @@
+.site-main {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+
+    --fw-primary: #00d1b2;
+    --fw-secondary: #0070f3;
+    --fw-dark: #000000;
+    --fw-light: #fafafa;
+    --fw-accent: #79ffe1;
+}
+
+.site-main[data-bs-theme='light'] {
+    --fw-bg: #ffffff;
+    --fw-surface: #ffffff;
+    --fw-border: #eaeaea;
+    --fw-text-primary: #000000;
+    --fw-text-secondary: #666666;
+    --fw-grid-line: rgba(0, 0, 0, 0.15);
+    --fw-grid-mask: radial-gradient(ellipse at center, black 50%, transparent 90%);
+}
+
+.site-main[data-bs-theme='dark'] {
+    --fw-bg: #000000;
+    --fw-surface: #111111;
+    --fw-border: #333333;
+    --fw-text-primary: #ffffff;
+    --fw-text-secondary: #888888;
+    --fw-grid-line: rgba(0, 209, 178, 0.18);
+    --fw-grid-mask: radial-gradient(ellipse at center, black 40%, transparent 85%);
+}
+
+.navbar {
+    border-top: 3px solid var(--fw-primary) !important;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.site-content {
+    flex: 1;
+    background-color: var(--fw-bg);
+    color: var(--fw-text-primary);
+}
+
+/* Override Bootstrap primary if needed */
+.text-primary {
+    color: var(--fw-primary) !important;
+}
+
+.btn-primary {
+    background-color: var(--fw-primary);
+    border-color: var(--fw-primary);
+    color: #fff !important;
+}
+
+.btn-outline-secondary {
+    color: var(--fw-text-primary);
+    border-color: var(--fw-border);
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--fw-primary);
+    border-color: var(--fw-primary);
+    color: #fff;
+}
+
+.navbar-brand {
+    font-size: 1.5rem;
+    letter-spacing: -0.05rem;
+}
+
+.nav-link.active {
+    font-weight: 600;
+    color: var(--fw-primary) !important;
+}

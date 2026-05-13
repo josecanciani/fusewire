@@ -4,9 +4,15 @@ import { Component } from '/js/component.js';
  *
  */
 export class Sidebar extends Component {
-    /** @type {Array.<object>} */
+    /**
+     * List of available demos.
+     * @type {Array.<{name: string, title: string, description: string, tags: string[]}>}
+     */
     demos = [];
-    /** @type {Array.<object>} */
+    /**
+     * List of files for the current demo.
+     * @type {Array.<{id: string, label: string, activeClass: string}>}
+     */
     demoFiles = [];
 
     /**
@@ -38,8 +44,7 @@ export class Sidebar extends Component {
      */
     highlightFile(id) {
         this.demoFiles.forEach((f) => {
-            /** @type {{id: string, activeClass: string}} */ (f).activeClass =
-                /** @type {{id: string}} */ (f).id === id ? 'active' : '';
+            f.activeClass = f.id === id ? 'active' : '';
         });
         this.react();
     }

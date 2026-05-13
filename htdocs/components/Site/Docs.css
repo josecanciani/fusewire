@@ -1,0 +1,25 @@
+.docs-sidebar .nav-link {
+    color: var(--fw-text-primary);
+    padding: 0.5rem 1rem;
+    transition: all 0.2s ease;
+}
+
+.docs-sidebar .nav-link:hover {
+    background-color: rgba(0, 209, 178, 0.1);
+    color: var(--fw-primary);
+}
+
+.docs-sidebar .nav-link.active {
+    background-color: var(--fw-primary) !important;
+    color: #fff !important;
+}
+
+[data-bs-theme='dark'] .docs-sidebar .nav-link.active {
+    color: #0a0a0a !important;
+}
+
+.docs-content {
+    background-color: var(--fw-surface);
+    border-color: var(--fw-border) !important;
+    transition: background-color 0.3s ease;
+}

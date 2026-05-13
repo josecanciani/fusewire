@@ -1,16 +1,25 @@
 import { Component } from '/js/component.js';
 
 /**
- *
+ * Fallback component.
  */
 export class Fallback extends Component {
-    /** @type {string} */
+    /**
+     * Fallback error message.
+     * @type {string}
+     */
     errorMessage = '';
 
-    /** @type {string} */
+    /**
+     * Failed component name.
+     * @type {string}
+     */
     failedComponent = '';
 
-    /** @type {number} */
+    /**
+     * Number of tries.
+     * @type {number}
+     */
     tries = 1;
 
     /**

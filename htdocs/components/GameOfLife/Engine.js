@@ -72,18 +72,27 @@ function speedToInterval(speedLevel) {
  * reset, resize). The component layer translates these into UI updates.
  */
 export class Engine {
-    /** @type {Array<Array<boolean>>|null} */
+    /**
+     * 2D boolean array representing cell states.
+     * @type {Array<Array<boolean>>|null}
+     */
     #grid = null;
     #rows = 0;
     #cols = 0;
-    /** @type {number|null} */
+    /**
+     * Interval ID for the tick loop.
+     * @type {number|null}
+     */
     #timer = null;
     #playing = false;
     #generation = 0;
     #speedLevel = 20;
     #totalCreated = 0;
     #totalDestroyed = 0;
-    /** @type {any[]} */
+    /**
+     * Buffer of cells created per tick.
+     * @type {any[]}
+     */
     #createdLog = [];
     #maxCreatedPerSecond = 0;
     #onStateChange;

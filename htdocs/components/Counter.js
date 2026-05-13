@@ -4,7 +4,10 @@ import { Component } from '/js/component.js';
  * Simple counter demo component.
  */
 export class Counter extends Component {
-    /** @type {number} */
+    /**
+     * The current counter value.
+     * @type {number}
+     */
     count = 0;
 
     /**

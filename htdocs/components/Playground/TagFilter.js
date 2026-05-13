@@ -1,10 +1,13 @@
 import { Component } from '/js/component.js';
 
 /**
- *
+ * UI filter for demo tags.
  */
 export class TagFilter extends Component {
-    /** @type {Array.<{name: string, activeClass: string}>} */
+    /**
+     * Collection of available tag filters.
+     * @type {Array.<{name: string, activeClass: string}>}
+     */
     tags = [];
 
     /**

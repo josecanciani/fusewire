@@ -4,7 +4,10 @@ import { Component } from '/js/component.js';
  *
  */
 export class Header extends Component {
-    /** @type {string} */
+    /**
+     * theme property.
+     * @type {string}
+     */
     theme = 'light';
 
     /**

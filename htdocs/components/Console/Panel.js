@@ -6,7 +6,10 @@ import { REACTOR } from '/js/symbols.js';
  * Console panel component — receives log messages from the reactor and displays them as a scrolling list.
  */
 export class Panel extends Component {
-    /** @type {Array.<import('./Line.js').Line>} */
+    /**
+     * Collection of rendered log lines.
+     * @type {Array.<import('./Line.js').Line>}
+     */
     logs = [];
 
     #lastKey = '';
@@ -19,15 +22,13 @@ export class Panel extends Component {
     async init() {
         this[REACTOR].attachConsole(this);
         this.logs.push(
-            /** @type {import('./Line.js').Line} */ (
-                this.createChild('Console/Line', '1', {
-                    level: 'log',
-                    message: 'Console ready',
-                    badge: 0,
-                    source: '',
-                    timestamp: '',
-                })
-            ),
+            this.createChild('Console/Line', '1', {
+                level: 'log',
+                message: 'Console ready',
+                badge: 0,
+                source: '',
+                timestamp: '',
+            }),
         );
     }
 
@@ -103,15 +104,13 @@ export class Panel extends Component {
             this.#lastKey = key;
             this.#lastCount = 1;
             this.logs.push(
-                /** @type {import('./Line.js').Line} */ (
-                    this.createChild('Console/Line', String(this.#messageCount), {
-                        level,
-                        message: fullMessage,
-                        badge: 0,
-                        source,
-                        timestamp,
-                    })
-                ),
+                this.createChild('Console/Line', String(this.#messageCount), {
+                    level,
+                    message: fullMessage,
+                    badge: 0,
+                    source,
+                    timestamp,
+                }),
             );
             this.react();
         }
@@ -121,9 +120,12 @@ export class Panel extends Component {
      * Scroll the console to the latest log entry after each render
      */
     afterRender() {
-        const anchor = this.querySelector('.scroll-anchor');
-        if (anchor) {
-            anchor.scrollIntoView({ block: 'end', behavior: 'instant' });
+        const container = this.querySelector('.console-panel-logs');
+        if (container) {
+            const scrollParent = container.closest('.overflow-auto');
+            if (scrollParent) {
+                scrollParent.scrollTop = scrollParent.scrollHeight;
+            }
         }
     }
 

@@ -1,21 +1,33 @@
-import { Component } from "/js/component.js";
+import { Component } from '/js/component.js';
 
 /**
- *
+ * Simulation controls panel for Conway's Game of Life.
  */
 export class Controls extends Component {
-    /** @type {boolean} */
+    /**
+     * Is the simulation currently running.
+     * @type {boolean}
+     */
     running = false;
-    /** @type {number} */
+    /**
+     * Current speed level (0-100).
+     * @type {number}
+     */
     speedLevel = 20;
-    /** @type {boolean} */
+    /**
+     * Whether the help overlay is shown.
+     * @type {boolean}
+     */
     #showHelp = false;
-    /** @type {boolean} */
+    /**
+     * Disable UI interactions.
+     * @type {boolean}
+     */
     disabled = false;
 
     /**
-     * @type {boolean}
      * Whether to show the help panel.
+     * @type {boolean}
      */
     get $showHelp() {
         return this.#showHelp;
@@ -42,7 +54,7 @@ export class Controls extends Component {
      */
     play() {
         this.running = true;
-        this.emit("play");
+        this.emit('play');
         this.react();
     }
 
@@ -51,7 +63,7 @@ export class Controls extends Component {
      */
     pause() {
         this.running = false;
-        this.emit("pause");
+        this.emit('pause');
         this.react();
     }
 
@@ -60,7 +72,7 @@ export class Controls extends Component {
      */
     step() {
         this.running = false;
-        this.emit("step");
+        this.emit('step');
         this.react();
     }
 
@@ -69,7 +81,7 @@ export class Controls extends Component {
      */
     reset() {
         this.running = false;
-        this.emit("reset");
+        this.emit('reset');
         this.react();
     }
 
@@ -78,12 +90,9 @@ export class Controls extends Component {
      * @param {Event} event - The input event from the range slider
      */
     changeSpeed(event) {
-        const level = parseInt(
-            /** @type {HTMLInputElement} */ (event.target).value,
-            10,
-        );
+        const level = parseInt(/** @type {HTMLInputElement} */ (event.target).value, 10);
         this.speedLevel = level;
-        this.emit("speed", level);
+        this.emit('speed', level);
         this.react();
     }
 
@@ -92,7 +101,7 @@ export class Controls extends Component {
      */
     toggleHelp() {
         this.#showHelp = !this.#showHelp;
-        this.emit("help", this.#showHelp);
+        this.emit('help', this.#showHelp);
         this.react();
     }
 }

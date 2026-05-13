@@ -4,17 +4,35 @@ import { Component } from '/js/component.js';
  *
  */
 export class Stats extends Component {
-    /** @type {number} */
+    /**
+     * generation property.
+     * @type {number}
+     */
     generation = 0;
-    /** @type {number} */
+    /**
+     * cellCount property.
+     * @type {number}
+     */
     cellCount = 0;
-    /** @type {number} */
+    /**
+     * totalCreated property.
+     * @type {number}
+     */
     totalCreated = 0;
-    /** @type {number} */
+    /**
+     * totalDestroyed property.
+     * @type {number}
+     */
     totalDestroyed = 0;
-    /** @type {number} */
+    /**
+     * createdPerSecond property.
+     * @type {number}
+     */
     createdPerSecond = 0;
-    /** @type {number} */
+    /**
+     * maxCreatedPerSecond property.
+     * @type {number}
+     */
     maxCreatedPerSecond = 0;
 
     /**

@@ -1,4 +1,5 @@
 /**
+ * Options for configuring flex resize behavior.
  * @typedef {Object<string, *>} ResizeOptions
  * @property {number} [minSize]
  * @property {number} [minGap]
