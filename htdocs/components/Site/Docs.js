@@ -100,7 +100,7 @@ export class Docs extends Component {
         if (this.doc === id) return;
         this.doc = id;
         if (this.markdownViewer) {
-            this.markdownViewer.update({ src: `/docs/${this.doc}.md` });
+            this.markdownViewer.update({ src: `./docs/${this.doc}.md` });
         }
         this.react().then(() => this.pushRoute());
     }
