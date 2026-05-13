@@ -40,7 +40,7 @@ export class Docs extends Component {
      * @returns {string} The full path to the active document
      */
     get $activeDoc() {
-        return `/docs/${this.doc}.md`;
+        return `./docs/${this.doc}.md`;
     }
 
     /**
@@ -78,7 +78,7 @@ export class Docs extends Component {
         if (routeSegment) {
             // Document might have changed via URL
             if (this.markdownViewer) {
-                this.markdownViewer.update({ src: `/docs/${this.doc}.md` });
+                this.markdownViewer.update({ src: `./docs/${this.doc}.md` });
             }
         }
         return result;

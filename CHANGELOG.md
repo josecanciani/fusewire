@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-05-13
+### Fixed
+- Fixed GitHub Pages deployment configuration to correctly copy the `docs/` folder to the public site.
+- Updated `Docs` component to use relative paths (`./docs/`) for fetching markdown files when hosted in a subpath.
+
 ## [1.1.2] - 2026-05-13
 ### Fixed
 - Fixed GitHub Pages deployment configuration to install and copy third-party frontend dependencies (Bootstrap, CodeMirror, Marked) instead of ignoring them.
@@ -86,7 +91,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed JS-in-HTML inline execution possibilities to strictly enforce declarative JS state truth.
 
-[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.1.2...main
+[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.1.3...main
+[1.1.3]: https://github.com/josecanciani/fusewire/compare/1.1.2...1.1.3
 [1.1.2]: https://github.com/josecanciani/fusewire/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/josecanciani/fusewire/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/josecanciani/fusewire/compare/1.0.2...1.1.0

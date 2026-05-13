@@ -37,6 +37,7 @@ jobs:
           npm install
           mkdir public
           cp -r htdocs/* public/
+          cp -r docs public/docs/
           mkdir -p public/js
           cp -r src/* public/js/
           mkdir -p public/node_modules
