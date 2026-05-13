@@ -15,10 +15,10 @@ export class Landing extends Component {
     }
 
     /**
-     * Navigate to a page via the parent Main component.
+     * Navigate to a page by emitting an event to the parent.
      * @param {string} page - Target page name
      */
     goTo(page) {
-        this.componentParent.navigate(page);
+        this.emit('navigate', page);
     }
 }

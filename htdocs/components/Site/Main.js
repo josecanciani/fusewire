@@ -241,6 +241,7 @@ export class Main extends Component {
         if (this.page === 'home') {
             if (!this.landing) {
                 this.landing = this.createChild('Site/Landing', 'home');
+                this.landing.on('navigate', (page) => this.navigate(page));
             }
         } else if (this.page === 'docs') {
             if (!this.docs) {
