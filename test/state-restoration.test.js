@@ -224,7 +224,7 @@ describe('State Restoration', () => {
             templateStore.set('App', {
                 version: 'v1',
                 // Template with mount point for header child
-                htmlCode: '<div>app <fw-mount data-fusewire-id="Header#h1" data-fusewire-parent-id="App#main"></fw-mount></div>',
+                htmlCode: '<div>app ((header))</div>',
                 cssCode: '',
             });
 

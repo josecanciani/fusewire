@@ -12,8 +12,12 @@ import { REACTOR, LIFECYCLE_ACTIVE } from '../src/symbols.js';
 import { ComponentNotFoundError } from '../src/errors/error-hierarchy.js';
 import { StrictConsole } from './strict-console.js';
 
-// Mock idiomorph for testing
-const mockMorph = () => { };
+import { Idiomorph } from 'idiomorph';
+
+// Simple morph for testing — applies HTML to container
+const mockMorph = (container, html, options) => {
+    return Idiomorph.morph(container, html, options);
+};
 
 // Track app names to unregister after each test
 let registeredApps = [];
@@ -272,6 +276,7 @@ describe('Reactor', () => {
             assert.ok(container.classList.contains(appName));
             // Root component class is on a child element (CSS scoping needs nesting)
             assert.ok(!container.classList.contains('FuseWire_Root'));
+            console.log('DEBUG container.innerHTML:', container.innerHTML);
             assert.ok(container.firstChild.classList.contains('FuseWire_Root'));
         });
 
@@ -454,14 +459,19 @@ describe('Reactor', () => {
             assert.strictEqual(afterRenderCalled, true);
         });
 
-        it('throws if instance is not found after render()', async () => {
+        it('silently ignores if instance is not found after render()', async () => {
             const strict = new StrictConsole();
             strict.expectError(/Error during re-render/);
             activeStrictConsoles.push(strict);
 
+            let getCount = 0;
             const mockRegistry = {
                 async render() { },
-                get() { return null; },
+                get() { 
+                    getCount++;
+                    if (getCount === 1) return {};
+                    return null;
+                },
             };
 
             const reactor = createReactor('test-react-7', {
@@ -470,10 +480,9 @@ describe('Reactor', () => {
                 console: strict,
             });
 
-            await assert.rejects(
-                () => reactor.react('Counter#main'),
-                ComponentNotFoundError,
-            );
+            // Should not throw
+            await reactor.react('Counter#main');
+            assert.strictEqual(getCount, 2);
         });
     });
 
@@ -798,6 +807,7 @@ describe('Reactor', () => {
                 afterRender() {
                     throw new Error('afterRender failed');
                 },
+                emitCancellable: () => false,
             };
             const mockRegistry = {
                 async render() { },

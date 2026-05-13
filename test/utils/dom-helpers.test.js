@@ -7,6 +7,7 @@ import {
 	createMountPoint,
 	isMountPoint,
 	getComponentIdFromElement,
+	toCssName,
 } from '../../src/utils/dom-helpers.js';
 
 // Set up JSDOM global document
@@ -261,6 +262,23 @@ describe('DOM Helpers', () => {
 			assert.strictEqual(
 				mountPoints[0].getAttribute('data-fusewire-id'),
 				'Child',
+			);
+		});
+	});
+
+	describe('toCssName', () => {
+		it('returns name unchanged when no slashes', () => {
+			assert.strictEqual(toCssName('Counter'), 'Counter');
+		});
+
+		it('replaces single slash with underscore', () => {
+			assert.strictEqual(toCssName('Basics/Counter'), 'Basics_Counter');
+		});
+
+		it('replaces multiple slashes', () => {
+			assert.strictEqual(
+				toCssName('Dashlet/Charts/LineChart'),
+				'Dashlet_Charts_LineChart',
 			);
 		});
 	});
