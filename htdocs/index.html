@@ -5,11 +5,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FuseWire</title>
-    <link href="./node_modules/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <script src="./node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+
     <script type="importmap">
         {
             "imports": {
+                "@popperjs/core": "./node_modules/@popperjs/core/dist/esm/popper.js",
+                "bootstrap/css": "./node_modules/bootstrap/dist/css/bootstrap.min.css",
+                "bootstrap": "./node_modules/bootstrap/dist/js/bootstrap.esm.min.js",
                 "marked": "./node_modules/marked/lib/marked.esm.js",
                 "codemirror": "./node_modules/codemirror/dist/index.js",
                 "@codemirror/autocomplete": "./node_modules/@codemirror/autocomplete/dist/index.js",
@@ -51,6 +53,12 @@
 
     </script>
     <script type="module">
+        import bootstrapCss from 'bootstrap/css'
+        with {
+            type: 'css'
+        };
+        document.adoptedStyleSheets = [...document.adoptedStyleSheets, bootstrapCss];
+        import 'bootstrap';
         import {
             Reactor
         } from './js/reactor.js';

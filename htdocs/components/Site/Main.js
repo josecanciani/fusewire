@@ -175,7 +175,7 @@ export class Main extends Component {
      * @param {import('../../js/component.js').ComponentVars} newVars - Vars to merge
      * @param {boolean} react - Whether to trigger a re-render
      * @param {import('../../js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
-     * @returns {Promise<boolean>} True if updated
+     * @returns {Promise<void>}
      */
     async update(newVars, react = true, routeSegment = null) {
         if (routeSegment) {
@@ -188,7 +188,7 @@ export class Main extends Component {
                 await this.#loadPage();
             }
         }
-        return super.update(newVars, react, routeSegment);
+        await super.update(newVars, react, routeSegment);
     }
 
     /**
@@ -241,7 +241,9 @@ export class Main extends Component {
         if (this.page === 'home') {
             if (!this.landing) {
                 this.landing = this.createChild('Site/Landing', 'home');
-                this.landing.on('navigate', (page) => this.navigate(page));
+                this.landing.on('navigate', (page) => {
+                    this.navigate(page);
+                });
             }
         } else if (this.page === 'docs') {
             if (!this.docs) {

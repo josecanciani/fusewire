@@ -11,6 +11,15 @@ import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
 
 /**
+ * File structure for Editor.
+ * @typedef EditorFile
+ * @property {string} id
+ * @property {string} label
+ * @property {string} ext
+ * @property {string} content
+ */
+
+/**
  * Code editor panel using CodeMirror; manages tabbed files and theme switching.
  */
 export class Editor extends Component {
@@ -26,7 +35,7 @@ export class Editor extends Component {
     activeTabId = null;
     /**
      * Files to populate the editor.
-     * @type {Array.<object>}
+     * @type {Array.<EditorFile>}
      */
     files = [];
     /**
@@ -81,8 +90,9 @@ export class Editor extends Component {
      * @param {import('../../js/component.js').ComponentVars} newVars - New vars to merge
      * @param {boolean} react - Whether to trigger a re-render
      * @param {import('../../js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
+     * @returns {Promise<void>}
      */
-    update(newVars, react = true, routeSegment = null) {
+    async update(newVars, react = true, routeSegment = null) {
         const oldFiles = this.files;
         const shouldProcessFiles = newVars.files !== undefined && newVars.files !== oldFiles;
 
@@ -91,7 +101,7 @@ export class Editor extends Component {
             this.#destroyEditorView();
         }
 
-        super.update(newVars, react && !shouldProcessFiles, routeSegment);
+        await super.update(newVars, react && !shouldProcessFiles, routeSegment);
 
         if (shouldProcessFiles) {
             this.#loadFilesInternal(this.files, this.activeFileId);
@@ -101,8 +111,8 @@ export class Editor extends Component {
 
     /**
      * Replace all files and reset tab state. Opens the specified file or the first file automatically.
-     * @param {Array.<{id: string, label: string, ext: string, content: string}>} files - New file set
-     * @param {string} [activeFileId] - Optional file ID to open
+     * @param {Array.<EditorFile>} files - New file set
+     * @param {string|null} [activeFileId] - Optional file ID to open
      */
     #loadFilesInternal(files, activeFileId) {
         this.#destroyEditorView();
@@ -316,7 +326,10 @@ export class Editor extends Component {
             });
             console.log('[Editor] Mounted CodeMirror for', this.activeTabId);
         } catch (err) {
-            console.error('[Editor] Failed to mount CodeMirror:', err.message);
+            console.error(
+                '[Editor] Failed to mount CodeMirror:',
+                /** @type {Error} */ (err).message,
+            );
         }
     }
 

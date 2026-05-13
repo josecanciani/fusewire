@@ -50,7 +50,7 @@ export class Markdown extends Component {
      */
     async update(newVars, react = true) {
         if (newVars.src && newVars.src !== this.src) {
-            this.src = newVars.src;
+            this.src = /** @type {string} */ (newVars.src);
             await this.#fetchContent();
             if (react) this.react();
             return;

@@ -71,17 +71,16 @@ export class Docs extends Component {
      * @param {import('../../js/component.js').ComponentVars} newVars - Vars to merge
      * @param {boolean} react - Whether to trigger a re-render
      * @param {import('../../js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
-     * @returns {Promise<boolean>} True if updated
+     * @returns {Promise<void>}
      */
     async update(newVars, react = true, routeSegment = null) {
-        const result = await super.update(newVars, react, routeSegment);
+        await super.update(newVars, react, routeSegment);
         if (routeSegment) {
             // Document might have changed via URL
             if (this.markdownViewer) {
                 this.markdownViewer.update({ src: `./docs/${this.doc}.md` });
             }
         }
-        return result;
     }
 
     /**

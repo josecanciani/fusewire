@@ -2,12 +2,24 @@ import { Component, Child } from '../../js/component.js';
 import { REACTOR } from '../../js/symbols.js';
 
 /**
+ * Definition of a Playground Demo.
+ * @typedef Demo
+ * @property {string} name
+ * @property {string} [title]
+ * @property {string} [description]
+ * @property {string[]} tags
+ * @property {string[]} [components]
+ * @property {string} [defaultFile]
+ * @property {Object<string, *>} [vars]
+ */
+
+/**
  * Playground Home component. Manages the sidebar, editor, and live demo preview.
  */
 export class Home extends Component {
     /**
      * demos property.
-     * @type {Array.<object>}
+     * @type {Array.<Demo>}
      */
     demos = [];
     /**
@@ -22,7 +34,7 @@ export class Home extends Component {
     demoRunId = 0;
     /**
      * filteredDemos property.
-     * @type {Array.<object>}
+     * @type {Array.<Demo>}
      */
     filteredDemos = [];
 
@@ -103,22 +115,30 @@ export class Home extends Component {
         // the plain JSON marker with a functional Child reference, and the buffered
         // .on() events will correctly attach to the live instances.
         if (this.sidebarComponent === null) {
-            this.sidebarComponent = this.createChild('Playground/Sidebar', 'sidebar', {
-                demos: this.demos,
-                demoFiles: [],
-            });
+            this.sidebarComponent = /** @type {import('./Sidebar.js').Sidebar} */ (
+                this.createChild('Playground/Sidebar', 'sidebar', {
+                    demos: this.demos,
+                    demoFiles: [],
+                })
+            );
         }
-        this.sidebarComponent.on('selectDemo', (name) => this.selectDemo(name));
+        this.sidebarComponent.on('selectDemo', (name) => {
+            this.selectDemo(name);
+        });
         this.sidebarComponent.on('openFile', (id) => this.editorComponent.openFile(id));
         this.sidebarComponent.on('back', () => this.back());
 
         if (this.editorComponent === null) {
-            this.editorComponent = this.createChild('Playground/Editor', 'editor', {
-                files: [],
-                activeFileId: null,
-            });
+            this.editorComponent = /** @type {import('./Editor.js').Editor} */ (
+                this.createChild('Playground/Editor', 'editor', {
+                    files: [],
+                    activeFileId: null,
+                })
+            );
         }
-        this.editorComponent.on('runDemo', () => this.runDemo());
+        this.editorComponent.on('runDemo', () => {
+            this.runDemo();
+        });
         this.editorComponent.on('activeFileChanged', (id) =>
             this.sidebarComponent.highlightFile(id),
         );
@@ -336,7 +356,7 @@ export class Home extends Component {
         }
 
         const componentNames = demo.components || [demo.name];
-        const files = [];
+        const files = /** @type {Array<import('./Editor.js').EditorFile>} */ ([]);
 
         const loadedComponents = await Promise.all(
             componentNames.map(async (compName) => {
@@ -397,21 +417,17 @@ export class Home extends Component {
         if (this.sidebarComponent instanceof Child) {
             // If they are still Child references, wait for their eager creation to finish
             // before calling their instance-specific methods.
-            this.sidebarComponent.whenReady().then(
-                /**
-                 * Wait for sidebar to resolve.
-                 * @param {import('./Sidebar.js').Sidebar|null} sidebar - Sidebar instance
-                 */
-                (sidebar) => {
-                    if (sidebar) sidebar.update({ demos: this.demos, demoFiles });
-                },
-            );
+            this.sidebarComponent.whenReady().then((comp) => {
+                const sidebar = /** @type {import('./Sidebar.js').Sidebar} */ (comp);
+                if (sidebar) sidebar.update({ demos: this.demos, demoFiles });
+            });
         } else if (this.sidebarComponent) {
             this.sidebarComponent.update({ demos: this.demos, demoFiles });
         }
 
         if (this.editorComponent instanceof Child) {
-            this.editorComponent.whenReady().then((editor) => {
+            this.editorComponent.whenReady().then((comp) => {
+                const editor = /** @type {import('./Editor.js').Editor} */ (comp);
                 if (editor) editor.update({ files, activeFileId: defaultFileId });
             });
         } else if (this.editorComponent) {
