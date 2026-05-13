@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-05-13
+### Fixed
+- Fixed GitHub Pages deployment configuration to explicitly copy `@popperjs` dependency so Bootstrap ES modules resolve correctly in production.
+
 ## [1.2.1] - 2026-05-13
 ### Added
 - Configured `rootDirs` in `jsconfig.json` to natively resolve relative browser imports (`../../js/`) in the IDE by virtually merging `htdocs/js` and `src`.
@@ -110,7 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed JS-in-HTML inline execution possibilities to strictly enforce declarative JS state truth.
 
-[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.2.1...main
+[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.2.2...main
+[1.2.2]: https://github.com/josecanciani/fusewire/compare/1.2.1...1.2.2
 [1.2.1]: https://github.com/josecanciani/fusewire/compare/1.2.0...1.2.1
 [1.2.0]: https://github.com/josecanciani/fusewire/compare/1.1.3...1.2.0
 [1.1.3]: https://github.com/josecanciani/fusewire/compare/1.1.2...1.1.3

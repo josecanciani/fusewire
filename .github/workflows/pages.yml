@@ -43,6 +43,7 @@ jobs:
           mkdir -p public/node_modules
           cp -r node_modules/idiomorph public/node_modules/
           cp -r node_modules/bootstrap public/node_modules/
+          cp -r node_modules/@popperjs public/node_modules/
           cp -r node_modules/marked public/node_modules/
           cp -r node_modules/codemirror public/node_modules/
           cp -r node_modules/@codemirror public/node_modules/
