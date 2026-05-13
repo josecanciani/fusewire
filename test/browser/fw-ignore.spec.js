@@ -59,7 +59,7 @@ test.describe('fw-ignore directive', () => {
         fs.writeFileSync(testHtmlPath, htmlContent);
         
         try {
-            await page.goto('http://localhost:8000/test-fw-ignore.html');
+            await page.goto('/test-fw-ignore.html');
             
             // Wait for initial render
             await expect(page.locator('#counter')).toHaveText('Count: 0');

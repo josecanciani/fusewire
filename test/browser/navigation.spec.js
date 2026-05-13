@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Navigation State Restoration', () => {
     test.beforeEach(async ({ page }) => {
         // Start on the Demo page with Counter selected
-        await page.goto('http://localhost:8000/#!/demo:demo=Counter');
+        await page.goto('/#!/demo:demo=Counter');
         
         // Wait for the Editor (CodeMirror) to fully mount
         await page.waitForSelector('.cm-editor', { state: 'visible' });
