@@ -234,12 +234,12 @@ export class Component {
      * and rendering into a detached container — all in parallel with other
      * children. The child is attached to the document when the parent renders
      * and discovers the mount point.
-     * @template T
+     * @template {Component} [T=import('./component.js').Component]
      * @param {string} name - Component name (e.g., 'Counter', 'Basics/Counter')
      * @param {string|ComponentVars} [idOrVars] - Instance id, or vars if id is omitted
      * @param {ComponentVars|import('./component.js').ChildOptions} [maybeVarsOrOptions] - Vars when id is provided, or options when id is omitted
      * @param {import('./component.js').ChildOptions} [maybeOptions] - Options when id and vars are provided
-     * @returns {Child} Reference that the framework replaces with the real instance after mounting
+     * @returns {T} Reference that the framework replaces with the real instance after mounting
      */
     createChild(name, idOrVars, maybeVarsOrOptions, maybeOptions) {
         let id;
@@ -258,7 +258,7 @@ export class Component {
         if (this[REACTOR]) {
             this[REACTOR].instanceRegistry.startEagerCreation(ref);
         }
-        return ref;
+        return /** @type {T} */ (/** @type {unknown} */ (ref));
     }
 
     /**
@@ -266,9 +266,10 @@ export class Component {
      * The parent renders immediately with a placeholder component. When the
      * real child is ready, the framework swaps the placeholder for the real
      * component and triggers a re-render of the parent.
+     * @template {Component} [T=import('./component.js').Component]
      * @param {Component|Child} lazyChild - The child reference to load lazily
      * @param {Component|Child} placeholderChild - Placeholder to show while loading
-     * @returns {Lazy} Reference that the framework replaces with the real instance after mounting
+     * @returns {T} Reference that the framework replaces with the real instance after mounting
      */
     createLazyChild(lazyChild, placeholderChild) {
         if (!placeholderChild) {
@@ -277,7 +278,7 @@ export class Component {
             );
         }
         const baseId = lazyChild.toComponentId().code;
-        return /** @type {Lazy} */ (
+        return /** @type {T} */ (
             /** @type {unknown} */ (
                 this.createChild('FuseWire/Lazy', `${baseId}-lazy`, {
                     lazyChild,
@@ -291,10 +292,10 @@ export class Component {
      * Create a child component wrapped in an error boundary.
      * If the child fails to initialize or render, the framework will catch the
      * `fw-error` event and automatically render the fallback component instead.
-     * @template T
+     * @template {Component} [T=import('./component.js').Component]
      * @param {Component|Child} targetChild - The child reference to mount
      * @param {Component|Child|string} fallbackChildOrName - Fallback child reference or component name if targetChild fails
-     * @returns {Child} Boundary reference that manages the child lifecycle
+     * @returns {T} Boundary reference that manages the child lifecycle
      */
     createErrorBoundedChild(targetChild, fallbackChildOrName) {
         if (!fallbackChildOrName) {
@@ -308,10 +309,14 @@ export class Component {
                 ? this.createChild(fallbackChildOrName, `${baseId}-eb-fallback`)
                 : fallbackChildOrName;
 
-        return this.createChild('FuseWire/ErrorBoundary', `${baseId}-eb`, {
-            targetChild,
-            fallbackChild,
-        });
+        return /** @type {T} */ (
+            /** @type {unknown} */ (
+                this.createChild('FuseWire/ErrorBoundary', `${baseId}-eb`, {
+                    targetChild,
+                    fallbackChild,
+                })
+            )
+        );
     }
 
     /**
@@ -320,30 +325,36 @@ export class Component {
      * current component's CSS stacking context.
      * @template {Component} [T=import('./component.js').PortalHost]
      * @param {string} id - Unique identifier for this portal host
-     * @returns {T|any} The PortalHost reference (place in template as ((varName)))
+     * @returns {T} The PortalHost reference (place in template as ((varName)))
      */
     createPortalHost(id) {
-        return this.createChild('FuseWire/PortalHost', id);
+        return /** @type {T} */ (
+            /** @type {unknown} */ (this.createChild('FuseWire/PortalHost', id))
+        );
     }
 
     /**
      * Create a child that renders in a PortalHost instead of this component's DOM.
      * The returned reference is a PortalChild proxy — it lives in this component's
      * tree (for lifecycle and events) but the real child renders in the PortalHost.
-     * @template T
+     * @template {Component} [T=import('./component.js').Component]
      * @param {string} name - Component name (e.g. 'Cart/Modal')
      * @param {string} id - Instance id
      * @param {ComponentVars} [vars] - Initial vars for the real child
      * @param {string} [portalHostId='default'] - ID of the target PortalHost
-     * @returns {T|any} PortalChild proxy reference (place in template as ((varName)))
+     * @returns {T} PortalChild proxy reference (place in template as ((varName)))
      */
     createPortalChild(name, id, vars, portalHostId) {
-        return this.createChild('FuseWire/PortalChild', `${name}-${id}-portal`, {
-            targetName: name,
-            targetId: id,
-            targetVars: vars || {},
-            portalHostId: portalHostId || 'default',
-        });
+        return /** @type {T} */ (
+            /** @type {unknown} */ (
+                this.createChild('FuseWire/PortalChild', `${name}-${id}-portal`, {
+                    targetName: name,
+                    targetId: id,
+                    targetVars: vars || {},
+                    portalHostId: portalHostId || 'default',
+                })
+            )
+        );
     }
 
     /**

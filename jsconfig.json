@@ -2,7 +2,9 @@
     "compilerOptions": {
         "checkJs": true,
         "noEmit": true,
-        "strict": true, "strictPropertyInitialization": false, "strictNullChecks": false,
+        "strict": true,
+        "strictPropertyInitialization": false,
+        "strictNullChecks": false,
         "target": "ESNext",
         "module": "ESNext",
         "moduleResolution": "bundler",
@@ -14,11 +16,16 @@
             "/js/*": [
                 "./src/*"
             ]
-        }
+        },
+        "rootDirs": [
+            "./htdocs/js",
+            "./src"
+        ]
     },
     "include": [
         "src/**/*.js",
-        "htdocs/**/*.js", "types.d.ts"
+        "htdocs/**/*.js",
+        "types.d.ts"
     ],
     "exclude": [
         "src/lib/**"

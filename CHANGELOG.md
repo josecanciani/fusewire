@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Configured `rootDirs` in `jsconfig.json` to natively resolve relative browser imports (`../../js/`) in the IDE by virtually merging `htdocs/js` and `src`.
+
+### Changed
+- Refactored core component factories (`createChild`, `createLazyChild`, `createPortalChild`, etc.) to use TypeScript Contextual Inference (`@returns {T}`). This automatically types child instances based on their class field declarations, eliminating the need for verbose inline JSDoc casting.
 
 ## [1.2.0] - 2026-05-13
 ### Changed
