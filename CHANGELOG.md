@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-05-13
+### Changed
+- Updated browser tests to inherit Playwright Base URL for robustness against dev server termination.
+
 ## [1.1.3] - 2026-05-13
 ### Fixed
 - Fixed GitHub Pages deployment configuration to correctly copy the `docs/` folder to the public site.
@@ -91,7 +95,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed JS-in-HTML inline execution possibilities to strictly enforce declarative JS state truth.
 
-[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.1.3...main
+[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.2.0...main
+[1.2.0]: https://github.com/josecanciani/fusewire/compare/1.1.3...1.2.0
 [1.1.3]: https://github.com/josecanciani/fusewire/compare/1.1.2...1.1.3
 [1.1.2]: https://github.com/josecanciani/fusewire/compare/1.1.1...1.1.2
 [1.1.1]: https://github.com/josecanciani/fusewire/compare/1.1.0...1.1.1
