@@ -1,4 +1,4 @@
-import { Component } from '/js/component.js';
+import { Component } from '../../js/component.js';
 
 /**
  * Heavy component that takes time to initialize.

@@ -1,4 +1,4 @@
-import { Component } from '/js/component.js';
+import { Component } from '../../js/component.js';
 
 /**
  * Simulation controls panel for Conway's Game of Life.

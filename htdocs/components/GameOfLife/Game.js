@@ -1,4 +1,4 @@
-import { Component } from '/js/component.js';
+import { Component } from '../../js/component.js';
 
 /**
  * Game of Life component. Manages the engine, cell grid, and UI sub-components.

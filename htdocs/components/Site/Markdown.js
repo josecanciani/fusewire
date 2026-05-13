@@ -1,4 +1,4 @@
-import { Component } from '/js/component.js';
+import { Component } from '../../js/component.js';
 import { marked } from 'marked';
 
 /**
@@ -44,7 +44,7 @@ export class Markdown extends Component {
 
     /**
      * Re-fetch if the source URL changes.
-     * @param {import('/js/component.js').ComponentVars} newVars - New vars
+     * @param {import('../../js/component.js').ComponentVars} newVars - New vars
      * @param {boolean} react - Whether to react
      * @returns {Promise<void>}
      */

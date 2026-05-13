@@ -1,4 +1,4 @@
-import { Component } from '/js/component.js';
+import { Component } from '../../js/component.js';
 
 /**
  * Documentation viewer component.
@@ -57,7 +57,7 @@ export class Docs extends Component {
     /**
      * Initialize the docs and load the requested document from the URL.
      * @param {Object<string, *>|null} previousState - State from previous destroy()
-     * @param {import('/js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
+     * @param {import('../../js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
      */
     async init(previousState, routeSegment) {
         if (routeSegment) {
@@ -68,9 +68,9 @@ export class Docs extends Component {
 
     /**
      * Handle back/forward navigation.
-     * @param {import('/js/component.js').ComponentVars} newVars - Vars to merge
+     * @param {import('../../js/component.js').ComponentVars} newVars - Vars to merge
      * @param {boolean} react - Whether to trigger a re-render
-     * @param {import('/js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
+     * @param {import('../../js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
      * @returns {Promise<boolean>} True if updated
      */
     async update(newVars, react = true, routeSegment = null) {

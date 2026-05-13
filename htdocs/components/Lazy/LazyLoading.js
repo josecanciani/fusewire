@@ -1,4 +1,4 @@
-import { Component } from '/js/component.js';
+import { Component } from '../../js/component.js';
 
 /**
  * Placeholder component for lazy loading demo.

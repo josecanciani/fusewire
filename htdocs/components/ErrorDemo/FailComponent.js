@@ -1,4 +1,4 @@
-import { Component } from '/js/component.js';
+import { Component } from '../../js/component.js';
 
 /**
  * Demo component that intentionally throws errors in different lifecycle hooks based on its component ID prefix.

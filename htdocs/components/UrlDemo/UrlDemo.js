@@ -1,4 +1,4 @@
-import { Component } from '/js/component.js';
+import { Component } from '../../js/component.js';
 
 /**
  * Demonstrates URL-driven state via the HistoryRouter.
@@ -22,7 +22,7 @@ export class UrlDemo extends Component {
     /**
      * Read initial values from the URL segment if available.
      * @param {Object<string, *>|null} previousState - State from previous destroy(), or null
-     * @param {import('/js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
+     * @param {import('../../js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
      */
     async init(previousState, routeSegment) {
         if (routeSegment) {
@@ -34,9 +34,9 @@ export class UrlDemo extends Component {
 
     /**
      * Handle URL changes (browser back/forward or eager hydration).
-     * @param {import('/js/component.js').ComponentVars} newVars - Vars to merge
+     * @param {import('../../js/component.js').ComponentVars} newVars - Vars to merge
      * @param {boolean} react - Whether to trigger a re-render
-     * @param {import('/js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
+     * @param {import('../../js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
      * @returns {Promise<void>} Resolves when the update is complete
      */
     async update(newVars, react = true, routeSegment = null) {

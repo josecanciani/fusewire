@@ -1,4 +1,4 @@
-import { Component } from '/js/component.js';
+import { Component } from '../../js/component.js';
 
 /**
  * Main demo component for lazy loading.
@@ -6,7 +6,7 @@ import { Component } from '/js/component.js';
 export class LazyParent extends Component {
     /**
      * child property.
-     * @type {import('/js/component.js').Lazy}
+     * @type {import('../../js/component.js').Lazy}
      */
     child = null;
 

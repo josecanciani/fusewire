@@ -1,4 +1,4 @@
-import { Component } from '/js/component.js';
+import { Component } from '../../js/component.js';
 // @ts-ignore
 import { EditorView, basicSetup } from 'codemirror';
 // @ts-ignore
@@ -78,9 +78,9 @@ export class Editor extends Component {
 
     /**
      * Handle updates from parent components.
-     * @param {import('/js/component.js').ComponentVars} newVars - New vars to merge
+     * @param {import('../../js/component.js').ComponentVars} newVars - New vars to merge
      * @param {boolean} react - Whether to trigger a re-render
-     * @param {import('/js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
+     * @param {import('../../js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
      */
     update(newVars, react = true, routeSegment = null) {
         const oldFiles = this.files;

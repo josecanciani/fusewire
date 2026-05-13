@@ -1,5 +1,5 @@
-import { Component, Child } from '/js/component.js';
-import { REACTOR } from '/js/symbols.js';
+import { Component, Child } from '../../js/component.js';
+import { REACTOR } from '../../js/symbols.js';
 
 /**
  * Playground Home component. Manages the sidebar, editor, and live demo preview.
@@ -28,7 +28,7 @@ export class Home extends Component {
 
     /**
      * demoComponent property.
-     * @type {import('/js/component.js').ErrorBoundary}
+     * @type {import('../../js/component.js').ErrorBoundary}
      */
     demoComponent = null;
     /**
@@ -84,7 +84,7 @@ export class Home extends Component {
     /**
      * Initialize playground with available demos and restore state from persistence.
      * @param {Object<string, *>|null} previousState - Restored state
-     * @param {import('/js/route-segment.js').RouteSegment|null} routeSegment - URL segment
+     * @param {import('../../js/route-segment.js').RouteSegment|null} routeSegment - URL segment
      */
     async init(previousState, routeSegment) {
         this.filteredDemos = this.demos;
@@ -170,9 +170,9 @@ export class Home extends Component {
     /**
      * Handle URL changes (browser back/forward) by reading the demo name/title
      * from the route segment and navigating accordingly.
-     * @param {import('/js/component.js').ComponentVars} newVars - Vars to merge
+     * @param {import('../../js/component.js').ComponentVars} newVars - Vars to merge
      * @param {boolean} react - Whether to trigger a re-render
-     * @param {import('/js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment during popstate
+     * @param {import('../../js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment during popstate
      * @returns {Promise<void>} Resolves when the state change is complete
      */
     async update(newVars, react = true, routeSegment = null) {
