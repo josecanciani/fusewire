@@ -208,21 +208,22 @@ This enables patterns like: create 10 children in parallel during `init()`, then
 
 ### FuseWire: Auto-scoped CSS via container classes
 
-CSS lives in separate `.css` files. The framework automatically scopes CSS by wrapping selectors with `.appName .componentName { ... }` using native CSS nesting. No Shadow DOM, no CSS modules, no CSS-in-JS.
+CSS lives in separate `.css` files. The framework automatically scopes CSS by "boxing" your stylesheet — wrapping selectors with `.appName .componentName { ... }` using native CSS nesting. No Shadow DOM, no CSS modules, no CSS-in-JS.
 
 ### Why this matters
 
-- Standard CSS tooling works without plugins
-- CSS specificity is predictable (just one extra nesting level)
-- No runtime CSS generation or injection overhead beyond the first render
-- Global styles (like Bootstrap) coexist naturally — listed in `.fusewire.json` as `globalClasses`
+- **Standard Tooling:** Standard CSS tooling works without plugins.
+- **Predictable Specificity:** CSS specificity is predictable (just one extra nesting level).
+- **Unidirectional Dependency:** Encourages an architecture where parents know their children (and can override their styles) but children never know their parents. This keeps the dependency tree clear and prevents "conditional rendering based on parent" logic inside components.
+- **Zero-Tooling:** No build step required to generate unique class names or hash attributes.
+- **Platform First:** Leverages native browser CSS inheritance. Since components are boxed rather than tagged with unique attributes, global context (like themes) is shared via CSS Variables inherited from parent containers.
 
 **Comparison:**
-- **React:** No built-in scoping. CSS Modules, styled-components, Tailwind, or other solutions added by the developer.
-- **Vue:** `<style scoped>` in SFCs. Uses data attributes for scoping. Works well but coupled to SFC format.
-- **Svelte:** `<style>` in SFCs. Compiler generates unique class names. Very efficient but requires compilation.
+- **React:** No built-in scoping. Developers must choose between CSS Modules, styled-components, or utility-first CSS (Tailwind).
+- **Vue / Svelte:** Use "Attribute Tagging" (injecting `[data-v-hash]` into every tag). This is powerful as it allows components to easily target global attributes, but it makes the HTML noisier and requires a compilation step.
+- **FuseWire:** Uses "Container Boxing". It keeps the HTML extremely clean and requires no build step. To handle global state like themes, it encourages the use of CSS Variables inherited from a themed root component.
 - **Angular:** ViewEncapsulation (emulated Shadow DOM via attribute selectors, or real Shadow DOM).
-- **Lit:** Shadow DOM for style encapsulation. True isolation but makes global styling harder.
+- **Lit:** Shadow DOM for style encapsulation. True isolation but makes global styling and variable inheritance more intentional.
 
 ## Portals
 

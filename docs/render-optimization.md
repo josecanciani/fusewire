@@ -82,3 +82,43 @@ Appending one item reconciles one mount point instead of diffing N elements.
 | Append 1 item to list of N | Diffs N mount points + N subtrees | Appends 1 mount point, skips N |
 | Remove 1 item from list of N | Diffs N mount points + (N-1) subtrees | Removes 1 mount point, skips N-1 |
 | Re-render with no list changes | Walks entire list | Compares ID sets, no DOM mutations |
+
+## Native Keep-Alive (DOM Teleportation)
+
+Because FuseWire decouples the component lifecycle from DOM presence, you can implement **Keep-Alive** components (instant resume with no state loss) entirely through standard JavaScript references, without needing any special wrapper components.
+
+### The Problem
+When a heavy component (like a WebGL canvas or a CodeMirror editor) is removed from the screen (e.g., via `<div fw-if="false">`), its physical DOM nodes are destroyed by the browser. If you bring it back later, it has to rebuild from scratch.
+
+### The Solution: Keep the Reference
+To implement a "Keep-Alive" component, simply keep the child reference in your parent component's variables, but hide it in the template using `fw-if`.
+
+```javascript
+// Parent.js
+export class Tabs extends Component {
+    editorComponent = this.createChild('HeavyEditor');
+    activeTab = 'home';
+    
+    showEditor() {
+        this.activeTab = 'editor';
+        this.react();
+    }
+}
+```
+
+```html
+<!-- Parent.html -->
+<div fw-if="activeTab === 'editor'">
+    <!-- 
+      When activeTab is 'home', the DOM is removed from the document.
+      Because 'editorComponent' is still stored in the JS vars, 
+      the framework's Garbage Collector skips it! 
+    -->
+    ((editorComponent))
+</div>
+```
+
+### How it works under the hood
+1. **Detachment:** When `fw-if` evaluates to false, Idiomorph naturally removes the DOM nodes from the live document. However, the `InstanceRegistry` recognizes that `this.editorComponent` still exists in your variables. It suspends the component, preserving its internal state and holding onto its detached DOM tree in memory (including all event listeners!).
+2. **Teleportation:** When `fw-if` evaluates to true again, the renderer produces a new, empty `<fw-mount>` placeholder. Instead of re-rendering the component from scratch, the framework's engine detects the existing instance and **physically teleports** the preserved DOM nodes (`appendChild`) directly into the new mount point.
+3. **Resumption:** The component's `afterRender()` hook fires, allowing third-party widgets to recalculate their layout dimensions for their new placement on the screen. The entire process takes less than a millisecond.

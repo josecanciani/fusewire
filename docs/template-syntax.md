@@ -1,45 +1,55 @@
 # Template Syntax
 
-## Overview
+## Design Philosophy
 
-FuseWire templates are plain HTML files with special directives for dynamic content. No JSX, no custom file format—just HTML with a few extensions.
+FuseWire templates are intentionally minimal: **you manage data in JavaScript, the template manages the UI**. No JSX, no custom file format—just plain HTML files with special directives for dynamic content.
+
+Templates support property access, conditionals, and iteration. To keep templates predictable and logic in testable component code, they deliberately exclude complex runtime expression evaluation like arithmetic, comparisons, or function calls. If you need derived values, compute them in JavaScript and expose them as component properties.
 
 ## Variable Interpolation
 
 ### Basic Syntax
 
-Use double parentheses `(( ))` to insert variable values:
+Use double parentheses `(( ))` to insert variable values. The expression inside must be a **property path**—a variable name optionally followed by dot-separated property access.
 
 ```html
 <h1>((title))</h1>
 <p>Count: ((count))</p>
+<p>Role: ((user.profile.role))</p>
 ```
 
-### Nested Properties
+### Multiple Interpolations
 
-Access nested object properties with dot notation:
+Several interpolations can appear in the same text node. Each one is an independent property lookup on the component instance:
 
 ```html
-<div>
-  <h2>((user.name))</h2>
-  <p>Email: ((user.email))</p>
-  <p>Role: ((user.profile.role))</p>
-</div>
+<p>((firstName)) ((lastName))</p>
 ```
 
-### Undefined/Null Handling
+### Type Coercion and Safety
 
-If a variable is undefined or null, it renders as an empty string:
+- All values are coerced to strings via `String(value)`.
+- `undefined` and `null` render as **empty string** (no literal "undefined" or "null" text).
+- Text content is HTML-escaped (`<`, `>`, `&`, `"`, `'`).
+- Dangerous URL attributes (`href`, `src`, `action`, `on*`) are sanitized to block `javascript:`, `data:`, and `vbscript:` protocols.
 
-```html
-<p>((missingVar))</p>  <!-- Renders: <p></p> -->
-```
+### What Can Go Inside `(( ))`
+
+| Kind | Example | Notes |
+|---|---|---|
+| Component property | `((count))` | Any public property on the component class |
+| Nested property | `((user.name))` | Dot notation, arbitrary depth |
+| Autocalculated property | `(($total))` | `$`-prefixed getter evaluated each render |
+| Loop variable | `((item.label))` | Scoped to the enclosing `fw-each` |
+| Array property | `((items.length))` | Reads `.length` like any other property |
+| Component reference | `((this))` | Replaced with a `FuseWire.get()` call (event handlers only) |
+| Child component | `((sidebar))` | Renders as a `<fw-mount>` mount point |
 
 ## Conditional Rendering
 
 ### Basic Conditionals
 
-Use `fw-if` attribute to conditionally render elements:
+Use `fw-if` attribute to conditionally render elements. The element (and its children) are removed when the expression is falsy.
 
 ```html
 <div fw-if="isLoggedIn">
@@ -51,68 +61,26 @@ Use `fw-if` attribute to conditionally render elements:
 </div>
 ```
 
-### Supported Conditions
+Truthiness follows standard JavaScript rules: `false`, `0`, `""`, `null`, `undefined`, and `NaN` are falsy; everything else is truthy.
+
+### Supported Expressions
 
 - **Truthy check**: `fw-if="variableName"`
 - **Falsy check**: `fw-if="!variableName"`
 - **Nested properties**: `fw-if="user.isAdmin"`
+- **Array length**: `fw-if="items.length"` — `0` is falsy, any positive number is truthy.
 
-### Examples
+## Ternary Expressions
+
+Templates support simple ternary logic for choosing between two values. This is especially useful for dynamic classes or attributes.
 
 ```html
-<!-- Show if array has items -->
-<ul fw-if="items.length">
-  ...
-</ul>
-
-<!-- Show if array is empty -->
-<p fw-if="!items.length">No items found.</p>
-
-<!-- Show based on string value -->
-<div fw-if="status">
-  Status: ((status))
+<div class="(( isActive ? 'active' : 'inactive' ))">
+  (( isAdmin ? 'Administrator' : 'Standard User' ))
 </div>
 ```
 
-### Limitations
-
-FuseWire uses **simple property path evaluation**, not JavaScript expressions:
-
-**✅ Supported:**
-```html
-<div fw-if="isVisible"></div>
-<div fw-if="!isHidden"></div>
-<div fw-if="user.isAdmin"></div>
-```
-
-**❌ Not supported:**
-```html
-<div fw-if="count > 5"></div>           <!-- No comparisons -->
-<div fw-if="isAdmin && isActive"></div> <!-- No logical operators -->
-<div fw-if="status === 'ready'"></div>  <!-- No equality checks -->
-```
-
-**Modern Approach: Autocalculated Variables**
-Instead of manually synchronizing state in lifecycle hooks or `update()`, you can define deterministic derived variables using a getter prefixed with `$`:
-
-```js
-class MyComponent extends Component {
-  // The framework auto-evaluates getters starting with $ during render
-  get $shouldShow() {
-    return this.count > 5;
-  }
-  
-  get $isReady() {
-    return this.status === 'ready';
-  }
-}
-```
-
-Template:
-```html
-<div fw-if="$shouldShow"></div>
-<div fw-if="$isReady"></div>
-```
+The condition and both result expressions can be property paths or strings.
 
 ## Loops
 
@@ -128,43 +96,31 @@ Use `fw-each` to repeat elements:
 </ul>
 ```
 
-### Accessing Loop Item
+### Loop Variable Scope
 
-Inside the loop, reference the current item:
+The loop variable is available in the element's content, attributes, nested directives, and event handlers:
 
 ```html
-<div fw-each="user in users">
-  <h3>((user.name))</h3>
-  <p>Email: ((user.email))</p>
-  <p>Role: ((user.role))</p>
-</div>
+<li fw-each="item in items"
+    data-id="((item.id))"
+    onclick="((this)).select(((item.id)))">
+    ((item.name))
+</li>
 ```
 
-### Nested Loops
+The variable does not exist outside the `fw-each` element.
 
-Loops can be nested:
+### Combining `fw-each` with `fw-if`
+
+When both directives appear on the same element, the loop runs first, then the condition is evaluated per item:
 
 ```html
-<div fw-each="category in categories">
-  <h2>((category.name))</h2>
-  <ul>
-    <li fw-each="item in category.items">
-      ((item.title))
-    </li>
-  </ul>
-</div>
+<li fw-each="item in items" fw-if="item.active">((item.name))</li>
 ```
 
 ### Empty Collections
 
-If the collection is empty or undefined, nothing renders:
-
-```html
-<li fw-each="item in items">...</li>
-<!-- If items is [], renders nothing -->
-```
-
-Combine with `fw-if` for empty states:
+If the collection is empty or undefined, nothing renders. Combine with `fw-if` for empty states:
 
 ```html
 <ul fw-if="items.length">
@@ -172,6 +128,45 @@ Combine with `fw-if` for empty states:
 </ul>
 <p fw-if="!items.length">No items available.</p>
 ```
+
+## Modern Approach: Autocalculated Variables
+
+For logic that requires comparisons, arithmetic, or complex conditions, define a deterministic derived variable using a getter prefixed with `$`. The framework auto-evaluates these getters during render:
+
+```js
+class Dashboard extends Component {
+  get $hasEnoughItems() {
+    return this.items.length > 5;
+  }
+  
+  get $isReady() {
+    return this.status === 'ready' && this.isAdmin;
+  }
+}
+```
+
+Template:
+```html
+<div fw-if="$hasEnoughItems">Showing extended view</div>
+<div fw-if="$isReady">Dashboard loaded</div>
+```
+
+## Limitations
+
+FuseWire uses a lightweight expression parser, not full JavaScript execution.
+
+**✅ Supported:**
+- Property paths (`user.name`)
+- Negation (`!isAdmin`)
+- Ternary (`cond ? 'a' : 'b'`)
+- Strings in ternary (`'active'`)
+
+**❌ Not supported:**
+- Arithmetic (`count + 1`)
+- Comparisons (`count > 5`)
+- Logical operators (`a && b`)
+- Function calls (`format(x)`)
+- Array indexing (`items[0]`)
 
 ## Component Mount Points
 
@@ -190,21 +185,7 @@ class Dashboard extends Component {
 Template:
 ```html
 <div class="dashboard">
-  <aside>
-    ((sidebar))
-  </aside>
-  <main>...</main>
-</div>
-```
-
-Rendered HTML:
-```html
-<div class="dashboard">
-  <aside>
-    <fw-mount id="Sidebar#main" data-fusewire-id="Sidebar#main">
-      <!-- Sidebar component content -->
-    </fw-mount>
-  </aside>
+  <aside>((sidebar))</aside>
   <main>...</main>
 </div>
 ```
@@ -213,37 +194,13 @@ Rendered HTML:
 
 If a variable is an array of Components, each renders as a mount point:
 
-```js
-class UserList extends Component {
-  async init() {
-    this.users = [
-      this.createChild('UserCard', 'user1', { name: 'Alice' }),
-      this.createChild('UserCard', 'user2', { name: 'Bob' })
-    ];
-  }
-}
-```
-
-Template:
 ```html
 <div class="user-list">
   ((users))
 </div>
 ```
 
-Rendered:
-```html
-<div class="user-list">
-  <fw-each data-fusewire-each="users">
-    <fw-mount id="UserCard#user1" data-fusewire-id="UserCard#user1">...</fw-mount>
-    <fw-mount id="UserCard#user2" data-fusewire-id="UserCard#user2">...</fw-mount>
-  </fw-each>
-</div>
-```
-
 ## Event Handlers
-
-### Referencing Component Instance
 
 Use `((this))` to reference the component instance in event handlers:
 
@@ -251,169 +208,39 @@ Use `((this))` to reference the component instance in event handlers:
 <button onclick="((this)).increment()">
   Increment
 </button>
-
-<input 
-  type="text" 
-  onkeyup="((this)).search(event)"
-  value="((searchQuery))"
->
 ```
-
-Component:
-```js
-class SearchBox extends Component {
-  increment() {
-    this.count++;
-    this.react();
-  }
-  
-  search(event) {
-    this.searchQuery = event.target.value;
-    this.react();
-  }
-}
-```
-
-### Why `((this))`?
 
 The `((this))` placeholder is replaced with a reference to the component instance at runtime, allowing you to call methods defined on the component class.
 
 ## CSS Scoping
 
-CSS is automatically scoped to prevent style collisions:
+CSS is automatically scoped per component:
 
 **Component.css:**
 ```css
-.container {
-  padding: 1rem;
-  background: white;
-}
-
-h1 {
-  color: blue;
-}
+.container { background: white; }
+h1 { color: blue; }
 ```
 
 **Generated (scoped):**
 ```css
-.fusewire-component-ComponentName .container {
-  padding: 1rem;
-  background: white;
-}
-
-.fusewire-component-ComponentName h1 {
-  color: blue;
-}
+.fusewire-component-ComponentName .container { background: white; }
+.fusewire-component-ComponentName h1 { color: blue; }
 ```
-
-The container element automatically gets the scoping class applied.
 
 ### Styling Child Components
 
-When a parent component mounts a child, the `<fw-mount>` wrapper receives the child's component name as a class (e.g., `.UserCard`). 
-
-However, `<fw-mount>` is rendered with `display: contents`, meaning it does not generate a physical DOM box. If you attempt to apply background colors or borders directly to the mount point from the parent's CSS, they will visually fail to render.
-
-To style a child component from the parent (e.g., zebra-striping a list), use a descendant selector to penetrate the mount boundary to reach the visual container inside the child:
+To style a child component from the parent, use a descendant selector to penetrate the mount boundary:
 
 ```css
-/* ❌ WRONG: Targets the invisible mount point; background won't be painted */
-.user-list .UserCard:nth-child(odd) {
-  background-color: #f5f5f5;
-}
-
-/* ✅ RIGHT: Penetrates the mount boundary to target the physical div inside */
-.user-list .UserCard:nth-child(odd) .user-card-body {
+/* ✅ RIGHT: Targets the physical div inside the child mount point */
+.user-list .UserCard .user-card-body {
   background-color: #f5f5f5;
 }
 ```
 
-**Note:** If your child components are dynamically generated inside an `<fw-each>` loop, do NOT use the direct child combinator (`>`) like `.user-list > .UserCard`. The `<fw-each>` tag acts as an invisible DOM wrapper between your parent container and the child mount points, which breaks direct child targeting. Always use the descendant selector (a space) instead.
-
-## Complete Example
-
-**Counter.html:**
-```html
-<div class="counter">
-  <h1>Counter: ((count))</h1>
-  
-  <div fw-if="count">
-    <p>The count is: ((count))</p>
-  </div>
-  
-  <div fw-if="!count">
-    <p>Click the button to start counting</p>
-  </div>
-  
-  <button onclick="((this)).increment()">
-    Increment
-  </button>
-  
-  <button onclick="((this)).reset()" fw-if="count">
-    Reset
-  </button>
-  
-  <div fw-if="history.length">
-    <h2>History</h2>
-    <ul>
-      <li fw-each="item in history">
-        ((item))
-      </li>
-    </ul>
-  </div>
-</div>
-```
-
-**Counter.js:**
-```js
-export class Counter extends Component {
-  async init() {
-    if (!this.history) {
-      this.history = [];
-    }
-  }
-  
-  increment() {
-    this.count++;
-    this.history.push(this.count);
-    this.react();
-  }
-  
-  reset() {
-    this.count = 0;
-    this.react();
-  }
-}
-```
-
-## Best Practices
-
-### ✅ Do
-
-- Keep templates focused on presentation
-- Use computed properties for complex conditions
-- Provide fallback content for empty states
-- Use semantic HTML elements
-- Keep event handler calls simple
-
-### ❌ Don't
-
-- Don't put logic in templates (use component methods)
-- Don't use complex expressions in `fw-if`
-- Don't nest components too deeply (performance)
-- Don't forget to handle empty/null cases
-- Don't use inline styles (use CSS files)
+**Note:** If child components are inside an `<fw-each>`, do NOT use the direct child combinator (`>`) because the `<fw-each>` tag acts as an invisible DOM wrapper.
 
 ## Template Compilation
 
-Templates are compiled into optimized render functions:
-
-1. **Parse**: HTML is parsed to identify directives and variables
-2. **Extract**: Variable references and control flow are extracted
-3. **Generate**: A render function is generated that:
-   - Evaluates conditionals
-   - Iterates over collections
-   - Interpolates variables
-   - Wraps components in mount points
-
-This compilation happens **once per component**, not on every render, making it fast.
+Templates are compiled once per component into optimized render functions. This compilation happens during the first instantiation, making subsequent renders extremely fast.

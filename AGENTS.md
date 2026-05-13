@@ -344,9 +344,10 @@ Use `createLazyChild()` for children that should load in the background without 
 
 ```javascript
 async init() {
-    this.chart = this.createLazyChild('Analytics/HeavyChart', 'chart', {
-        placeholder: 'Common/Skeleton',  // optional — defaults to built-in placeholder
-    });
+    this.chart = this.createLazyChild(
+        this.createChild('Analytics/HeavyChart', 'chart'),
+        this.createChild('Common/Skeleton', 'chart')
+    );
 }
 ```
 
@@ -382,10 +383,13 @@ hydrate() {
     this.#resizeObserver = new ResizeObserver((entries) => this.#handleResize(entries));
     this.#resizeObserver.observe(gridEl);
 }
-
+```javascript
 afterRender() {
-    const lastLog = this.querySelector('.console-panel-logs').lastElementChild;
-    if (lastLog) lastLog.scrollIntoView({ block: 'end', behavior: 'instant' });
+    const container = this.querySelector('.console-panel-logs');
+    if (container) {
+        const scrollParent = container.closest('.overflow-auto');
+        if (scrollParent) scrollParent.scrollTop = scrollParent.scrollHeight;
+    }
 }
 ```
 

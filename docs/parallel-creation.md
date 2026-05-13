@@ -343,10 +343,10 @@ this.child = this.createChild('MyComponent', 'main', { count: 0 }, {
 });
 
 // Lazy loading (new)
-this.child = this.createLazyChild('HeavyComponent', 'main', {}, {
-    placeholder: 'Common/Skeleton',
-    fallback: 'Common/ErrorCard',
-});
+this.child = this.createLazyChild(
+    this.createChild('HeavyComponent', 'main', {}, { fallback: 'Common/ErrorCard' }),
+    this.createChild('Common/Skeleton', 'main')
+);
 ```
 
 ### Lifecycle hook usage

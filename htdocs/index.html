@@ -4,17 +4,36 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FuseWire Demos</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
-          integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous" />
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
-            integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
-            crossorigin="anonymous"></script>
+    <title>FuseWire</title>
+    <link href="/node_modules/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <script src="/node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script type="importmap">
         {
             "imports": {
-                "idiomorph": "./node_modules/idiomorph/dist/idiomorph.esm.js",
-                "/js/": "./js/"
+                "marked": "/node_modules/marked/lib/marked.esm.js",
+                "codemirror": "/node_modules/codemirror/dist/index.js",
+                "@codemirror/autocomplete": "/node_modules/@codemirror/autocomplete/dist/index.js",
+                "@codemirror/commands": "/node_modules/@codemirror/commands/dist/index.js",
+                "@codemirror/lang-css": "/node_modules/@codemirror/lang-css/dist/index.js",
+                "@codemirror/lang-html": "/node_modules/@codemirror/lang-html/dist/index.js",
+                "@codemirror/lang-javascript": "/node_modules/@codemirror/lang-javascript/dist/index.js",
+                "@codemirror/language": "/node_modules/@codemirror/language/dist/index.js",
+                "@codemirror/lint": "/node_modules/@codemirror/lint/dist/index.js",
+                "@codemirror/search": "/node_modules/@codemirror/search/dist/index.js",
+                "@codemirror/state": "/node_modules/@codemirror/state/dist/index.js",
+                "@codemirror/theme-one-dark": "/node_modules/@codemirror/theme-one-dark/dist/index.js",
+                "@codemirror/view": "/node_modules/@codemirror/view/dist/index.js",
+                "@lezer/common": "/node_modules/@lezer/common/dist/index.js",
+                "@lezer/css": "/node_modules/@lezer/css/dist/index.js",
+                "@lezer/highlight": "/node_modules/@lezer/highlight/dist/index.js",
+                "@lezer/html": "/node_modules/@lezer/html/dist/index.js",
+                "@lezer/javascript": "/node_modules/@lezer/javascript/dist/index.js",
+                "@lezer/lr": "/node_modules/@lezer/lr/dist/index.js",
+                "crelt": "/node_modules/crelt/index.js",
+                "style-mod": "/node_modules/style-mod/src/style-mod.js",
+                "w3c-keyname": "/node_modules/w3c-keyname/index.js",
+                "@marijn/find-cluster-break": "/node_modules/@marijn/find-cluster-break/src/index.js",
+                "/js/": "/js/"
             }
         }
     </script>
@@ -22,71 +41,36 @@
 
 <body>
     <div id="app"></div>
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            console.error('[Global Error] ' + msg + ' at ' + url + ':' + line + ':' + col);
+        };
+        window.onunhandledrejection = function(event) {
+            console.error('[Global Promise Rejection]', event.reason);
+        };
+
+    </script>
     <script type="module">
         import {
             Reactor
         } from './js/reactor.js';
+        import {
+            HistoryRouter
+        } from './js/history-router.js';
+        import {
+            HashUrlService
+        } from './js/url-service.js';
 
-        const reactor = new Reactor('playground', {
+        console.log('[Index] Starting reactor...');
+        const reactor = new Reactor('site', {
             basePath: new URL('./components', window.location.href).href,
+            router: new HistoryRouter({
+                urlService: new HashUrlService()
+            })
         });
 
-        await reactor.start(document.getElementById('app'), 'Playground/Home', 'main', {
-            demos: [{
-                    name: 'Counter',
-                    title: 'Counter',
-                    description: 'Increment and decrement buttons.',
-                    tags: ['basics'],
-                    defaultFile: 'Counter/js',
-                },
-                {
-                    name: 'Lazy/LazyParent',
-                    title: 'Lazy Loading',
-                    description: 'Demonstrates createLazyChild() with a custom placeholder and slow-loading component.',
-                    tags: ['basics'],
-                    defaultFile: 'Lazy/LazyParent/js',
-                    components: [
-                        'Lazy/LazyParent',
-                        'Lazy/LazyLoading',
-                        'Lazy/Lazy',
-                    ],
-                },
-                {
-                    name: 'ErrorDemo/Parent',
-                    title: 'Error Boundaries',
-                    description: 'Demonstrates fw-error bubbling and declarative fallbacks across different lifecycle hooks.',
-                    tags: ['basics'],
-                    defaultFile: 'ErrorDemo/Parent/js',
-                    components: [
-                        'ErrorDemo/Parent',
-                        'ErrorDemo/FailComponent',
-                        'ErrorDemo/Fallback',
-                    ],
-                },
-                {
-                    name: 'GameOfLife/Game',
-                    title: 'Game of Life',
-                    description: "Conway's Game of Life. Click cells to toggle alive/dead, then play, step, or reset.",
-                    tags: ['performance'],
-                    defaultFile: 'GameOfLife/Game/js',
-                    components: [
-                        'GameOfLife/Game',
-                        'GameOfLife/Controls',
-                        'GameOfLife/Stats',
-                        'GameOfLife/Alive',
-                        'GameOfLife/Dead',
-                        'GameOfLife/Help',
-                    ],
-                },
-                {
-                    name: 'UrlDemo/UrlDemo',
-                    title: 'URL Routing',
-                    description: 'Text and color driven by the browser URL. Edit the address bar and press Enter.',
-                    tags: ['basics'],
-                    defaultFile: 'UrlDemo/UrlDemo/js',
-                },
-            ],
-        });
+        await reactor.start(document.getElementById('app'), 'Site/Main', 'main');
+        console.log('[Index] Reactor started.');
 
     </script>
 </body>
