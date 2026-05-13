@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-05-13
+### Fixed
+- Fixed broken dynamic imports in the website demo components by using relative paths (`../../js/`) to ensure proper module resolution when deployed under GitHub Pages subpaths.
+
 ## [1.1.0] - 2026-05-13
 ### Added
 - Implemented robust DOM Teleportation during reconciliation: existing DOM elements are preserved and moved instead of re-rendered when mount points change, drastically improving performance and preserving third-party widget states.
@@ -77,7 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed JS-in-HTML inline execution possibilities to strictly enforce declarative JS state truth.
 
-[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.1.0...main
+[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.1.1...main
+[1.1.1]: https://github.com/josecanciani/fusewire/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/josecanciani/fusewire/compare/1.0.2...1.1.0
 [1.0.2]: https://github.com/josecanciani/fusewire/compare/1.0.1...1.0.2
 [1.0.1]: https://github.com/josecanciani/fusewire/compare/1.0.0...1.0.1
