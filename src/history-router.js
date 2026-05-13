@@ -377,8 +377,11 @@ export class HistoryRouter {
             const name = entry.instance[COMPONENT_ID].name;
             return name.split('/').pop().toLowerCase();
         }
+        const parentEntry = this.#reactor.instanceRegistry._instances.get(entry.parent.code);
+        if (!parentEntry) return entry.instance.componentCode;
         return (
-            findVarName(entry.parent, entry.instance.componentCode) ?? entry.instance.componentCode
+            findVarName(parentEntry.instance, entry.instance.componentCode) ??
+            entry.instance.componentCode
         );
     }
 

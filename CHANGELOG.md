@@ -5,11 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.2.1] - 2026-05-13
 ### Added
 - Configured `rootDirs` in `jsconfig.json` to natively resolve relative browser imports (`../../js/`) in the IDE by virtually merging `htdocs/js` and `src`.
+- Enabled full strict TypeScript compilation and type-checking for demo components in `htdocs/`.
+- Integrated Bootstrap CSS as a CSS Module Script using Import Assertions (`with { type: 'css' }`).
+- Mapped `@popperjs/core` as an external dependency to natively support Bootstrap ES modules in the browser.
 
 ### Changed
 - Refactored core component factories (`createChild`, `createLazyChild`, `createPortalChild`, etc.) to use TypeScript Contextual Inference (`@returns {T}`). This automatically types child instances based on their class field declarations, eliminating the need for verbose inline JSDoc casting.
+
+### Fixed
+- Fixed 28 undocumented implicit `any` type errors across the playground and site demo components.
+- Fixed Playwright test timeouts by properly resolving the missing Popper dependency that crashed Bootstrap initialization.
+- Fixed a URL serialization bug in `HistoryRouter` where pass-through parent components caused child segments to be dropped or incorrectly serialized, resulting in broken deep links upon page refresh.
 
 ## [1.2.0] - 2026-05-13
 ### Changed
@@ -100,7 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed JS-in-HTML inline execution possibilities to strictly enforce declarative JS state truth.
 
-[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.2.0...main
+[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.2.1...main
+[1.2.1]: https://github.com/josecanciani/fusewire/compare/1.2.0...1.2.1
 [1.2.0]: https://github.com/josecanciani/fusewire/compare/1.1.3...1.2.0
 [1.1.3]: https://github.com/josecanciani/fusewire/compare/1.1.2...1.1.3
 [1.1.2]: https://github.com/josecanciani/fusewire/compare/1.1.1...1.1.2

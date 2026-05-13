@@ -41,7 +41,7 @@ reactor.start(
 
 ## Documentation
 
-See the [FuseWire documentation](https://github.com/josecanciani/fusewire-js) for full details.
+See the [FuseWire documentation](https://josecanciani.github.io/fusewire) for full details.
 
 ## Development
 
