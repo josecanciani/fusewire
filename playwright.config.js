@@ -9,11 +9,11 @@ export default defineConfig({
     reporter: 'list',
     use: {
         headless: true,
-        baseURL: 'http://localhost:9876',
+        baseURL: 'http://localhost:8001',
     },
     webServer: {
-        command: 'npx http-server . -p 9876 --silent',
-        port: 9876,
+        command: 'PORT=8001 node demo-server.js',
+        port: 8001,
         reuseExistingServer: !process.env.CI,
     },
     projects: [

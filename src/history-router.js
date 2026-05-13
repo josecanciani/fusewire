@@ -4,9 +4,9 @@ import { Child } from './component.js';
 import { COMPONENT_ID, ROUTE_DEFAULTS } from './symbols.js';
 import { HashUrlService } from './url-service.js';
 
-/** 
+/**
  * Configuration options for the HistoryRouter.
- * @typedef {{urlService?: import('./url-service.js').UrlService, routeEncoder?: import('./route-segment.js').RouteEncoder}} HistoryRouterConfig 
+ * @typedef {{urlService?: import('./url-service.js').UrlService, routeEncoder?: import('./route-segment.js').RouteEncoder}} HistoryRouterConfig
  */
 
 /**
@@ -41,21 +41,21 @@ import { HashUrlService } from './url-service.js';
  * });
  */
 export class HistoryRouter {
-    /** 
+    /**
      * The Reactor instance this router is attached to.
-     * @type {import('./reactor.js').Reactor} 
+     * @type {import('./reactor.js').Reactor}
      */
     #reactor;
 
-    /** 
+    /**
      * The service responsible for reading, writing, and listening to URL changes.
-     * @type {import('./url-service.js').UrlService} 
+     * @type {import('./url-service.js').UrlService}
      */
     #urlService;
 
-    /** 
+    /**
      * The encoder responsible for serializing and deserializing segment values.
-     * @type {import('./route-segment.js').RouteEncoder} 
+     * @type {import('./route-segment.js').RouteEncoder}
      */
     #routeEncoder;
 
@@ -112,18 +112,6 @@ export class HistoryRouter {
      */
     replaceUrl() {
         this.#updateUrl(false);
-    }
-
-    /**
-     * Try to consume the next initial-load segment for the root component.
-     * Returns the segment if available, or null if the URL is empty.
-     * Only used during the initial tree build (before the first popstate).
-     * @returns {RouteSegment|null} Root segment or null
-     */
-    consumeRootSegment() {
-        if (this.#initialCursor < 0) return null;
-        if (this.#initialCursor >= this.#initialSegments.length) return null;
-        return this.#initialSegments[this.#initialCursor++];
     }
 
     /**
@@ -320,9 +308,9 @@ export class HistoryRouter {
      * @returns {string} Full URL path (e.g. "/dashboard:id=123/table:id=10")
      */
     #serialize() {
-        /** 
+        /**
          * Accumulator for serialized string segments.
-         * @type {string[]} 
+         * @type {string[]}
          */
         const parts = [];
         const registry = this.#reactor.instanceRegistry;
@@ -340,7 +328,7 @@ export class HistoryRouter {
     #serializeSubtree(code, parts) {
         const registry = this.#reactor.instanceRegistry;
         const entry = registry._instances.get(code);
-        if (!entry) return;
+        if (!entry || !entry.container.isConnected) return;
 
         const state = entry.instance.routeState();
         if (state === false) return;
@@ -348,9 +336,9 @@ export class HistoryRouter {
         if (this.#hasRouteProperties(state)) {
             // Filter out properties that still match their pre-init defaults
             const defaults = entry.instance[ROUTE_DEFAULTS];
-            /** 
+            /**
              * State object containing only properties that have changed from their defaults.
-             * @type {Record<string, any>} 
+             * @type {Record<string, any>}
              */
             const filtered = {};
             for (const [key, value] of Object.entries(state)) {
@@ -358,7 +346,11 @@ export class HistoryRouter {
                     filtered[key] = value;
                 }
             }
-            const routeKey = this.#getRouteKeyForChild(entry);
+            const routeKey = this.#getRouteKeyForChild(
+                /** @type {{instance: import('./component.js').Component, parent: import('./component.js').Component}} */ (
+                    /** @type {unknown} */ (entry)
+                ),
+            );
             const segment = new RouteSegment(routeKey, new Map(Object.entries(filtered)));
             parts.push(segment.toString(this.#routeEncoder));
         }

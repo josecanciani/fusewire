@@ -6,7 +6,7 @@ import { RouteSegment } from '../src/route-segment.js';
 import { Reactor } from '../src/reactor.js';
 import { Component } from '../src/component.js';
 import { FuseWire } from '../src/fusewire.js';
-import { REACTOR } from '../src/symbols.js';
+import { REACTOR, ROUTE_DEFAULTS } from '../src/symbols.js';
 import { UrlService } from '../src/url-service.js';
 import { StrictConsole } from './strict-console.js';
 
@@ -75,20 +75,7 @@ describe('HistoryRouter', () => {
         });
     });
 
-    describe('consumeRootSegment', () => {
-        it('returns null for empty URL', () => {
-            const router = new HistoryRouter();
-            createReactor('root-empty', { router });
-            assert.strictEqual(router.consumeRootSegment(), null);
-        });
 
-        it('returns null after completeInitialLoad', () => {
-            const router = new HistoryRouter();
-            createReactor('root-complete', { router });
-            router.completeInitialLoad();
-            assert.strictEqual(router.consumeRootSegment(), null);
-        });
-    });
 
     describe('consumeSegment', () => {
         it('returns null when no segments remain', () => {
@@ -214,6 +201,7 @@ describe('Component routing methods', () => {
 
             const component = new RoutedComponent();
             component[REACTOR] = { react: () => Promise.resolve(), drainPromise: Promise.resolve() };
+            component[ROUTE_DEFAULTS] = component.routeState();
             const segment = new RouteSegment('test', new Map([['page', 'settings'], ['sort', 'date']]));
             component.update({}, false, segment);
             assert.strictEqual(component.page, 'settings');
@@ -244,6 +232,7 @@ describe('Component routing methods', () => {
 
             const component = new RoutedComponent();
             component[REACTOR] = { react: () => Promise.resolve(), drainPromise: Promise.resolve() };
+            component[ROUTE_DEFAULTS] = component.routeState();
             const segment = new RouteSegment('test', new Map([['page', 'new'], ['secret', 'hacked']]));
             component.update({}, false, segment);
             assert.strictEqual(component.page, 'new');
@@ -264,6 +253,7 @@ describe('Component routing methods', () => {
 
             const component = new RoutedComponent();
             component[REACTOR] = { react: () => Promise.resolve(), drainPromise: Promise.resolve() };
+            component[ROUTE_DEFAULTS] = component.routeState();
             const segment = new RouteSegment('test', new Map([['page', 'from-url']]));
             // newVars applied AFTER auto-map, so newVars wins
             component.update({ page: 'from-vars' }, false, segment);
@@ -345,7 +335,7 @@ describe('HistoryRouter with custom UrlService', () => {
         const { service } = createFakeUrlService('/home:demo=Counter');
         const router = new HistoryRouter({ urlService: service });
         createReactor('custom-svc-init', { router });
-        const segment = router.consumeRootSegment();
+        const segment = router.consumeSegment('home');
         assert.ok(segment);
         assert.strictEqual(segment.key, 'home');
         assert.strictEqual(segment.get('demo'), 'Counter');
@@ -385,3 +375,67 @@ describe('HistoryRouter with custom UrlService', () => {
         assert.ok(true);
     });
 });
+
+describe('Integration: Initial URL load', () => {
+    function createFakeUrlService(initialPath = '/') {
+        let currentPath = initialPath;
+        const service = new UrlService();
+        service.getPath = () => currentPath;
+        service.pushPath = (path) => { currentPath = path; };
+        service.replacePath = (path) => { currentPath = path; };
+        service.onNavigate = () => () => {};
+        return { service };
+    }
+
+    it('passes route segments to children during initial mount', async () => {
+        let childInitSegment = null;
+
+        class NestedChild extends Component {
+            constructor() {
+                super();
+                this.tab = 'default';
+            }
+            routeState() { return { tab: this.tab }; }
+            async init(previousState, routeSegment) {
+                childInitSegment = routeSegment;
+            }
+            update(newVars, react = true, routeSegment = null) {
+                if (routeSegment) this.tab = routeSegment.getString('tab');
+                super.update(newVars, react, routeSegment);
+            }
+        }
+
+        class NestedParent extends Component {
+            constructor() {
+                super();
+                this.myChild = null;
+            }
+            routeState() { return { id: '0' }; }
+            async init() {
+                this.myChild = this.createChild('NestedChild', 'child');
+            }
+        }
+
+        const { service } = createFakeUrlService('/app:id=1/myChild:tab=2');
+        const router = new HistoryRouter({ urlService: service });
+        const reactor = createReactor('integration-app', { router });
+        
+        // Register components with InstanceRegistry so createChild works
+        reactor.instanceRegistry.registerComponent('NestedChild', NestedChild);
+        reactor.instanceRegistry._templateStore.set('NestedChild', { version: '1', htmlCode: '' });
+        
+        reactor.instanceRegistry.registerComponent('NestedParent', NestedParent);
+        reactor.instanceRegistry._templateStore.set('NestedParent', { version: '1', htmlCode: '((myChild))' });
+
+        const container = document.createElement('div');
+        const rootInstance = await reactor.start(container, 'NestedParent', 'app');
+
+        // Eager children receive null in init() because they start building before their routeKey is known
+        assert.strictEqual(childInitSegment, null, 'Eager child should receive null in init');
+        
+        // But they should receive the segment via update() before being attached
+        const childInstance = rootInstance.myChild;
+        assert.strictEqual(childInstance.tab, '2', 'Eager child should be updated with route state');
+    });
+});
+
