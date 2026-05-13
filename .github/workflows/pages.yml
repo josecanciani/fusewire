@@ -34,13 +34,22 @@ jobs:
         
       - name: Build static site
         run: |
-          npm install --omit=dev
+          npm install
           mkdir public
           cp -r htdocs/* public/
           mkdir -p public/js
           cp -r src/* public/js/
-          mkdir -p public/node_modules/idiomorph
-          cp -r node_modules/idiomorph/* public/node_modules/idiomorph/
+          mkdir -p public/node_modules
+          cp -r node_modules/idiomorph public/node_modules/
+          cp -r node_modules/bootstrap public/node_modules/
+          cp -r node_modules/marked public/node_modules/
+          cp -r node_modules/codemirror public/node_modules/
+          cp -r node_modules/@codemirror public/node_modules/
+          cp -r node_modules/@lezer public/node_modules/
+          cp -r node_modules/crelt public/node_modules/
+          cp -r node_modules/style-mod public/node_modules/
+          cp -r node_modules/w3c-keyname public/node_modules/
+          cp -r node_modules/@marijn public/node_modules/
           
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
