@@ -93,7 +93,7 @@ export class StrictConsole {
         // Each expectation can only match one warning (prefer unmatched expectations).
         const unexpectedWarnings = [];
         for (const args of this._warnings) {
-            const msg = this._toMessageString(args[0]);
+            const msg = args.map((a) => this._toMessageString(a)).join(' ');
             const match = this._expectedWarnings.find(
                 (e) => !e.matched && e.pattern.test(msg),
             );
@@ -107,7 +107,7 @@ export class StrictConsole {
         // Match errors against expected patterns.
         const unexpectedErrors = [];
         for (const args of this._errors) {
-            const msg = this._toMessageString(args[0]);
+            const msg = args.map((a) => this._toMessageString(a)).join(' ');
             const match = this._expectedErrors.find(
                 (e) => !e.matched && e.pattern.test(msg),
             );

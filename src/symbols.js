@@ -3,60 +3,74 @@
  *
  * DO NOT import these in application components. These Symbols are reserved
  * for the FuseWire engine (InstanceRegistry, Reactor, Component base class).
- *
- * The only acceptable use outside the engine is privileged tooling that needs
- * direct access to framework internals (e.g., a live component editor).
- *
- * Using Symbol-keyed properties ensures:
- *   - Object.keys() never returns framework state (only component vars)
- *   - Developers cannot accidentally collide with framework properties
- *   - collectVars() needs no filtering — only string keys are component vars
  */
 
 /**
- * Component identity (ComponentId object)
+ * Unique component identifier (ComponentId object).
  * @type {symbol}
  */
-export const COMPONENT_ID = Symbol('componentId');
+export const COMPONENT_ID = Symbol.for('fusewire.componentId');
 
 /**
- * Shared registry entry ({ instance, container, parent, children })
- * @type {symbol}
+ * Shared registry entry ({ instance, container, parent, children, needsHydration }).
+ * @typedef RegistryEntry
+ * @property {import('./component.js').Component} instance
+ * @property {HTMLElement} container
+ * @property {import('./component-id.js').ComponentId|null} parent
+ * @property {Map<string, import('./component-id.js').ComponentId>} children
+ * @property {boolean} needsHydration
  */
-export const REGISTRY_ENTRY = Symbol('registryEntry');
 
 /**
- * Pre-built console wrapper with component context
+ * Shared registry entry ({ instance, container, parent, children, needsHydration }).
  * @type {symbol}
  */
-export const CONSOLE = Symbol('console');
+export const REGISTRY_ENTRY = Symbol.for('fusewire.registryEntry');
 
 /**
- * Reactor reference (enables react(), console, etc.)
+ * Pre-built console wrapper with component context.
  * @type {symbol}
  */
-export const REACTOR = Symbol('reactor');
+export const CONSOLE = Symbol.for('fusewire.console');
 
 /**
- * Name of the active lifecycle hook, or null (guards react() during hooks)
+ * Reactor reference (enables react(), broadcast(), etc.).
  * @type {symbol}
  */
-export const LIFECYCLE_ACTIVE = Symbol('lifecycleActive');
+export const REACTOR = Symbol.for('fusewire.reactor');
 
 /**
- * Event handlers map for pub/sub (Map<string, Set<function>>) — cleared by InstanceRegistry on destroy
+ * Name of the active lifecycle hook ('init', 'render', 'hydrate', 'afterRender', 'update').
  * @type {symbol}
  */
-export const EVENTS = Symbol('events');
+export const LIFECYCLE_ACTIVE = Symbol.for('fusewire.lifecycleActive');
 
 /**
- * Library loading state — Map<string, {promise, exportNames, module}>
+ * Event emitter for component-local events.
  * @type {symbol}
  */
-export const LIBRARIES = Symbol('libraries');
+export const EVENTS = Symbol.for('fusewire.events');
 
 /**
- * Snapshot of routeState() defaults captured before init() — used by the router to omit unchanged values from the URL
+ * Library loading state — Map of library name to {promise, module}.
  * @type {symbol}
  */
-export const ROUTE_DEFAULTS = Symbol('routeDefaults');
+export const LIBRARIES = Symbol.for('fusewire.libraries');
+
+/**
+ * Snapshot of routeState() defaults captured before init().
+ * @type {symbol}
+ */
+export const ROUTE_DEFAULTS = Symbol.for('fusewire.routeDefaults');
+
+/**
+ * Marker Symbol for identifying Component instances.
+ * @type {symbol}
+ */
+export const IS_COMPONENT = Symbol.for('fusewire.isComponent');
+
+/**
+ * Marker Symbol for identifying Child references.
+ * @type {symbol}
+ */
+export const IS_CHILD = Symbol.for('fusewire.isChild');

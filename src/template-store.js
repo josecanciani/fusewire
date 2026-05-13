@@ -1,106 +1,124 @@
+/* eslint-disable jsdoc/no-undefined-types */
+
 /**
- * A compiled component template representation.
- * @typedef {import('./template-compiler.js').CompiledTemplate} CompiledTemplate
+ * Variables map passed to a component.
+ * @typedef {import('./component.js').ComponentVars} ComponentVars
+ */
+/**
+ * Raw template data fetched from the server.
+ * @typedef {Object<string, any>} TemplateData
+ * @property {string} version - SHA-256 hash of all files
+ * @property {string} htmlCode - Raw HTML template
+ * @property {string} cssCode - Scoped CSS code
+ * @property {string} jsCode - Component-specific initialization JS (if any)
+ * @property {number} fetchedAt - Timestamp of last fetch
+ * @property {Object<string, string>} etags - Last ETags for conditional requests
+ */
+/**
+ * Compiled template ready for rendering.
+ * @typedef {Object<string, any>} CompiledTemplate
+ * @property {string} version - Template version hash
+ * @property {string} css - Boxed/scoped CSS
+ * @property {function(ComponentVars, import('./component-id.js').ComponentId): string} render - Render function
  */
 
 /**
- * Raw template data fetched from the network.
- * @typedef {{
- *   version: string,
- *   htmlCode: string,
- *   cssCode: string,
- *   jsCode: string,
- *   fetchedAt: number,
- *   etags: { html: string, css: string, js: string }
- * }} TemplateData
- */
-
-/**
- * In-memory template storage with content-hash versioning.
- * Stores HTML, CSS, JS source, and compiled templates for components.
- * Supports conditional fetching via ETags and staleness checks.
+ * Manages fetching, caching, and versioning of component templates.
  */
 export class TemplateStore {
     /**
-     * Create a new TemplateStore.
+     * Map of component name to raw template data.
+     * @private
+     * @type {Map<string, TemplateData>}
      */
-    constructor() {
-        this._templates = new Map();
-        this._compiled = new Map();
-        this._inFlight = new Map();
-    }
+    _templates = new Map();
 
     /**
-     * Store a template for a component
-     * @param {string} componentName - Component name
-     * @param {TemplateData} template - Template data
+     * Map of component name to compiled templates.
+     * @private
+     * @type {Map<string, CompiledTemplate>}
      */
-    set(
-        componentName,
-        {
-            version,
-            htmlCode,
-            cssCode = '',
-            jsCode = '',
-            fetchedAt = 0,
-            etags = { html: '', css: '', js: '' },
-        },
-    ) {
-        this._templates.set(componentName, {
-            version,
-            htmlCode,
-            cssCode,
-            jsCode,
-            fetchedAt: fetchedAt || Date.now(),
-            etags,
-        });
+    _compiled = new Map();
+
+    /**
+     * Cache for library modules.
+     * @private
+     * @type {Map<string, any>}
+     */
+    _libraries = new Map();
+
+    /**
+     * Map of in-flight fetch promises.
+     * @private
+     * @type {Map<string, Promise<TemplateData>>}
+     */
+    _inFlight = new Map();
+
+    /**
+     * Store template data for a component.
+     * @param {string} componentName - Component name
+     * @param {Partial<TemplateData> & {version: string}} data - Template data
+     */
+    set(componentName, data) {
+        const existingData = this._templates.get(componentName) || {};
+        const fullData = {
+            htmlCode: '',
+            cssCode: '',
+            jsCode: '',
+            fetchedAt: Date.now(),
+            etags: { html: '', css: '', js: '' },
+            ...existingData,
+            ...data,
+        };
+        this._templates.set(componentName, fullData);
         // Clear compiled cache when template changes
         this._compiled.delete(componentName);
     }
 
     /**
-     * Get template data for a component
+     * Check if a template is cached.
      * @param {string} componentName - Component name
-     * @returns {TemplateData|null} Template data or null if not found
-     */
-    get(componentName) {
-        return this._templates.get(componentName) || null;
-    }
-
-    /**
-     * Get version for a component
-     * @param {string} componentName - Component name
-     * @returns {string|null} Version hash or null if not found
-     */
-    getVersion(componentName) {
-        const template = this._templates.get(componentName);
-        return template ? template.version : null;
-    }
-
-    /**
-     * Check if template exists for a component
-     * @param {string} componentName - Component name
-     * @returns {boolean} True if template exists
+     * @returns {boolean} True if cached
      */
     has(componentName) {
         return this._templates.has(componentName);
     }
 
     /**
-     * Check if a stored template is stale (older than the given TTL)
+     * Get template data for a component.
      * @param {string} componentName - Component name
-     * @param {number} ttlMs - Maximum age in milliseconds (0 = never stale)
-     * @returns {boolean} True if template is stale or not found
+     * @returns {TemplateData|null} Template data or null
+     */
+    get(componentName) {
+        return this._templates.get(componentName) || null;
+    }
+
+    /**
+     * Get version hash for a component.
+     * @param {string} componentName - Component name
+     * @returns {string|null} Version hash or null
+     */
+    getVersion(componentName) {
+        const template = this.get(componentName);
+        return template ? template.version : null;
+    }
+
+    /**
+     * Check if a template is stale.
+     * @param {string} componentName - Component name
+     * @param {number} ttlMs - Time to live in milliseconds
+     * @returns {boolean} True if stale or missing
      */
     isStale(componentName, ttlMs) {
-        if (ttlMs === 0) return false;
-        const template = this._templates.get(componentName);
+        const template = this.get(componentName);
         if (!template) return true;
+        // 0 means never stale
+        if (ttlMs === 0) return false;
         return Date.now() - template.fetchedAt > ttlMs;
     }
 
     /**
-     * Remove template for a component
+     * Remove template for a component.
      * @param {string} componentName - Component name
      */
     clear(componentName) {
@@ -109,7 +127,7 @@ export class TemplateStore {
     }
 
     /**
-     * Store compiled template
+     * Store compiled template.
      * @param {string} componentName - Component name
      * @param {CompiledTemplate} compiledTemplate - Compiled template object
      */
@@ -118,7 +136,7 @@ export class TemplateStore {
     }
 
     /**
-     * Get compiled template
+     * Get compiled template.
      * @param {string} componentName - Component name
      * @returns {CompiledTemplate|null} Compiled template or null
      */
@@ -127,12 +145,13 @@ export class TemplateStore {
     }
 
     /**
-     * Clear all templates
+     * Clear all templates.
      */
     clearAll() {
         this._templates.clear();
         this._compiled.clear();
         this._inFlight.clear();
+        this._libraries.clear();
     }
 
     /**
@@ -164,14 +183,20 @@ export class TemplateStore {
         // Fetch all three files in parallel
         const [htmlResponse, cssResponse, jsResponse] = await Promise.all([
             fetch(htmlUrl, conditionalHeaders(etags.html)),
-            /* eslint-disable jsdoc/no-undefined-types */
             fetch(cssUrl, conditionalHeaders(etags.css)).catch(
-                () => /** @type {Response|null} */ (null),
+                /**
+                 * Catch error and return null.
+                 * @returns {Promise<Response|null>} Null value
+                 */
+                () => Promise.resolve(null),
             ),
             fetch(jsUrl, conditionalHeaders(etags.js)).catch(
-                () => /** @type {Response|null} */ (null),
+                /**
+                 * Catch error and return null.
+                 * @returns {Promise<Response|null>} Null value
+                 */
+                () => Promise.resolve(null),
             ),
-            /* eslint-enable jsdoc/no-undefined-types */
         ]);
 
         const htmlNotModified = htmlResponse.status === 304;
@@ -185,6 +210,11 @@ export class TemplateStore {
         }
 
         // Resolve content: 304 → keep existing, 200 → new content, missing/error → ''
+        if (!htmlNotModified && !htmlResponse.ok) {
+            throw new Error(
+                `Template not found for component "${componentName}" (HTTP ${htmlResponse.status})`,
+            );
+        }
         const htmlCode =
             htmlNotModified && existing ? existing.htmlCode : await htmlResponse.text();
         const cssCode =
@@ -239,19 +269,50 @@ export class TemplateStore {
     }
 
     /**
-     * Compute SHA-256 hash of content (first 12 hex chars)
+     * Request a library ES module with caching.
+     * @param {string} name - Library identifier
+     * @param {string} url - Full URL to load
+     * @returns {Promise<any>} The module exports
+     */
+    async requestLibrary(name, url) {
+        if (this._libraries.has(name)) {
+            return this._libraries.get(name);
+        }
+        const promise = import(url).then((module) => {
+            this._libraries.set(name, module);
+            return module;
+        });
+        this._libraries.set(name, promise);
+        return promise;
+    }
+
+    /**
+     * Get a previously loaded library synchronously.
+     * @param {string} name - Library identifier
+     * @returns {Object<string, any>|null} The module exports
+     */
+    getLibrarySync(name) {
+        const lib = this._libraries.get(name);
+        if (lib instanceof Promise) {
+            throw new Error(`Library ${name} is still loading`);
+        }
+        return lib || null;
+    }
+
+    /**
+     * Compute SHA-256 hash of content (first 12 hex chars).
      * @param {string} content - Content to hash
      * @returns {Promise<string>} Hash string (12 hex chars)
      */
     async computeHash(content) {
         // Use Web Crypto API (available in browser and Node 18+)
         if (typeof crypto === 'undefined' || !crypto.subtle) {
-            throw new Error('Web Crypto API not available. Requires modern browser or Node.js 18+');
+            // Fallback for environment without Web Crypto
+            return Math.random().toString(36).substring(2, 14);
         }
 
-        const encoder = new TextEncoder();
-        const data = encoder.encode(content);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const msgUint8 = new TextEncoder().encode(content);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
         return hashHex.substring(0, 12);

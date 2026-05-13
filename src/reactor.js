@@ -12,21 +12,21 @@ import { StateSerializer } from './state-serializer.js';
 import { HistoryRouter } from './history-router.js';
 import { REACTOR, LIFECYCLE_ACTIVE, LIBRARIES } from './symbols.js';
 
-/** 
+/**
  * Map of variables passed to a component.
- * @typedef {import('./component.js').ComponentVars} ComponentVars 
+ * @typedef {import('./component.js').ComponentVars} ComponentVars
  */
-/** 
+/**
  * Interface for a logger/console object.
- * @typedef {{log: function(...*): void, warn: function(...*): void, error: function(...*): void}} ConsoleLike 
+ * @typedef {{log: function(...*): void, warn: function(...*): void, error: function(...*): void}} ConsoleLike
  */
-/** 
+/**
  * Interface for a custom state serializer.
- * @typedef {{stringify: function(ComponentVars): string, parse: function(string): ComponentVars}} SerializerLike 
+ * @typedef {{stringify: function(ComponentVars): string, parse: function(string): ComponentVars}} SerializerLike
  */
-/** 
+/**
  * Reactor configuration options.
- * @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: function(HTMLElement, string, Object<string, *>=): void, instanceRegistry?: InstanceRegistry, basePath?: string, globalVars?: ComponentVars, enableDefaultConsole?: boolean, persistence?: Persistence, serializer?: SerializerLike, router?: import('./history-router.js').HistoryRouter|null}} ReactorConfig 
+ * @typedef {{console?: Console, templateStore?: TemplateStore, renderer?: Renderer, morphFunction?: function(HTMLElement, string, Object<string, *>=): void, instanceRegistry?: InstanceRegistry, basePath?: string, globalVars?: ComponentVars, enableDefaultConsole?: boolean, persistence?: Persistence, serializer?: SerializerLike, router?: import('./history-router.js').HistoryRouter|null}} ReactorConfig
  */
 
 /**
@@ -58,28 +58,28 @@ export class Reactor {
         this._rootContainer = null;
         this._defaultConsole = config.console ?? globalThis.console;
         this._enableDefaultConsole = config.enableDefaultConsole ?? false;
-        /** 
+        /**
          * List of attached UI consoles receiving logs.
-         * @type {any[]} 
+         * @type {any[]}
          */
         this._attachedConsoles = [];
-        /** 
+        /**
          * The active console multiplexer for this reactor.
-         * @type {ConsoleLike} 
+         * @type {ConsoleLike}
          */
         this._console = this._buildConsoleMultiplexer();
 
         // Render queue — serializes all react() calls so only one render chain
         // runs at a time. Keyed by component code for O(1) dedup.
-        /** 
+        /**
          * Map of queued render tasks.
-         * @type {Map<string, {id: ComponentId, mode: string}>} 
+         * @type {Map<string, {id: ComponentId, mode: string}>}
          */
         this._queue = new Map();
         this._draining = false;
-        /** 
+        /**
          * Promise resolving when the current queue drain completes.
-         * @type {Promise<void>} 
+         * @type {Promise<void>}
          */
         this._drainPromise = Promise.resolve();
 
@@ -99,14 +99,25 @@ export class Reactor {
         }
 
         // Persistence — manages storing component state across destroy/recreate cycles.
-        /** @type {Persistence} */
+        /**
+         * Persistence layer for component state management.
+         * @type {Persistence}
+         */
         this.persistence =
-            config.persistence || new Persistence(config.serializer || new StateSerializer());
+            config.persistence ||
+            new Persistence(
+                /** @type {import('./persistence.js').SerializerLike} */ (
+                    /** @type {unknown} */ (config.serializer || new StateSerializer())
+                ),
+            );
 
         // Router — HistoryRouter for URL-based state management.
         // Auto-created by default; pass null to disable.
         // Must be attached before start() so init() can receive route segments.
-        /** @type {import('./history-router.js').HistoryRouter|null} */
+        /**
+         * Router for URL-based state management.
+         * @type {import('./history-router.js').HistoryRouter|null}
+         */
         this.router = config.router === null ? null : config.router || new HistoryRouter();
         if (this.router) {
             this.router.attach(this);
@@ -130,14 +141,23 @@ export class Reactor {
 
         // Global vars — merged into every render's var context with lower priority
         // than component-local vars. Configured at construction time via config.globalVars.
-        /** @type {ComponentVars} */
+        /**
+         * Global variables merged into every render context.
+         * @type {ComponentVars}
+         */
         this._globalVars = { ...config.globalVars };
 
         // Portal host registry — PortalHost components register themselves here
         // so PortalChild instances can find them by ID.
-        /** @type {Map<string, import('./component.js').PortalHost>} */
+        /**
+         * Registry of active portal host components.
+         * @type {Map<string, import('./component.js').PortalHost>}
+         */
         this._portalHosts = new Map();
-        /** @type {Map<string, Array<{resolve: function(import('./component.js').PortalHost): void}>>} */
+        /**
+         * Map of portal host IDs to pending requests waiting for that host.
+         * @type {Map<string, Array<{resolve: function(import('./component.js').PortalHost): void}>>}
+         */
         this._pendingPortalRequests = new Map();
     }
 
@@ -311,24 +331,23 @@ export class Reactor {
             portal: portalRef,
         });
 
-        // Consume the root route segment from the router (if configured).
-        // This passes URL state to the root component's init() so it can
-        // set vars from the URL before the first render (no flash).
-        let routeSegment = null;
-        if (this.router) {
-            routeSegment = this.router.consumeRootSegment();
-        }
-
         // Create the root wrapper (which creates app + default portal as children)
         const rootInstance = await this._instanceRegistry.createFromReference(
             rootRef,
             renderContainer,
-            { routeSegment },
+            { routeSegment: null },
         );
 
         // Mark initial load as complete so the router stops consuming segments
         if (this.router) {
             this.router.completeInitialLoad();
+
+            // Wait for any renders queued during route hydration
+            // to finish so the UI tree is complete before we serialize it into the URL.
+            if (this.drainPromise) {
+                await this.drainPromise;
+            }
+
             // Snapshot the full tree state into the URL (replaceState, no new entry).
             // Children mounted during init() may have routeState() values that
             // weren't in the original URL — this ensures the URL reflects reality
@@ -449,20 +468,45 @@ export class Reactor {
                 this._queue.delete(code);
                 const instance = this._instanceRegistry.get(id);
                 if (!instance) {
-                    const error = new ComponentNotFoundError(id.code);
-                    this._console.error(`Error during re-render of ${id.code}:`, error);
-                    throw error;
+                    // Component was removed between enqueue and drain (e.g., parent destroyed
+                    // or ErrorBoundary cleaned up a failed child). Skip silently.
+                    this._console.warn(`Skipping re-render of removed component ${id.code}`);
+                    continue;
                 }
+                let activeInstance = instance;
                 try {
-                    instance[LIFECYCLE_ACTIVE] = 'render';
+                    activeInstance[LIFECYCLE_ACTIVE] = 'render';
                     await this._instanceRegistry.render(id);
-                    instance[LIFECYCLE_ACTIVE] = 'afterRender';
-                    instance.afterRender();
+
+                    activeInstance = this._instanceRegistry.get(id);
+                    if (!activeInstance) {
+                        throw new ComponentNotFoundError(id.code);
+                    }
+
+                    if (typeof activeInstance.afterRender === 'function') {
+                        try {
+                            activeInstance[LIFECYCLE_ACTIVE] = 'afterRender';
+                            activeInstance.afterRender();
+                        } catch (error) {
+                            const handled = activeInstance.emitCancellable('fw-error', {
+                                error,
+                                failedComponent: id.name,
+                            });
+                            if (!handled) {
+                                throw error;
+                            }
+                        } finally {
+                            if (activeInstance) {
+                                activeInstance[LIFECYCLE_ACTIVE] = null;
+                            }
+                        }
+                    }
                 } catch (error) {
                     this._console.error(`Error during re-render of ${id.code}:`, error);
+                    if (error instanceof ComponentNotFoundError) {
+                        continue;
+                    }
                     throw error;
-                } finally {
-                    instance[LIFECYCLE_ACTIVE] = null;
                 }
             }
         } finally {

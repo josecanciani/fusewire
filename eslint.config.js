@@ -2,7 +2,7 @@ import jsdoc from 'eslint-plugin-jsdoc';
 
 export default [
     {
-        ignores: ['src/lib/**'],
+        ignores: ['src/lib/**', 'src/vendor/**'],
     },
     {
         // All source files are ES modules — strict mode is always active.

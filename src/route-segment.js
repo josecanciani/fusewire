@@ -132,6 +132,15 @@ export class RouteSegment {
     }
 
     /**
+     * Check if a property is present in the segment.
+     * @param {string} name - Property name
+     * @returns {boolean} True if present
+     */
+    has(name) {
+        return this.#properties.has(name);
+    }
+
+    /**
      * Get a raw string value, or null if the property is not present
      * @param {string} name - Property name
      * @returns {string|null} The value, or null if not present

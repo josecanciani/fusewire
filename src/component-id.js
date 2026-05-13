@@ -57,6 +57,14 @@ export class ComponentId {
     }
 
     /**
+     * Set the template version hash.
+     * @param {string} value - New version hash
+     */
+    set version(value) {
+        this._version = value;
+    }
+
+    /**
      * Full component code — unique reference within the application.
      * Format: "Name#id" when id is present, "Name" otherwise.
      * @returns {string} The component code string
@@ -109,4 +117,14 @@ export class ComponentId {
     toString() {
         return this.code;
     }
+}
+
+/**
+ * Convert a component name to a CSS-safe identifier.
+ * Replaces '/' (used in directory-based names like 'Basics/Counter') with '_'.
+ * @param {string} name - Component name
+ * @returns {string} CSS-safe name
+ */
+export function toCssName(name) {
+    return name.replaceAll('/', '_');
 }

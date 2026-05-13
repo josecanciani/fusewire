@@ -239,7 +239,7 @@ export class Component {
      * @param {string|ComponentVars} [idOrVars] - Instance id, or vars if id is omitted
      * @param {ComponentVars|import('./component.js').ChildOptions} [maybeVarsOrOptions] - Vars when id is provided, or options when id is omitted
      * @param {import('./component.js').ChildOptions} [maybeOptions] - Options when id and vars are provided
-     * @returns {any} Reference that the framework replaces with the real instance after mounting
+     * @returns {Child} Reference that the framework replaces with the real instance after mounting
      */
     createChild(name, idOrVars, maybeVarsOrOptions, maybeOptions) {
         let id;
@@ -255,7 +255,9 @@ export class Component {
             options = maybeVarsOrOptions;
         }
         const ref = new Child(name, id, vars, null, options);
-        this[REACTOR].instanceRegistry.startEagerCreation(ref);
+        if (this[REACTOR]) {
+            this[REACTOR].instanceRegistry.startEagerCreation(ref);
+        }
         return ref;
     }
 
@@ -276,10 +278,12 @@ export class Component {
         }
         const baseId = lazyChild.toComponentId().code;
         return /** @type {Lazy} */ (
-            this.createChild('FuseWire/Lazy', `${baseId}-lazy`, {
-                lazyChild,
-                placeholderChild,
-            })
+            /** @type {unknown} */ (
+                this.createChild('FuseWire/Lazy', `${baseId}-lazy`, {
+                    lazyChild,
+                    placeholderChild,
+                })
+            )
         );
     }
 
@@ -290,7 +294,7 @@ export class Component {
      * @template T
      * @param {Component|Child} targetChild - The child reference to mount
      * @param {Component|Child|string} fallbackChildOrName - Fallback child reference or component name if targetChild fails
-     * @returns {any} Boundary reference that manages the child lifecycle
+     * @returns {Child} Boundary reference that manages the child lifecycle
      */
     createErrorBoundedChild(targetChild, fallbackChildOrName) {
         if (!fallbackChildOrName) {
@@ -902,6 +906,7 @@ export class ErrorBoundary extends Component {
             this.update({
                 child: this.fallbackChild,
             }).then(() => this.emit('error', ctx));
+            if (ctx.preventDefault) ctx.preventDefault();
             return false; // Prevent further bubbling
         });
     }
@@ -1160,7 +1165,7 @@ export class KeepAlive extends Component {
 
     /**
      * The active child reference. Returns null if inactive to detach DOM.
-     * @returns {Child|Component|null}
+     * @returns {Child|Component|null} The child instance or null
      */
     get $child() {
         return this.active ? this.targetChild : null;

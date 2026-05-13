@@ -24,7 +24,7 @@ function isComponentRef(value) {
  * serializable markers. Called by JSON.stringify for every value
  * in the object tree.
  * @param {string} _key - Property key (unused)
- * @param {Component|Child|string|number|boolean|null|Array<any>|object} value - Value to potentially replace
+ * @param {Component|import('./component.js').Child|string|number|boolean|null|Array<any>|object} value - Value to potentially replace
  * @returns {object|string|number|boolean|null|Array<any>} Serializable value
  */
 function componentReplacer(_key, value) {
@@ -69,11 +69,16 @@ export class StateSerializer {
      */
     parse(serialized) {
         if (!serialized) return {};
-        return JSON.parse(serialized, (key, value) => {
-            if (isComponentRef(value)) {
-                return new Child(value.name, value.id, {});
-            }
-            return value;
-        });
+        try {
+            return JSON.parse(serialized, (key, value) => {
+                if (isComponentRef(value)) {
+                    return new Child(value.name, value.id, {});
+                }
+                return value;
+            });
+        } catch (e) {
+            console.error('[StateSerializer] Failed to parse state:', e);
+            return {};
+        }
     }
 }
