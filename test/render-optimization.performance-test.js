@@ -198,7 +198,7 @@ describe('Render Optimizations', () => {
             );
         });
 
-        it('re-renders child when _mountChild receives a different container element', async () => {
+        it('teleports DOM and skips re-render when _mountChild receives a different container element', async () => {
             templateStore.set('TestComponent', {
                 htmlCode: '<div>((child))</div>',
                 cssCode: '',
@@ -241,9 +241,10 @@ describe('Render Optimizations', () => {
 
             assert.strictEqual(
                 childRendered,
-                true,
-                'Child should be re-rendered when mount point is a different DOM element',
+                false,
+                'Child should not be re-rendered because DOM teleportation preserves the old DOM',
             );
+            assert.ok(newMountPoint.innerHTML.includes('child content'), 'DOM should have been teleported');
         });
 
         it('skips re-render for all children when parent re-renders with stable vars', async () => {

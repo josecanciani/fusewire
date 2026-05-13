@@ -76,7 +76,12 @@ export class Renderer {
             });
 
             // Reconcile mount points inside each-containers after morphing
-            this._reconcileContainers(container, expectedContainers);
+            this._reconcileContainers(
+                container,
+                /** @type {Map<string, Array<{id: string, parentId: string, className: string}>>} */ (
+                    /** @type {unknown} */ (expectedContainers)
+                ),
+            );
         }
 
         // 3. Inject CSS if not already present
@@ -185,14 +190,15 @@ export class Renderer {
             const name = eachContainer.getAttribute('data-fusewire-each');
             /**
              * Extracted component mount point declarations.
-             * @type {Array<{id: string, parentId: string}>}
+             * @type {Array<{id: string, parentId: string, className: string}>}
              */
             const mountPoints = [];
             for (const child of eachContainer.children) {
                 const id = child.getAttribute('data-fusewire-id');
                 const parentId = child.getAttribute('data-fusewire-parent-id');
+                const className = child.className;
                 if (id) {
-                    mountPoints.push({ id, parentId: parentId || '' });
+                    mountPoints.push({ id, parentId: parentId || '', className: className || '' });
                 }
             }
             state.set(name, mountPoints);
@@ -205,7 +211,7 @@ export class Renderer {
      * Adds new mount points, removes stale ones, and preserves order.
      * @private
      * @param {HTMLElement} parentContainer - Parent container element
-     * @param {Map<string, Array<{id: string, parentId: string}>>} expectedContainers - Expected state from new HTML
+     * @param {Map<string, Array<{id: string, parentId: string, className: string}>>} expectedContainers - Expected state from new HTML
      */
     _reconcileContainers(parentContainer, expectedContainers) {
         const domContainers = parentContainer.querySelectorAll('[data-fusewire-each]');
@@ -233,7 +239,7 @@ export class Renderer {
 
             // Append/reorder mount points in expected order.
             // appendChild moves existing elements or appends new ones.
-            for (const { id, parentId } of expected) {
+            for (const { id, parentId, className } of expected) {
                 let element = existing.get(id);
                 if (!element) {
                     element = document.createElement('fw-mount');
@@ -242,6 +248,9 @@ export class Renderer {
                     if (parentId) {
                         element.setAttribute('data-fusewire-parent-id', parentId);
                     }
+                }
+                if (className) {
+                    element.className = className;
                 }
                 domContainer.appendChild(element);
             }
