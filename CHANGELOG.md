@@ -6,17 +6,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-13
 ### Added
+- Implemented robust DOM Teleportation during reconciliation: existing DOM elements are preserved and moved instead of re-rendered when mount points change, drastically improving performance and preserving third-party widget states.
+- 100% strict TypeScript and JSDoc typing for all framework core files (`src/*.js`).
+- New `Site` components for building full documentation web pages (`Landing`, `Main`, `Docs`).
+- Integration tests in Playwright for browser-native navigation and playground components.
 - Added the `fw-ignore` template directive to instruct the DOM morphing engine to skip specific subtrees, safely preserving un-synced state for third-party libraries (like CodeMirror or Leaflet).
 - New `template-vars` quality check to ensure all variables used in HTML templates are defined as public members in the component's JS file.
 - Enforced `$` prefix convention for calculated variables: public getters must start with `$`, and public class fields must not.
 - Added regression tests for `>` operator handling in `fw-if` directives.
 
 ### Changed
+- Replaced ES Module import mapping of idiomorph with a local vendored version (`src/vendor/idiomorph.js`) to fix deployment compatibility.
+- Updated npm scripts and linter configurations (`.oxlintignore`, `.oxfmtignore`) to exclude vendor files seamlessly.
+- Greatly improved Playground robustness with lazy-loading demos inside Error Boundaries to prevent single-demo crashes from affecting the entire page.
+- Rewrote the core unit test suite to leverage the native Node.js test runner exclusively with stricter console mocking.
 - Updated architectural documentation to formalize the "Data Down, Events Up" pattern for interacting with child components asynchronously via `update()`.
 - Enhanced component check runner to display the total number of components inspected during a run.
 
 ### Fixed
+- Fixed nested route hydration on initial page load in `HistoryRouter`.
+- Fixed performance regressions in `InstanceRegistry._mountChild` where unchanged components were triggering unnecessary render cycles.
+- Fixed var extraction in `InstanceRegistry.createFromReference` to support directly instantiated `Component` class instances, not just `Child` config objects.
 - Fixed an unhandled Promise rejection crash that occurred when an eagerly-created child component threw an error before completing its initial render.
 - Fixed a rendering pipeline crash (`Cannot set properties of undefined`) caused when an ErrorBoundary intercepted a failed eager child.
 - Fixed a bug where hidden Keep-Alive components (`fw-if="false"`) would fail to receive buffered event listeners during state restoration.
@@ -65,7 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed JS-in-HTML inline execution possibilities to strictly enforce declarative JS state truth.
 
-[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.0.2...main
+[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.1.0...main
+[1.1.0]: https://github.com/josecanciani/fusewire/compare/1.0.2...1.1.0
 [1.0.2]: https://github.com/josecanciani/fusewire/compare/1.0.1...1.0.2
 [1.0.1]: https://github.com/josecanciani/fusewire/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/josecanciani/fusewire/releases/tag/1.0.0
