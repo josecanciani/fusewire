@@ -589,8 +589,23 @@ export class InstanceRegistry {
         // manage their own children internally (e.g. ErrorBoundary holds a
         // fallback child that is only mounted when an error occurs).
         if (!componentId.name.startsWith('FuseWire/')) {
+            let mountedCodes = null;
             for (const [, decl] of declarations) {
                 if (decl instanceof Child && decl._creationPromise && !decl._replaced) {
+                    if (!mountedCodes) {
+                        mountedCodes = new Set(
+                            childMountPoints
+                                .map((el) => {
+                                    const id = getComponentIdFromElement(el);
+                                    return id ? id.code : null;
+                                })
+                                .filter(Boolean),
+                        );
+                    }
+                    if (mountedCodes.has(decl.toComponentId().code)) {
+                        continue; // It was mounted, so it's valid
+                    }
+
                     // Check if the component was intentionally hidden by an fw-if condition.
                     // If the original template contains the placeholder, it's valid.
                     let varName = null;

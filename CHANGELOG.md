@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Performance
 - Optimized DOM reconciliation in `Renderer.js` to batch new element insertions using a `DocumentFragment` and avoid detached node tracking during massive component grid renders.
+- Eliminated an O(N²) array scan bottleneck in `InstanceRegistry` when verifying unmounted children during massive DOM render cycles (like grid generation).
 
 ## [1.3.0] - 2026-05-14
 ### Fixed
