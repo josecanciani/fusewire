@@ -238,7 +238,10 @@ export class Renderer {
             }
 
             // Append/reorder mount points in expected order.
-            // appendChild moves existing elements or appends new ones.
+            // Only move elements if they are not already in the correct position.
+            // Batch appends at the end using a DocumentFragment to avoid layout thrashing.
+            let currentDomChild = domContainer.firstElementChild;
+            let fragment = null;
             for (const { id, parentId, className } of expected) {
                 let element = existing.get(id);
                 if (!element) {
@@ -248,11 +251,33 @@ export class Renderer {
                     if (parentId) {
                         element.setAttribute('data-fusewire-parent-id', parentId);
                     }
+                    existing.set(id, element);
                 }
-                if (className) {
+                if (className && element.className !== className) {
                     element.className = className;
                 }
-                domContainer.appendChild(element);
+
+                if (currentDomChild !== element) {
+                    if (currentDomChild === null) {
+                        if (!fragment) fragment = document.createDocumentFragment();
+                        fragment.appendChild(element);
+                    } else {
+                        if (fragment) {
+                            domContainer.insertBefore(fragment, currentDomChild);
+                            fragment = null;
+                        }
+                        domContainer.insertBefore(element, currentDomChild);
+                    }
+                } else {
+                    if (fragment) {
+                        domContainer.insertBefore(fragment, currentDomChild);
+                        fragment = null;
+                    }
+                    currentDomChild = currentDomChild.nextElementSibling;
+                }
+            }
+            if (fragment) {
+                domContainer.appendChild(fragment);
             }
         }
     }
