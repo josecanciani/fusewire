@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Performance
 - Optimized DOM reconciliation in `Renderer.js` to batch new element insertions using a `DocumentFragment` and avoid detached node tracking during massive component grid renders.
 - Eliminated an O(N²) array scan bottleneck in `InstanceRegistry` when verifying unmounted children during massive DOM render cycles (like grid generation).
+- Fixed massive layout thrashing in Safari by breaking component mounting into a 3-phase architecture: awaiting creation concurrently, performing all DOM node teleports in a single synchronous loop (guaranteeing zero interleaved rendering frames), and then resuming async hydration.
 
 ## [1.3.0] - 2026-05-14
 ### Fixed

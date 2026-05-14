@@ -633,10 +633,67 @@ export class InstanceRegistry {
             }
         }
 
-        // Recursively mount/update children at discovered mount points
+        // Phase 1: Wait for all eagerly-created children concurrently
+        const eagerPromises = [];
         for (const mountPoint of childMountPoints) {
-            await this._mountChild(mountPoint, instance, declarations);
+            const childId = getComponentIdFromElement(mountPoint);
+            if (childId) {
+                const ref = declarations.get(childId.code);
+                if (ref && ref instanceof Child && ref._creationPromise) {
+                    eagerPromises.push(ref._creationPromise);
+                }
+            }
         }
+        if (eagerPromises.length > 0) {
+            // Use allSettled so that if a child fails to create (e.g. throws in init),
+            // it doesn't abort the entire parent render pass. The failure will be
+            // caught and handled by ErrorBoundary mechanisms during _mountChild.
+            await Promise.allSettled(eagerPromises);
+        }
+
+        // Phase 2: Perform all DOM node transfers synchronously.
+        // Doing this in a tight synchronous loop prevents the browser from scheduling
+        // rendering frames (Layout recalculations) between partial DOM updates,
+        // eliminating massive layout thrashing in WebKit when mounting large grids.
+        for (const mountPoint of childMountPoints) {
+            const childId = getComponentIdFromElement(mountPoint);
+            if (childId) {
+                const childCode = childId.code;
+                const ref = declarations.get(childCode);
+
+                // Handle eagerly-created children
+                if (ref && ref instanceof Child && ref._creationPromise && ref._detachedContainer) {
+                    mountPoint.innerHTML = '';
+                    const detached = ref._detachedContainer;
+                    while (detached.firstChild) {
+                        mountPoint.appendChild(detached.firstChild);
+                    }
+                    ref._detachedContainer = null;
+                } else {
+                    // Handle existing children that need DOM teleportation
+                    const existingEntry = this._instances.get(childCode);
+                    if (
+                        existingEntry &&
+                        existingEntry.container &&
+                        existingEntry.container !== mountPoint &&
+                        existingEntry.container.parentNode
+                    ) {
+                        mountPoint.innerHTML = '';
+                        const detached = existingEntry.container;
+                        while (detached.firstChild) {
+                            mountPoint.appendChild(detached.firstChild);
+                        }
+                        existingEntry.container = mountPoint;
+                    }
+                }
+            }
+        }
+
+        // Phase 3: Run the rest of the lifecycle (routing, hydration) concurrently
+        const mountPromises = childMountPoints.map((mountPoint) =>
+            this._mountChild(mountPoint, instance, declarations),
+        );
+        await Promise.all(mountPromises);
 
         // Clean up orphaned component instances that were removed from the template/vars
         for (const [childCode, childId] of previousChildren) {
@@ -882,15 +939,14 @@ export class InstanceRegistry {
             }
 
             // Transfer rendered DOM from detached container into the real mount point.
-            // We MUST use physical node transfer (appendChild) instead of innerHTML
-            // because deeply-nested eager children already have their registry
-            // entry.container pointing to these specific DOM nodes. Using innerHTML
-            // would destroy those nodes and create new ones, leaving the children
-            // permanently detached from the document.
-            mountPoint.innerHTML = '';
-            const detached = ref._detachedContainer;
-            while (detached.firstChild) {
-                mountPoint.appendChild(detached.firstChild);
+            // (May have already been done synchronously by Phase 2 of render)
+            if (ref._detachedContainer) {
+                mountPoint.innerHTML = '';
+                const detached = ref._detachedContainer;
+                while (detached.firstChild) {
+                    mountPoint.appendChild(detached.firstChild);
+                }
+                ref._detachedContainer = null;
             }
 
             // Deliver initial route segment if present (before hydration)
