@@ -5,7 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FuseWire</title>
-
+    <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css" />
     <script type="importmap">
         {
             "imports": {
@@ -44,20 +44,15 @@
 <body>
     <div id="app"></div>
     <script>
-        window.onerror = function(msg, url, line, col, error) {
+        window.onerror = function (msg, url, line, col, error) {
             console.error('[Global Error] ' + msg + ' at ' + url + ':' + line + ':' + col);
         };
-        window.onunhandledrejection = function(event) {
+        window.onunhandledrejection = function (event) {
             console.error('[Global Promise Rejection]', event.reason);
         };
 
     </script>
     <script type="module">
-        import bootstrapCss from 'bootstrap/css'
-        with {
-            type: 'css'
-        };
-        document.adoptedStyleSheets = [...document.adoptedStyleSheets, bootstrapCss];
         import 'bootstrap';
         import {
             Reactor
