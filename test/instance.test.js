@@ -527,8 +527,13 @@ describe('InstanceRegistry', () => {
                 registry.registerComponent('ChildComponent', ChildComponent);
 
                 class Parent extends Component {
-                    child = this.createChild('ChildComponent', 'child1');
+                    /** @type {any} */
+                    child = null;
+                
+                async init() {
+                    this.child = this.createChild('ChildComponent', 'child1');
                 }
+            }
                 const id = new ComponentId('Parent', 'root', 'v1');
                 await registry.create(id, Parent, {}, container);
 
@@ -596,7 +601,11 @@ describe('InstanceRegistry', () => {
         it('auto-mounts child from Child in vars', async () => {
             templateStore.set('Parent', { version: 'v1', htmlCode: '<div>((child))</div>', cssCode: '' });
             class Parent extends Component {
-                child = this.createChild('ChildComponent', 'child1', { msg: 'eager' });
+                /** @type {any} */
+                child = null;
+                async init() {
+                    this.child = this.createChild('ChildComponent', 'child1', { msg: 'eager' });
+                }
             }
             await registry.create(new ComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
             
@@ -607,10 +616,14 @@ describe('InstanceRegistry', () => {
         it('auto-mounts array of Child children', async () => {
             templateStore.set('Parent', { version: 'v1', htmlCode: '<div>((children))</div>', cssCode: '' });
             class Parent extends Component {
-                children = [
-                    this.createChild('ChildComponent', 'c1', { msg: 'one' }),
-                    this.createChild('ChildComponent', 'c2', { msg: 'two' })
-                ];
+                /** @type {any[]} */
+                children = [];
+                async init() {
+                    this.children = [
+                        this.createChild('ChildComponent', 'c1', { msg: 'one' }),
+                        this.createChild('ChildComponent', 'c2', { msg: 'two' })
+                    ];
+                }
             }
             await registry.create(new ComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
             
@@ -623,7 +636,11 @@ describe('InstanceRegistry', () => {
         it('passes vars from Child to child instance', async () => {
             templateStore.set('Parent', { version: 'v1', htmlCode: '<div>((child))</div>', cssCode: '' });
             class Parent extends Component {
-                child = this.createChild('ChildComponent', 'child1', { msg: 'hello' });
+                /** @type {any} */
+                child = null;
+                async init() {
+                    this.child = this.createChild('ChildComponent', 'child1', { msg: 'hello' });
+                }
             }
             await registry.create(new ComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
             
@@ -634,7 +651,12 @@ describe('InstanceRegistry', () => {
         it('replaces Child with Component instance in parent vars (top-level)', async () => {
             templateStore.set('Parent', { version: 'v1', htmlCode: '<div>((child))</div>', cssCode: '' });
             class Parent extends Component {
-                child = this.createChild('ChildComponent', 'child1');
+                /** @type {any} */
+                child = null;
+            
+                async init() {
+                    this.child = this.createChild('ChildComponent', 'child1');
+                }
             }
             const parentId = new ComponentId('Parent', 'p1', 'v1');
             const parent = await registry.create(parentId, Parent, {}, container);
@@ -646,7 +668,12 @@ describe('InstanceRegistry', () => {
         it('replaces Child with Component instance in parent vars (array)', async () => {
             templateStore.set('Parent', { version: 'v1', htmlCode: '<div>((children))</div>', cssCode: '' });
             class Parent extends Component {
-                children = [this.createChild('ChildComponent', 'c1')];
+                /** @type {any[]} */
+                children = [];
+            
+                async init() {
+                    this.children = [this.createChild('ChildComponent', 'c1')];
+                }
             }
             const parent = await registry.create(new ComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
             
@@ -657,7 +684,9 @@ describe('InstanceRegistry', () => {
         it('allows update() on Component after ref replacement', async () => {
             templateStore.set('Parent', { version: 'v1', htmlCode: '<div>((child))</div>', cssCode: '' });
             class Parent extends Component {
-                child = this.createChild('ChildComponent', 'child1', { msg: 'initial' });
+                /** @type {any} */
+                child = null;
+                async init() { this.child = this.createChild('ChildComponent', 'child1', { msg: 'initial' }); }
             }
             const parent = await registry.create(new ComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
             
@@ -725,10 +754,20 @@ describe('InstanceRegistry', () => {
             templateStore.set('Grandchild', { version: 'v1', htmlCode: '<div></div>', cssCode: '' });
 
             class ParentComp extends Component {
-                child = this.createChild('Child', 'c1');
+                /** @type {any} */
+                child = null;
+            
+                async init() {
+                    this.child = this.createChild('Child', 'c1');
+                }
             }
             class ChildComp extends Component {
-                grandchild = this.createChild('Grandchild', 'g1');
+                /** @type {any} */
+                grandchild = null;
+            
+                async init() {
+                    this.grandchild = this.createChild('Grandchild', 'g1');
+                }
             }
             registry.registerComponent('Parent', ParentComp);
             registry.registerComponent('Child', ChildComp);
@@ -752,7 +791,12 @@ describe('InstanceRegistry', () => {
             templateStore.set('Child', { version: 'v1', htmlCode: '<div></div>', cssCode: '' });
 
             class ParentComp extends Component {
-                child = this.createChild('Child', 'c1');
+                /** @type {any} */
+                child = null;
+            
+                async init() {
+                    this.child = this.createChild('Child', 'c1');
+                }
             }
             registry.registerComponent('Parent', ParentComp);
 
@@ -773,8 +817,15 @@ describe('InstanceRegistry', () => {
             templateStore.set('Child', { version: 'v1', htmlCode: '<div></div>', cssCode: '' });
 
             class RootComp extends Component {
-                left = this.createChild('Child', 'l1');
-                right = this.createChild('Child', 'r1');
+                /** @type {any} */
+                left = null;
+                /** @type {any} */
+                right = null;
+            
+                async init() {
+                    this.left = this.createChild('Child', 'l1');
+                    this.right = this.createChild('Child', 'r1');
+                }
             }
             registry.registerComponent('Root', RootComp);
 
@@ -793,7 +844,12 @@ describe('InstanceRegistry', () => {
             templateStore.set('Child', { version: 'v1', htmlCode: '<div></div>', cssCode: '' });
 
             class ParentComp extends Component {
-                child = this.createChild('Child', 'c1');
+                /** @type {any} */
+                child = null;
+            
+                async init() {
+                    this.child = this.createChild('Child', 'c1');
+                }
             }
             const parent = await registry.create(new ComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
             
@@ -810,7 +866,12 @@ describe('InstanceRegistry', () => {
             templateStore.set('Child', { version: 'v1', htmlCode: '<div></div>', cssCode: '' });
 
             class ParentComp extends Component {
-                child = this.createChild('Child', 'c1');
+                /** @type {any} */
+                child = null;
+            
+                async init() {
+                    this.child = this.createChild('Child', 'c1');
+                }
             }
             const parent = await registry.create(new ComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
             
@@ -846,7 +907,12 @@ describe('InstanceRegistry', () => {
             templateStore.set('Child', { version: 'v1', htmlCode: '<div></div>', cssCode: '' });
 
             class ParentComp extends Component {
-                child = this.createChild('Child', 'c1');
+                /** @type {any} */
+                child = null;
+            
+                async init() {
+                    this.child = this.createChild('Child', 'c1');
+                }
             }
             const parent = await registry.create(new ComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
             
@@ -871,11 +937,23 @@ describe('InstanceRegistry', () => {
             templateStore.set('Grandchild', { version: 'v1', htmlCode: '<div></div>', cssCode: '' });
 
             class ChildWithGrandchild extends Component {
-                grandchild = this.createChild('Grandchild', 'g1');
+                /** @type {any} */
+                grandchild = null;
+            
+                async init() {
+                    this.grandchild = this.createChild('Grandchild', 'g1');
+                }
             }
             class ParentComp extends Component {
-                child = this.createChild('ChildWithGrandchild', 'c1');
-                sibling = this.createChild('TestComponent', 's1');
+                /** @type {any} */
+                child = null;
+                /** @type {any} */
+                sibling = null;
+            
+                async init() {
+                    this.child = this.createChild('ChildWithGrandchild', 'c1');
+                    this.sibling = this.createChild('TestComponent', 's1');
+                }
             }
             registry.registerComponent('Parent', ParentComp);
             registry.registerComponent('ChildWithGrandchild', ChildWithGrandchild);
@@ -1060,7 +1138,9 @@ describe('InstanceRegistry', () => {
             registry.registerComponent('Child', ChildComp);
 
             class Parent extends Component {
-                child = this.createChild('Child', 'main', {});
+                /** @type {any} */
+                child = null;
+                async init() { this.child = this.createChild('Child', 'main', {}); }
             }
             const parentId = new ComponentId('Parent', 'root', 'v1');
             
@@ -1105,8 +1185,12 @@ describe('InstanceRegistry', () => {
                 hydrate() { events.push('child-hydrate'); }
             }
             class Parent extends Component {
-                child = this.createChild('Child', 'main');
+                /** @type {any} */
+                child = null;
                 hydrate() { events.push('parent-hydrate'); }
+                async init() {
+                    this.child = this.createChild('Child', 'main');
+                }
             }
             registry.registerComponent('Parent', Parent);
             registry.registerComponent('Child', ChildComp);
@@ -1122,7 +1206,12 @@ describe('InstanceRegistry', () => {
             registry.registerComponent('Child', TestComponent);
 
             class Parent extends Component {
-                child = this.createChild('Child', 'main');
+                /** @type {any} */
+                child = null;
+            
+                async init() {
+                    this.child = this.createChild('Child', 'main');
+                }
             }
             await registry.create(new ComponentId('Parent', 'root', 'v1'), Parent, {}, container);
             

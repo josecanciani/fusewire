@@ -255,9 +255,7 @@ export class Component {
             options = maybeVarsOrOptions;
         }
         const ref = new Child(name, id, vars, null, options);
-        if (this[REACTOR]) {
-            this[REACTOR].instanceRegistry.startEagerCreation(ref);
-        }
+        this[REACTOR].instanceRegistry.startEagerCreation(ref);
         return /** @type {T} */ (/** @type {unknown} */ (ref));
     }
 

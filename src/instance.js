@@ -228,9 +228,7 @@ export class InstanceRegistry {
         { deferHydration = false, routeSegment = null } = {},
     ) {
         const code = componentId.code;
-        if (this._instances.has(code)) {
-            throw new Error(`Component ${code} already exists in registry`);
-        }
+        this.assertComponentDoesNotExist(code);
 
         // Add component scope class to container
         container.classList.add(toCssName(componentId.name));
@@ -370,6 +368,21 @@ export class InstanceRegistry {
     has(componentId) {
         const code = typeof componentId === 'string' ? componentId : componentId.code;
         return this._instances.has(code);
+    }
+
+    /**
+     * Assert that a component does not already exist in the registry.
+     * Throws a descriptive developer error if it does.
+     * @param {ComponentId|string} componentId - Component identifier
+     */
+    assertComponentDoesNotExist(componentId) {
+        const code = typeof componentId === 'string' ? componentId : componentId.code;
+        if (this._instances.has(code)) {
+            throw new Error(
+                `Developer Error: Component "${code}" already exists or is currently being created. ` +
+                    `createChild() must only be called once per component instance. To update an existing component, mutate its properties directly.`,
+            );
+        }
     }
 
     /**
@@ -570,6 +583,7 @@ export class InstanceRegistry {
         const compiledTpl = /** @type {import('./template-compiler.js').CompiledTemplate} */ (
             /** @type {unknown} */ (compiled)
         );
+
         const childMountPoints = this._renderer.render(
             container,
             compiledTpl,
@@ -675,8 +689,7 @@ export class InstanceRegistry {
                     if (
                         existingEntry &&
                         existingEntry.container &&
-                        existingEntry.container !== mountPoint &&
-                        existingEntry.container.parentNode
+                        existingEntry.container !== mountPoint
                     ) {
                         mountPoint.innerHTML = '';
                         const detached = existingEntry.container;
@@ -727,6 +740,7 @@ export class InstanceRegistry {
 
         // If child already exists, just update its container and re-render.
         const existingEntry = this._instances.get(childCode);
+
         if (existingEntry) {
             if (existingEntry.container !== mountPoint) {
                 // DOM Teleportation: Physically move nodes from the old detached/orphaned container
