@@ -478,6 +478,32 @@ export class Component {
     }
 
     /**
+     * Destroy a child component and remove it from the registry.
+     * @param {Child|Component} child - The child component or reference
+     */
+    destroyChild(child) {
+        if (!this[REACTOR]) return;
+        this[REACTOR].instanceRegistry.remove(child.toComponentId());
+    }
+
+    /**
+     * Get the base path configured for the application.
+     * @returns {string} Base path
+     */
+    get basePath() {
+        return this[REACTOR] ? this[REACTOR].basePath : '';
+    }
+
+    /**
+     * Peek at the current route segment without consuming it.
+     * @returns {import('./route-segment.js').RouteSegment|null} The current route segment
+     */
+    peekRouteSegment() {
+        if (!this[REACTOR] || !this[REACTOR].router) return null;
+        return this[REACTOR].router.peekSegment();
+    }
+
+    /**
      * Query this component's own DOM for the first element matching a CSS selector,
      * excluding child component subtrees.
      * @param {string} selector - CSS selector
@@ -697,10 +723,12 @@ export class Child {
      * If this reference has already been replaced by the real Component, calling
      * update() is a bug — the caller is holding a stale reference.
      *
-     * @param {ComponentVars} newVars - Vars to merge into the reference
+     * @param {import('./component.js').ComponentVars} newVars - Vars to merge into the reference
+     * @param {boolean} [react=true] - Whether to trigger a re-render
+     * @param {import('./route-segment.js').RouteSegment|null} [routeSegment=null] - Parsed URL segment
      * @returns {Promise<void>} A resolved promise for compatibility with Component.update()
      */
-    update(newVars) {
+    update(newVars, react = true, routeSegment = null) {
         if (this._replaced) {
             throw new Error(
                 `Child: update() called on replaced reference "${this.toComponentId().code}". ` +
@@ -714,7 +742,7 @@ export class Child {
         if (this._creationPromise) {
             this._creationPromise
                 .then((/** @type {Component} */ instance) => {
-                    instance.update(newVars, true);
+                    instance.update(newVars, react, routeSegment);
                 })
                 .catch(() => {});
         }

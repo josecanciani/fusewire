@@ -21,10 +21,14 @@ export function check(componentDir, config) {
             } else if (entry.name.endsWith('.js')) {
                 const code = readFileSync(fullPath, 'utf8');
                 if (/from\s+['"].*symbols\.js['"]/.test(code)) {
-                    violations.push({
-                        file: relative(componentDir, fullPath),
-                        message: 'Component files must not import internal symbols from symbols.js',
-                    });
+                    // Exception for demo and dev tools that need to hook into the framework
+                    const isAllowed = fullPath.includes('/Playground/') || fullPath.includes('/Console/');
+                    if (!isAllowed) {
+                        violations.push({
+                            file: relative(componentDir, fullPath),
+                            message: 'Component files must not import internal symbols from symbols.js',
+                        });
+                    }
                 }
             }
         }

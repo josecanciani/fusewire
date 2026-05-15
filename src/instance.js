@@ -754,11 +754,6 @@ export class InstanceRegistry {
                 existingEntry.container = mountPoint;
                 existingEntry.parent = parentInstance[COMPONENT_ID];
 
-                const cssName = toCssName(childId.name);
-                if (!mountPoint.classList.contains(cssName)) {
-                    mountPoint.classList.add(cssName);
-                }
-
                 // Re-hydrate the subtree to update container references for deeply nested children
                 // whose mount points just moved physically in the DOM tree.
                 await this._hydrateSubtree(childId);
@@ -782,6 +777,15 @@ export class InstanceRegistry {
                     }
                 }
             }
+
+            // Always ensure the CSS scoping class is present. If the parent component just re-rendered,
+            // Idiomorph may have stripped this class because the TemplateCompiler generates <fw-mount>
+            // tags without class attributes.
+            const cssName = toCssName(childId.name);
+            if (!mountPoint.classList.contains(cssName)) {
+                mountPoint.classList.add(cssName);
+            }
+
             return;
         }
 

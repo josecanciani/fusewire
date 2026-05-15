@@ -252,7 +252,7 @@ export class HistoryRouter {
     async #walkAndApply(assignments) {
         const registry = this.#reactor.instanceRegistry;
         for (const rootCode of registry._roots) {
-            await this.#applyToSubtree(rootCode, assignments);
+            await this.#applyToSubtree(rootCode, assignments, null);
         }
     }
 
@@ -260,8 +260,9 @@ export class HistoryRouter {
      * Recursively apply route assignments to a component and its mounted children.
      * @param {string} code - Component code
      * @param {Map.<string, RouteSegment>} assignments - code → segment map
+     * @param {RouteSegment|null} inheritedSegment - Segment passed down for pass-through components
      */
-    async #applyToSubtree(code, assignments) {
+    async #applyToSubtree(code, assignments, inheritedSegment = null) {
         const registry = this.#reactor.instanceRegistry;
         const entry = registry._instances.get(code);
         if (!entry) return;
@@ -270,18 +271,27 @@ export class HistoryRouter {
         if (state === false) return;
 
         const segment = assignments.get(code) ?? null;
-        if (this.#hasRouteProperties(state) || segment) {
+        const isPassThrough = !this.#hasRouteProperties(state);
+
+        let effectiveSegment = segment;
+        if (!effectiveSegment && isPassThrough) {
+            effectiveSegment = inheritedSegment;
+        }
+
+        if (!isPassThrough || effectiveSegment) {
             // When a routed component has no matching URL segment, pass an
             // empty RouteSegment instead of null so the component can
             // distinguish "route update with no data" from "not a route update".
-            const effectiveSegment = segment ?? new RouteSegment('');
-            await registry.update(entry.instance[COMPONENT_ID], {}, effectiveSegment);
+            const finalSegment = effectiveSegment ?? new RouteSegment('');
+            await registry.update(entry.instance[COMPONENT_ID], {}, finalSegment);
         }
+
+        const segmentToPass = effectiveSegment ?? inheritedSegment;
 
         // Walk mounted children (may have been recreated by update above)
         if (entry.children) {
             for (const [childCode] of entry.children) {
-                await this.#applyToSubtree(childCode, assignments);
+                await this.#applyToSubtree(childCode, assignments, segmentToPass);
             }
         }
     }
