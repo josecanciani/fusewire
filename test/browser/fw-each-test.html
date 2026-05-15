@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+    <div id="app"></div>
+    <script type="module">
+        import { Reactor } from '../../src/reactor.js';
+        import { Component } from '../../src/component.js';
+        
+        class App extends Component {
+            init() {
+                this.items = ['A'];
+                
+                setTimeout(() => {
+                    this.items = ['A', 'B'];
+                    this.react();
+                }, 100);
+            }
+        }
+        
+        const reactor = new Reactor('test', { basePath: '' });
+        reactor.registerComponent('App', App);
+        reactor._templateStore.set('App', {
+            htmlCode: '<fw-each data-fusewire-each="items"><div class="item">((this))</div></fw-each>',
+            cssCode: ''
+        });
+        
+        reactor.start(document.getElementById('app'), 'App', 'main').then(() => {
+            console.log("Started. Items:", document.querySelectorAll('.item').length);
+            setTimeout(() => {
+                console.log("Later. Items:", document.querySelectorAll('.item').length);
+            }, 500);
+        });
+    </script>
+</body>
+</html>

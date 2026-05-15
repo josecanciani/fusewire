@@ -45,7 +45,7 @@ function extractTemplateVars(html) {
 
     // 1. Directives fw-if, fw-each (do this first to find locals)
     const openingTags = extractOpeningTags(html);
-    for (const { attrs } of openingTags) {
+    for (const { tagName, attrs } of openingTags) {
         const ifAttr = attrs.find((a) => a.name === "fw-if");
         if (ifAttr && ifAttr.value) {
             const path = ifAttr.value.trim().startsWith("!")
@@ -61,6 +61,16 @@ function extractTemplateVars(html) {
             if (eachMatch) {
                 vars.add(eachMatch[2]);
                 locals.add(eachMatch[1]);
+            }
+        }
+
+        // Handle fw-each tag syntax (as an element)
+        if (tagName === "fw-each") {
+            const itemAttr = attrs.find((a) => a.name === "item");
+            const inAttr = attrs.find((a) => a.name === "in");
+            if (itemAttr && itemAttr.value && inAttr && inAttr.value) {
+                vars.add(inAttr.value.trim());
+                locals.add(itemAttr.value.trim());
             }
         }
     }
