@@ -1016,6 +1016,12 @@ export class InstanceRegistry {
             for (const [childCode] of entry.children) {
                 const childEntry = this._instances.get(childCode);
                 if (childEntry) {
+                    // Children declared in init() but omitted from the template (e.g. via fw-if)
+                    // remain in detached, unmounted containers with parentNode === null.
+                    // We must skip hydrating them until they are actually rendered and mounted.
+                    if (childEntry.container && childEntry.container.parentNode === null) {
+                        continue;
+                    }
                     const escapedId = childEntry.instance.componentId.replace(/["\\]/g, '\\$&');
                     const escapedParent = componentId.code.replace(/["\\]/g, '\\$&');
                     const selector = `[data-fusewire-id="${escapedId}"][data-fusewire-parent-id="${escapedParent}"]`;
