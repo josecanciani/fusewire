@@ -55,4 +55,30 @@ test.describe('Playground Integration', () => {
         // The specific failed component boundaries should still show their "Load count: 1" and "Retry" buttons
         await expect(page.locator('button', { hasText: 'Retry' })).toHaveCount(4);
     });
+
+    test('DOM Morphing Attribute Retention', async ({ page }) => {
+        // Navigate to the Counter demo
+        await page.goto('/#!/demo:demo=Counter');
+        
+        // Wait for it to render
+        const demoMount = page.locator('fw-mount[data-fusewire-id="Playground/Home#demo"]');
+        await expect(demoMount).toHaveClass(/Playground_Home/, { timeout: 5000 });
+        
+        // Ensure flex layout is working
+        const ideBody = page.locator('.ide-body');
+        await expect(ideBody).toHaveCSS('display', 'flex');
+        
+        // Navigate away using the top navigation bar to trigger DOM diffing/removal
+        await page.locator('text=Docs').click();
+        await page.waitForTimeout(500); // Allow morphing to settle
+        
+        // Navigate back
+        await page.goBack();
+        
+        // Wait for restoration
+        await expect(demoMount).toHaveClass(/Playground_Home/, { timeout: 5000 });
+        
+        // Ensure layout flex properties are fully restored, proving the CSS class was not stripped
+        await expect(ideBody).toHaveCSS('display', 'flex');
+    });
 });
