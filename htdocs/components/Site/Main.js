@@ -1,5 +1,4 @@
 import { Component } from '../../js/component.js';
-import { REACTOR } from '../../js/symbols.js';
 
 /**
  * Root component for the FuseWire website.
@@ -161,7 +160,7 @@ export class Main extends Component {
      * @param {import('../../js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
      */
     async init(previousState, routeSegment) {
-        const peek = this[REACTOR].router?.peekSegment();
+        const peek = this.peekRouteSegment();
         if (peek) {
             this.#setPageFromSegment(peek);
         } else if (routeSegment) {
@@ -178,14 +177,22 @@ export class Main extends Component {
      * @returns {Promise<void>}
      */
     async update(newVars, react = true, routeSegment = null) {
-        if (routeSegment) {
-            this.#setPageFromSegment(routeSegment);
+        let currentSegment = routeSegment;
+        if (!currentSegment) {
+            currentSegment = this.peekRouteSegment() || null;
+        }
+
+        if (currentSegment) {
+            this.#setPageFromSegment(currentSegment);
             await this.#loadPage();
-        } else {
-            const peek = this[REACTOR].router?.peekSegment();
-            if (peek) {
-                this.#setPageFromSegment(peek);
-                await this.#loadPage();
+
+            // Forward the route segment to the active child page so it can respond to back/forward
+            if (this.page === 'demo' && this.demo) {
+                await this.demo.update({}, false, currentSegment);
+            } else if (this.page === 'docs' && this.docs) {
+                await this.docs.update({}, false, currentSegment);
+            } else if (this.page === 'home' && this.landing) {
+                await this.landing.update({}, false, currentSegment);
             }
         }
         await super.update(newVars, react, routeSegment);
@@ -217,6 +224,7 @@ export class Main extends Component {
      */
     toggleTheme() {
         this.theme = this.theme === 'light' ? 'dark' : 'light';
+        this.broadcast('theme', this.theme);
         document.documentElement.setAttribute('data-bs-theme', this.theme);
         this.react();
     }

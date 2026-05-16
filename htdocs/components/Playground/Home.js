@@ -31,7 +31,7 @@ export class Home extends Component {
      * demoRunId property.
      * @type {number}
      */
-    demoRunId = 0;
+    #demoRunId = 0;
     /**
      * filteredDemos property.
      * @type {Array.<Demo>}
@@ -39,10 +39,10 @@ export class Home extends Component {
     filteredDemos = [];
 
     /**
-     * demoComponent property.
+     * demo property.
      * @type {import('../../js/component.js').ErrorBoundary}
      */
-    demoComponent = null;
+    demo = null;
     /**
      * consoleComponent property.
      * @type {import('../Console/Panel.js').Panel}
@@ -78,7 +78,7 @@ export class Home extends Component {
      * sidebarHidden property.
      * @type {boolean}
      */
-    sidebarHidden = false;
+    #sidebarHidden = false;
     /**
      * sidebarDisplayClass property.
      * @type {string}
@@ -149,9 +149,10 @@ export class Home extends Component {
 
         if (routeSegment) {
             const val = routeSegment.getString('demo');
-            const demo = this.demos.find((d) => d.name === val || d.title === val);
-            if (demo) {
-                await this.#loadDemo(demo.name);
+            if (val) {
+                const demo = this.demos.find((d) => d.name === val || d.title === val);
+                const name = demo ? demo.name : val;
+                await this.#loadDemo(name);
             }
         }
     }
@@ -198,11 +199,11 @@ export class Home extends Component {
     async update(newVars, react = true, routeSegment = null) {
         if (routeSegment) {
             const val = routeSegment.getString('demo');
-            const demo = this.demos.find((d) => d.name === val || d.title === val);
-            const name = demo ? demo.name : '';
-            if (name && name !== this.selectedDemo) {
+            if (val && val !== this.selectedDemo) {
+                const demo = this.demos.find((d) => d.name === val || d.title === val);
+                const name = demo ? demo.name : val;
+                this.selectedDemo = name;
                 await this.#loadDemo(name);
-                if (react) this.react();
             }
         }
         return super.update(newVars, react);
@@ -240,6 +241,7 @@ export class Home extends Component {
      */
     back() {
         this.selectedDemo = null;
+        this.demo = null;
         this.pushRoute();
         this.react();
     }
@@ -265,21 +267,26 @@ export class Home extends Component {
                 const compName = file.id.substring(0, file.id.lastIndexOf('/'));
 
                 if (file.ext === '.html') {
-                    this[REACTOR]._templateStore.set(compName, { htmlCode: content });
+                    this[REACTOR]._templateStore.set(compName, {
+                        htmlCode: content,
+                        version: 'override-' + Date.now(),
+                    });
                 } else if (file.ext === '.css') {
-                    this[REACTOR]._templateStore.set(compName, { cssCode: content });
+                    this[REACTOR]._templateStore.set(compName, {
+                        cssCode: content,
+                        version: 'override-' + Date.now(),
+                    });
                 }
             }
 
-            const registry = this[REACTOR].instanceRegistry;
-            if (this.demoComponent) {
-                registry.remove(this.demoComponent.toComponentId());
+            if (this.demo) {
+                this.destroyChild(this.demo);
             }
 
             // We increment runId so the top-level parent gets a unique instance id.
-            this.demoRunId = Date.now();
-            this.demoComponent = this.createErrorBoundedChild(
-                this.createChild(demo.name, `demo-${this.demoRunId}`, demo.vars || {}),
+            this.#demoRunId = Date.now();
+            this.demo = this.createErrorBoundedChild(
+                this.createChild(demo.name, `demo-${this.#demoRunId}`, demo.vars || {}),
                 'Playground/DemoFallback',
             );
             this.react();
@@ -292,8 +299,8 @@ export class Home extends Component {
      * Toggle the sidebar visibility.
      */
     toggleSidebar() {
-        this.sidebarHidden = !this.sidebarHidden;
-        this.sidebarDisplayClass = this.sidebarHidden ? 'hidden' : '';
+        this.#sidebarHidden = !this.#sidebarHidden;
+        this.sidebarDisplayClass = this.#sidebarHidden ? 'hidden' : '';
         this.react();
     }
 
@@ -352,6 +359,7 @@ export class Home extends Component {
         const demo = this.demos.find((d) => d.name === name);
         if (!demo) {
             console.log('loadDemo end (no demo)', name);
+            this.demo = null;
             return;
         }
 
@@ -360,7 +368,7 @@ export class Home extends Component {
 
         const loadedComponents = await Promise.all(
             componentNames.map(async (compName) => {
-                const baseUrl = this[REACTOR].basePath + '/' + compName;
+                const baseUrl = this.basePath + '/' + compName;
                 const [html, js, css] = await Promise.all([
                     fetch(baseUrl + '.html').then((r) => (r.ok ? r.text() : '')),
                     fetch(baseUrl + '.js').then((r) => (r.ok ? r.text() : '')),
@@ -371,6 +379,9 @@ export class Home extends Component {
                 return { compName, html, js, css };
             }),
         );
+
+        // Abort if another demo was selected while we were fetching
+        if (this.selectedDemo !== name) return;
 
         for (const { compName, html, js, css } of loadedComponents) {
             files.push({
@@ -395,22 +406,22 @@ export class Home extends Component {
 
         // Check if we are hydrating from an initial URL load
         let isHydratingFromUrl = false;
-        const nextSegment = this[REACTOR].router?.peekSegment();
+        const nextSegment = this.peekRouteSegment();
         if (nextSegment && nextSegment.key.startsWith('demo-')) {
             const parsed = parseInt(nextSegment.key.substring(5), 10);
             if (!Number.isNaN(parsed)) {
-                this.demoRunId = parsed;
+                this.#demoRunId = parsed;
                 isHydratingFromUrl = true;
             }
         }
 
         // Generate a new ID if we are switching demos or clicking Run
         if (!isHydratingFromUrl) {
-            this.demoRunId = Date.now();
+            this.#demoRunId = Date.now();
         }
 
-        this.demoComponent = this.createErrorBoundedChild(
-            this.createChild(demo.name, `demo-${this.demoRunId}`, demo.vars || {}),
+        this.demo = this.createErrorBoundedChild(
+            this.createChild(demo.name, `demo-${this.#demoRunId}`, demo.vars || {}),
             'Playground/DemoFallback',
         );
 

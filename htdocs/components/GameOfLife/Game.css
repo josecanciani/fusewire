@@ -33,6 +33,10 @@
     display: contents;
 }
 
+.grid > fw-mount {
+    display: contents;
+}
+
 .help-area {
     flex: 1;
     min-height: 0;

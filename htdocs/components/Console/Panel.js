@@ -20,7 +20,7 @@ export class Panel extends Component {
      * Attach this console to the reactor and add the initial log entry
      */
     async init() {
-        this[REACTOR].attachConsole(this);
+        if (this[REACTOR]) this[REACTOR].attachConsole(this);
         this.logs.push(
             this.createChild('Console/Line', '1', {
                 level: 'log',
@@ -36,7 +36,7 @@ export class Panel extends Component {
      * Detach this console from the reactor
      */
     destroy() {
-        this[REACTOR].detachConsole(this);
+        if (this[REACTOR]) this[REACTOR].detachConsole(this);
     }
 
     /**

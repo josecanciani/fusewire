@@ -105,7 +105,9 @@ export class Editor extends Component {
 
         if (shouldProcessFiles) {
             this.#loadFilesInternal(this.files, this.activeFileId);
-            if (react) this.react();
+            if (react) {
+                this.react();
+            }
         }
     }
 
@@ -239,7 +241,6 @@ export class Editor extends Component {
      * Mount the CodeMirror editor on first render
      */
     hydrate() {
-        console.log('Editor hydrate: activeTabId=', this.activeTabId);
         if (this.activeTabId) {
             this.#mountEditor();
         }
@@ -247,8 +248,19 @@ export class Editor extends Component {
 
     /**
      * Re-mount the CodeMirror editor if morphing cleared the editor area
+     * @returns {Promise<void>} Render completion
+     */
+    render() {
+        return super.render();
+    }
+
+    /**
+     * Restore CodeMirror after re-renders
      */
     afterRender() {
+        if (!this.activeTabId) {
+            return;
+        }
         if (this.activeTabId && !this.#editorView) {
             this.#mountEditor();
         }
@@ -324,7 +336,6 @@ export class Editor extends Component {
                 extensions,
                 parent: container,
             });
-            console.log('[Editor] Mounted CodeMirror for', this.activeTabId);
         } catch (err) {
             console.error(
                 '[Editor] Failed to mount CodeMirror:',

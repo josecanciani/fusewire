@@ -29,7 +29,12 @@
         <div class="sidebar-container d-flex ((sidebarDisplayClass))">
             ((sidebarComponent))
         </div>
-        <div class="ide-body">
+        <div fw-if="!demo" class="ide-body p-5 d-flex flex-column justify-content-center align-items-center text-center">
+            <h2 class="text-danger mb-3">Demo Not Found</h2>
+            <p class="text-body-secondary mb-4">The demo "((selectedDemo))" does not exist.</p>
+            <button type="button" class="btn btn-primary" onclick="((this)).back()">Return to Demos</button>
+        </div>
+        <div fw-if="demo" class="ide-body">
             ((editorComponent))
             <div class="resize-handle" onmousedown="((this)).startResize(event)"></div>
             <div class="right-pane d-flex flex-column panel">
@@ -42,7 +47,7 @@
                             </svg>
                         </button>
                     </div>
-                    <div class="flex-grow-1 overflow-auto p-2 panel d-flex flex-column">((demoComponent))</div>
+                    <div class="flex-grow-1 overflow-auto p-2 panel d-flex flex-column">((demo))</div>
                 </div>
                 <div class="resize-handle-y" onmousedown="((this)).startConsoleResize(event)"></div>
                 <div class="console-bar d-flex flex-column">
