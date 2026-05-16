@@ -5,7 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### Performance
+
+## [1.4.0] - 2026-05-16
+### Changed
 - Optimized DOM reconciliation in `Renderer.js` to batch new element insertions using a `DocumentFragment` and avoid detached node tracking during massive component grid renders.
 - Eliminated an O(N²) array scan bottleneck in `InstanceRegistry` when verifying unmounted children during massive DOM render cycles (like grid generation).
 - Fixed massive layout thrashing in Safari by breaking component mounting into a 3-phase architecture: awaiting creation concurrently, performing all DOM node teleports in a single synchronous loop (guaranteeing zero interleaved rendering frames), and then resuming async hydration.
@@ -122,7 +124,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed JS-in-HTML inline execution possibilities to strictly enforce declarative JS state truth.
 
-[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.3.0...main
+[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.4.0...main
+[1.4.0]: https://github.com/josecanciani/fusewire/compare/1.3.0...1.4.0
 [1.3.0]: https://github.com/josecanciani/fusewire/compare/1.2.2...1.3.0
 [1.2.2]: https://github.com/josecanciani/fusewire/compare/1.2.1...1.2.2
 [1.2.1]: https://github.com/josecanciani/fusewire/compare/1.2.0...1.2.1
