@@ -61,6 +61,8 @@ export class Line extends Component {
 
 FuseWire supports calculated vars (JS getters starting with `$`) which allow you to work declaratively in the JS class, defining state-derived truths, and avoiding duplicating these sources of truth in the HTML templates with complex conditional operators.
 
+> **Tip:** The `fw-if` directive natively supports simple negation (e.g., `fw-if="!property"`). You do not need to create a `$getter` just to invert a boolean or check if a child component reference is `null`. Save `$getters` for actual JS expressions (e.g., `this.count > 0` or `this.items.length === 0`).
+
 ```javascript
 export class Line extends Component {
     count = 5;
@@ -157,14 +159,20 @@ The framework runs these hooks in order during component creation:
 init()  →  render()  →  hydrate()  →  afterRender()
 ```
 
-**`async init(previousState = null)`** — runs once after the framework is wired up (you have access
+**`async init(previousState = null, routeSegment = null)`** — runs once after the framework is wired up (you have access
 to `this.console`, `this.createChild()`, `this.loadLibrary()`, etc.) and before
 the first render. Use it for:
 - Creating child references (`createChild`)
 - Restoring private state passed via `previousState` (saved by `destroy()`)
+- Processing the initial URL routing state via `routeSegment`
 - Loading libraries (`loadLibrary`)
 - Subscribing to child events (buffered on the reference)
 - Setting initial state
+
+**`update(newVars, react = true, routeSegment = null)`** — called when the parent pushes new data or the URL changes.
+- Merge new vars, compare changes, and optionally trigger a re-render.
+- Always call `super.update(newVars, react, routeSegment)` to apply the merge.
+- Works polymorphically with `Child.update()` to push state safely regardless of whether the child is fully loaded.
 
 **`hydrate()`** — runs once after the first render. The DOM exists,
 all children are mounted, and all libraries are loaded. Use it for one-time
@@ -187,7 +195,7 @@ third-party widgets. Must stay synchronous.
 
 **`destroy()`** — cleanup when the component is removed. You may return a serializable object here (e.g. `return { scroll: this.#scroll };`). The framework will intercept this return value and inject it into the next component instance's `init(previousState)` if it is ever recreated later.
 
-Never call `this.react()` inside `init()`, `hydrate()`, or `afterRender()` — the
+Never call `this.react()` inside `init()`, `update()`, `hydrate()`, or `afterRender()` — the
 framework renders automatically after those hooks return.
 
 ---
@@ -392,8 +400,54 @@ async init() {
 `on()` returns an unsubscribe function. Subscriptions are cleared automatically
 when the child is destroyed — no manual cleanup needed.
 
-Do not call `emit()` inside `init()`, `hydrate()`, or `afterRender()` — parent
+Do not call `emit()` inside `init()`, `update()`, `hydrate()`, or `afterRender()` — parent
 listeners may not be registered yet and a warning will be logged.
+
+---
+
+## Routing and URL State
+
+Components can participate in the browser's URL history by returning state from `routeState()`. The framework's History Router automatically parses the URL, routes it to matching components, and handles back/forward navigation.
+
+**1. Declare route state**
+Override `routeState()` to map your component's vars to URL properties. Return `false` to opt out completely (the default). Return an empty object `{}` to act as a pass-through for routed children.
+
+```javascript
+routeState() {
+    return { id: this.dashboardId, order: this.order };
+}
+```
+
+**2. Push URL changes**
+Call `this.pushRoute()` to create a new browser history entry (user can press Back), or `this.replaceRoute()` to replace the current entry (for transient state like sorting).
+
+```javascript
+selectDashboard(id) {
+    this.dashboardId = id;
+    this.pushRoute();
+    this.react();
+}
+```
+
+**3. Receive URL state**
+On initial page load, the framework passes a typed `RouteSegment` to `init()`. On back/forward navigation, it is passed to `update()`.
+
+```javascript
+async init(previousState = null, routeSegment = null) {
+    if (routeSegment) {
+        this.dashboardId = routeSegment.getString('id');
+        this.currentPage = routeSegment.getInt('page', 1);
+    }
+}
+
+update(newVars, react = true, routeSegment = null) {
+    if (routeSegment) {
+        // read new routing state
+    }
+    super.update(newVars, react, routeSegment);
+}
+```
+*Note: If your var names perfectly match your URL properties, the framework auto-maps them inside the default `update()` implementation, so you might not even need to override `update()`!*
 
 ---
 
