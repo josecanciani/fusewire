@@ -683,6 +683,11 @@ export class InstanceRegistry {
                         mountPoint.appendChild(detached.firstChild);
                     }
                     ref._detachedContainer = null;
+
+                    const existingEntry = this._instances.get(childCode);
+                    if (existingEntry) {
+                        existingEntry.container = mountPoint;
+                    }
                 } else {
                     // Handle existing children that need DOM teleportation
                     const existingEntry = this._instances.get(childCode);
@@ -887,6 +892,17 @@ export class InstanceRegistry {
         if (this._instances.has(code)) {
             return;
         }
+        // Auto-consume route segment during eager creation if possible.
+        // The componentId strictly maps to the routeKey in the URL. If a different
+        // naming is required (e.g., for localization), it will be handled transparently
+        // via a conversion table as defined in docs/translations.md.
+        if (!routeSegment && this._reactor.router) {
+            const nextSegment = this._reactor.router.peekSegment();
+            if (nextSegment && nextSegment.key === ref.componentId) {
+                routeSegment = this._reactor.router.consumeSegment(ref.componentId);
+            }
+        }
+
         const container = document.createElement('div');
         ref._detachedContainer = container;
 

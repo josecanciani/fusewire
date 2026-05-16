@@ -13,7 +13,8 @@ import {
 /**
  * Configuration options for child components.
  * @typedef {{
- *   fallback?: string
+ *   fallback?: string,
+ *   routeSegment?: import('./route-segment.js').RouteSegment|null
  * }} ChildOptions
  */
 
@@ -247,15 +248,15 @@ export class Component {
         let options;
         if (typeof idOrVars === 'string') {
             id = idOrVars;
-            vars = maybeVarsOrOptions || {};
+            vars = /** @type {ComponentVars} */ (maybeVarsOrOptions) || {};
             options = maybeOptions;
         } else {
             id = '';
-            vars = idOrVars || {};
-            options = maybeVarsOrOptions;
+            vars = /** @type {ComponentVars} */ (idOrVars) || {};
+            options = /** @type {import('./component.js').ChildOptions} */ (maybeVarsOrOptions);
         }
         const ref = new Child(name, id, vars, null, options);
-        this[REACTOR].instanceRegistry.startEagerCreation(ref);
+        this[REACTOR].instanceRegistry.startEagerCreation(ref, options?.routeSegment);
         return /** @type {T} */ (/** @type {unknown} */ (ref));
     }
 
