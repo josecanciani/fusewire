@@ -104,20 +104,6 @@ export class TemplateStore {
     }
 
     /**
-     * Check if a template is stale.
-     * @param {string} componentName - Component name
-     * @param {number} ttlMs - Time to live in milliseconds
-     * @returns {boolean} True if stale or missing
-     */
-    isStale(componentName, ttlMs) {
-        const template = this.get(componentName);
-        if (!template) return true;
-        // 0 means never stale
-        if (ttlMs === 0) return false;
-        return Date.now() - template.fetchedAt > ttlMs;
-    }
-
-    /**
      * Remove template for a component.
      * @param {string} componentName - Component name
      */

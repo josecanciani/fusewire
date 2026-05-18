@@ -52,6 +52,7 @@ global.fetch = async (url) => {
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { InstanceRegistry, collectVars } from '../src/instance.js';
+import { broadcastFromRoots, broadcastFrom } from '../src/broadcast.js';
 import { Renderer } from '../src/renderer.js';
 import { TemplateStore } from '../src/template-store.js';
 import { Component } from '../src/component.js';
@@ -740,7 +741,7 @@ describe('InstanceRegistry', () => {
             let called = false;
             instance.on('theme', () => called = true);
 
-            registry.broadcastFromRoots('theme', ['dark']);
+            broadcastFromRoots(registry, 'theme', ['dark']);
             assert.ok(called);
         });
 
@@ -780,7 +781,7 @@ describe('InstanceRegistry', () => {
             child.on('theme', () => calls.push('child'));
             grandchild.on('theme', () => calls.push('grandchild'));
 
-            registry.broadcastFromRoots('theme', ['dark']);
+            broadcastFromRoots(registry, 'theme', ['dark']);
             assert.deepStrictEqual(calls, ['parent', 'child', 'grandchild']);
         });
 
@@ -806,7 +807,7 @@ describe('InstanceRegistry', () => {
             parent.on('theme', () => { calls.push('parent'); return false; });
             child.on('theme', () => calls.push('child'));
 
-            registry.broadcastFromRoots('theme', ['dark']);
+            broadcastFromRoots(registry, 'theme', ['dark']);
             assert.deepStrictEqual(calls, ['parent']);
         });
 
@@ -834,7 +835,7 @@ describe('InstanceRegistry', () => {
             root.left.on('theme', () => { calls.push('left'); return false; });
             root.right.on('theme', () => calls.push('right'));
 
-            registry.broadcastFromRoots('theme', ['dark']);
+            broadcastFromRoots(registry, 'theme', ['dark']);
             assert.deepStrictEqual(calls, ['root', 'left', 'right']);
         });
 
@@ -856,7 +857,7 @@ describe('InstanceRegistry', () => {
             const calls = [];
             parent.child.on('theme', () => calls.push('child'));
 
-            registry.broadcastFromRoots('theme', ['dark']);
+            broadcastFromRoots(registry, 'theme', ['dark']);
             assert.deepStrictEqual(calls, ['child']);
         });
 
@@ -879,7 +880,7 @@ describe('InstanceRegistry', () => {
             const calls = [];
             parent.child.on('theme', () => calls.push('child'));
 
-            registry.broadcastFromRoots('theme', ['dark']);
+            broadcastFromRoots(registry, 'theme', ['dark']);
             
             strictConsole.expectError(/listener threw: boom/);
             assert.deepStrictEqual(calls, ['child'], 'child still called after parent error');
@@ -892,12 +893,12 @@ describe('InstanceRegistry', () => {
             let receivedArgs = null;
             instance.on('theme', (...args) => receivedArgs = args);
 
-            registry.broadcastFromRoots('theme', ['dark', true]);
+            broadcastFromRoots(registry, 'theme', ['dark', true]);
             assert.deepStrictEqual(receivedArgs, ['dark', true]);
         });
 
         it('does nothing when no instances exist', () => {
-            assert.doesNotThrow(() => registry.broadcastFromRoots('theme', []));
+            assert.doesNotThrow(() => broadcastFromRoots(registry, 'theme', []));
         });
 
         it('uses cached _roots set instead of iterating all instances', async () => {
@@ -923,7 +924,7 @@ describe('InstanceRegistry', () => {
             assert.strictEqual(registry._roots.size, 1);
             assert.ok(registry._roots.has('Parent#p1'));
 
-            registry.broadcastFromRoots('theme', []);
+            broadcastFromRoots(registry, 'theme', []);
             assert.deepStrictEqual(calls, ['root', 'child']);
         });
     });
@@ -965,13 +966,13 @@ describe('InstanceRegistry', () => {
             parent.child.grandchild.on('theme', () => calls.push('grandchild'));
             parent.sibling.on('theme', () => calls.push('sibling'));
 
-            registry.broadcastFrom(parent.child.toComponentId(), 'theme', []);
+            broadcastFrom(registry, parent.child.toComponentId(), 'theme', []);
             
             assert.deepStrictEqual(calls, ['child', 'grandchild']);
         });
 
         it('does nothing for a non-existent component', () => {
-            assert.doesNotThrow(() => registry.broadcastFrom(new ComponentId('Fake', '1'), 'test', []));
+            assert.doesNotThrow(() => broadcastFrom(registry, new ComponentId('Fake', '1'), 'test', []));
         });
 
         it('respects false return to stop subtree propagation', async () => {
@@ -993,7 +994,7 @@ describe('InstanceRegistry', () => {
             child.on('test', () => { calls.push('child'); return false; });
             grand.on('test', () => calls.push('grand'));
 
-            registry.broadcastFrom(childId, 'test', []);
+            broadcastFrom(registry, childId, 'test', []);
             assert.deepStrictEqual(calls, ['child']);
         });
     });

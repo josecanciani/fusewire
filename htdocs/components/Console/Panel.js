@@ -1,5 +1,5 @@
 import { Component } from '../../js/component.js';
-import { LogMessage } from '../../js/log-message.js';
+import { LogMessage } from './log-message.js';
 import { REACTOR } from '../../js/symbols.js';
 
 /**
@@ -69,7 +69,7 @@ export class Panel extends Component {
     /**
      * Append a new log entry or increment the badge on the last entry if it is a duplicate.
      * @param {string} level - Log level ('log', 'warn', or 'error')
-     * @param {string|import('../../js/log-message.js').LogMessage} message - Message text or structured log message
+     * @param {string|import('./log-message.js').LogMessage} message - Message text or structured log message
      * @param {...*} args - Additional values to append
      */
     #addLog(level, message, ...args) {

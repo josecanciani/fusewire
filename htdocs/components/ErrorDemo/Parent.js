@@ -6,7 +6,7 @@ import { Component } from '../../js/component.js';
 export class Parent extends Component {
     /**
      * Error boundary for the init phase failure.
-     * @type {import('../../js/component.js').ErrorBoundary|null}
+     * @type {import('../../js/builtins/error-boundary.js').ErrorBoundary|null}
      */
     initFail = null;
     /**
@@ -16,7 +16,7 @@ export class Parent extends Component {
     initTries = 1;
     /**
      * Error boundary for the hydrate phase failure.
-     * @type {import('../../js/component.js').ErrorBoundary|null}
+     * @type {import('../../js/builtins/error-boundary.js').ErrorBoundary|null}
      */
     hydrateFail = null;
     /**
@@ -26,7 +26,7 @@ export class Parent extends Component {
     hydrateTries = 1;
     /**
      * Error boundary for the render phase failure.
-     * @type {import('../../js/component.js').ErrorBoundary|null}
+     * @type {import('../../js/builtins/error-boundary.js').ErrorBoundary|null}
      */
     renderFail = null;
     /**
@@ -36,7 +36,7 @@ export class Parent extends Component {
     renderTries = 1;
     /**
      * Error boundary for the afterRender phase failure.
-     * @type {import('../../js/component.js').ErrorBoundary|null}
+     * @type {import('../../js/builtins/error-boundary.js').ErrorBoundary|null}
      */
     afterRenderFail = null;
     /**
@@ -136,7 +136,7 @@ export class Parent extends Component {
                 break;
         }
         const boundary =
-            /** @type {import('../../js/component.js').ErrorBoundary} */ (
+            /** @type {import('../../js/builtins/error-boundary.js').ErrorBoundary} */ (
                 this.createErrorBoundedChild(
                     this.createChild('ErrorDemo/FailComponent', `${stage}-${Date.now()}`),
                     this.createChild('ErrorDemo/Fallback', `fallback-${stage}-${Date.now()}`, {

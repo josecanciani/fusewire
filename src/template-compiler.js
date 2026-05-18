@@ -3,6 +3,7 @@ import { Child } from './component.js';
 import { Component } from './component.js';
 import { DIRECTIVE_REGEX, INTERPOLATION_REGEX, findMatchingClose } from './template-parser.js';
 import fusewireExpr from './parser/fusewire-expr.js';
+import { HtmlContextTracker } from './html-context.js';
 
 /**
  * Map of variables passed to a component.
@@ -180,10 +181,7 @@ function renderMountPoint(decl, parentId) {
 function interpolateText(text, vars, componentId, constants) {
     let result = '';
     let lastIndex = 0;
-    let inTag = false;
-    let inAttributeValue = false;
-    let currentAttributeName = '';
-    let quoteChar = '';
+    const tracker = new HtmlContextTracker();
 
     const regex = new RegExp(INTERPOLATION_REGEX.source, INTERPOLATION_REGEX.flags);
     let match;
@@ -191,32 +189,7 @@ function interpolateText(text, vars, componentId, constants) {
     while ((match = regex.exec(text)) !== null) {
         // Process text before the match to track context
         const beforeMatch = text.substring(lastIndex, match.index);
-        for (let i = 0; i < beforeMatch.length; i++) {
-            const char = beforeMatch[i];
-            if (char === '<' && !inAttributeValue) {
-                inTag = true;
-                currentAttributeName = '';
-            } else if (char === '>' && !inAttributeValue) {
-                inTag = false;
-            } else if (inTag) {
-                if (!inAttributeValue) {
-                    if (char === '"' || char === "'") {
-                        inAttributeValue = true;
-                        quoteChar = char;
-                    } else if (char === '=') {
-                        // Attribute name is what was collected before '='
-                    } else if (/[a-zA-Z-]/.test(char)) {
-                        currentAttributeName += char;
-                    } else if (/\s/.test(char)) {
-                        currentAttributeName = '';
-                    }
-                } else if (char === quoteChar) {
-                    inAttributeValue = false;
-                    quoteChar = '';
-                    currentAttributeName = '';
-                }
-            }
-        }
+        tracker.process(beforeMatch);
 
         const path = match[1].trim();
         let value;
@@ -226,11 +199,11 @@ function interpolateText(text, vars, componentId, constants) {
             const safeCode = componentId.code.replace(/#/g, '_');
             value = `__FUSEWIRE_COMPONENT_${safeCode}__`;
         } else if (path === 'componentId') {
-            value = escapeHtml(componentId.code, inTag);
+            value = escapeHtml(componentId.code, tracker.inTag);
         } else if (path === 'componentName') {
-            value = escapeHtml(componentId.name, inTag);
+            value = escapeHtml(componentId.name, tracker.inTag);
         } else if (path === 'componentVersion') {
-            value = escapeHtml(constants.version || '', inTag);
+            value = escapeHtml(constants.version || '', tracker.inTag);
         } else {
             let rawValue;
             try {
@@ -253,34 +226,19 @@ function interpolateText(text, vars, componentId, constants) {
                         renderMountPoint(/** @type {Component|Child} */ (comp), componentId),
                     )
                     .join('');
-                value = `<fw-each id="${componentId.code}:${escapeHtml(path, inTag)}" data-fusewire-each="${escapeHtml(path, inTag)}">${mountPoints}</fw-each>`;
+                value = `<fw-each id="${componentId.code}:${escapeHtml(path, tracker.inTag)}" data-fusewire-each="${escapeHtml(path, tracker.inTag)}">${mountPoints}</fw-each>`;
             } else {
                 let strValue = String(rawValue);
 
                 // Context-aware sanitization
-                const dangerousAttrs = [
-                    'href',
-                    'src',
-                    'action',
-                    'formaction',
-                    'data',
-                    'background',
-                    'on',
-                ];
-                const isDangerousAttr = dangerousAttrs.some(
-                    (attr) =>
-                        currentAttributeName.toLowerCase() === attr ||
-                        (attr === 'on' && currentAttributeName.toLowerCase().startsWith('on')),
-                );
-
-                if (inTag && isDangerousAttr) {
+                if (tracker.isDangerousAttribute()) {
                     strValue = sanitizeUrl(strValue);
                 }
 
                 // If inTag is true but inAttributeValue is false, we are likely in an unquoted attribute
                 // (or just started an attribute name, but placeholders shouldn't be there usually)
                 // We use isAttribute=true for all tag contexts for maximum safety.
-                value = escapeHtml(strValue, inTag);
+                value = escapeHtml(strValue, tracker.inTag);
             }
         }
 

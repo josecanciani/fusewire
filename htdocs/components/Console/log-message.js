@@ -12,7 +12,7 @@
 export class LogMessage {
     /**
      * Create a log message with context
-     * @param {import('./component-id.js').ComponentId} componentId - Source component identity
+     * @param {import('../../js/component-id.js').ComponentId} componentId - Source component identity
      * @param {string} message - The log text
      */
     constructor(componentId, message) {

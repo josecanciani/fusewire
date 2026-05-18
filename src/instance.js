@@ -1,13 +1,10 @@
 import { ComponentId } from './component-id.js';
-import {
-    Component,
-    Child,
-    Lazy,
-    ErrorBoundary,
-    Root,
-    PortalHost,
-    PortalChild,
-} from './component.js';
+import { Component, Child } from './component.js';
+import { Lazy } from './builtins/lazy.js';
+import { ErrorBoundary } from './builtins/error-boundary.js';
+import { Root } from './builtins/root.js';
+import { PortalHost } from './builtins/portal-host.js';
+import { PortalChild } from './builtins/portal-child.js';
 import {
     COMPONENT_ID,
     REGISTRY_ENTRY,
@@ -770,10 +767,12 @@ export class InstanceRegistry {
                         existingEntry.instance[LIFECYCLE_ACTIVE] = 'afterRender';
                         existingEntry.instance.afterRender();
                     } catch (error) {
-                        const handled = existingEntry.instance.emitCancellable('fw-error', {
-                            error,
-                            failedComponent: childId.name,
-                        });
+                        const handled = existingEntry.instance[EVENTS]
+                            ? existingEntry.instance[EVENTS].emitBroadcast('fw-error', {
+                                  error,
+                                  failedComponent: childId.name,
+                              }).stopped
+                            : false;
                         if (!handled) {
                             throw error;
                         }
@@ -1084,10 +1083,12 @@ export class InstanceRegistry {
             } catch (error) {
                 entry.needsHydration = false;
                 instance[LIFECYCLE_ACTIVE] = null;
-                const handled = instance.emitCancellable('fw-error', {
-                    error,
-                    failedComponent: componentId.name,
-                });
+                const handled = instance[EVENTS]
+                    ? instance[EVENTS].emitBroadcast('fw-error', {
+                          error,
+                          failedComponent: componentId.name,
+                      }).stopped
+                    : false;
                 if (!handled) {
                     throw error;
                 }
@@ -1251,91 +1252,11 @@ export class InstanceRegistry {
     }
 
     /**
-     * Broadcast an event top-down through the component tree starting from root(s).
-     * Called by Reactor.broadcast() after reactor-level listeners have fired.
-     * Uses the cached _roots set for O(1) root lookup.
-     * @param {string} eventName - Event name to broadcast
-     * @param {Array.<*>} args - Arguments forwarded to each handler
+     * Get the reactor instance attached to this registry.
+     * @returns {import('./reactor.js').Reactor} The reactor instance
      */
-    broadcastFromRoots(eventName, args) {
-        for (const code of this._roots) {
-            this._broadcastToEntry(this._instances.get(code), eventName, args);
-        }
-    }
-
-    /**
-     * Broadcast an event top-down starting from a specific component and its children.
-     * Called by Component.broadcast() for subtree-scoped broadcasts.
-     * @param {ComponentId} componentId - Component to broadcast from
-     * @param {string} eventName - Event name to broadcast
-     * @param {Array.<*>} args - Arguments forwarded to each handler
-     */
-    broadcastFrom(componentId, eventName, args) {
-        const entry = this._instances.get(componentId.code);
-        if (entry) {
-            this._broadcastToEntry(entry, eventName, args);
-        }
-    }
-
-    /**
-     * Recursively broadcast an event to a single registry entry and its children.
-     * If any handler on the entry returns false, propagation stops for that subtree.
-     * @private
-     * @param {import('./symbols.js').RegistryEntry} entry - Registry entry
-     * @param {string} eventName - Event name to broadcast
-     * @param {Array.<*>} args - Arguments forwarded to each handler
-     */
-    _broadcastToEntry(entry, eventName, args) {
-        const { instance } = entry;
-        const { PortalHost, PortalChild } = this._reactor.instanceRegistry._getBuiltins();
-
-        // PortalHost subtrees are excluded — broadcasts reach portal children
-        // only via PortalChild forwarding to prevent double-delivery
-        if (PortalHost && instance instanceof PortalHost) return;
-
-        let stopped = false;
-        const events = /** @type {Object<symbol, unknown>} */ (/** @type {unknown} */ (instance))[
-            EVENTS
-        ];
-        if (events) {
-            const result =
-                /** @type {{emitBroadcast: function(string, ...unknown): {errors: Error[], stopped: boolean}}} */ (
-                    events
-                ).emitBroadcast(eventName, ...args);
-            for (const err of result.errors) {
-                /** @type {{error: function(string): void}} */ (
-                    /** @type {Object<symbol, unknown>} */ (/** @type {unknown} */ (instance))[
-                        CONSOLE
-                    ]
-                ).error(`broadcast('${eventName}') listener threw: ${err.message}`);
-            }
-            stopped = result.stopped;
-        }
-        if (stopped) return;
-
-        // Forward broadcast through PortalChild bridge to the real child
-        if (PortalChild && instance instanceof PortalChild) {
-            const pc = /** @type {unknown} */ (instance);
-            const host = this._reactor.getPortalHostSync(
-                /** @type {{portalHostId: string}} */ (pc).portalHostId,
-            );
-            if (host) {
-                host.broadcastToChild(
-                    /** @type {{getChildCode: () => string}} */ (pc).getChildCode(),
-                    eventName,
-                    args,
-                );
-            }
-        }
-
-        if (entry.children) {
-            for (const [childCode] of entry.children) {
-                const childEntry = this._instances.get(childCode);
-                if (childEntry) {
-                    this._broadcastToEntry(childEntry, eventName, args);
-                }
-            }
-        }
+    get reactor() {
+        return this._reactor;
     }
 
     /**
@@ -1346,6 +1267,27 @@ export class InstanceRegistry {
     getContainer(componentId) {
         const entry = this._instances.get(componentId.code);
         return entry ? entry.container : null;
+    }
+
+    /**
+     * Get a registry entry by component code.
+     * @param {string} code - Component code
+     * @returns {import('./symbols.js').RegistryEntry|undefined} The registry entry
+     */
+    getEntry(code) {
+        return this._instances.get(code);
+    }
+
+    /**
+     * Get all root component entries.
+     * @returns {Array<import('./symbols.js').RegistryEntry>} Array of root entries
+     */
+    get rootEntries() {
+        return /** @type {Array<import('./symbols.js').RegistryEntry>} */ (
+            Array.from(this._roots)
+                .map((code) => this._instances.get(code))
+                .filter(Boolean)
+        );
     }
 
     /**
@@ -1388,23 +1330,5 @@ export class InstanceRegistry {
         for (const [, entry] of libs) {
             entry.module = await entry.promise;
         }
-    }
-
-    /**
-     * Helper to get built-in classes safely.
-     * @private
-     * @returns {{PortalHost: any, PortalChild: any}} The builtin components
-     */
-    _getBuiltins() {
-        // This is a bit of a hack to avoid circular dependencies in this simplified ESM structure.
-        // In a full build system this would be handled differently.
-        const _global =
-            /** @type {{FuseWireBuiltins?: {PortalHost: unknown, PortalChild: unknown}}} */ (
-                /** @type {unknown} */ (globalThis)
-            );
-        return {
-            PortalHost: _global.FuseWireBuiltins?.PortalHost,
-            PortalChild: _global.FuseWireBuiltins?.PortalChild,
-        };
     }
 }

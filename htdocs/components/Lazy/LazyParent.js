@@ -6,7 +6,7 @@ import { Component } from '../../js/component.js';
 export class LazyParent extends Component {
     /**
      * child property.
-     * @type {import('../../js/component.js').Lazy}
+     * @type {import('../../js/builtins/lazy.js').Lazy}
      */
     child = null;
 

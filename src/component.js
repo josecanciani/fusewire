@@ -411,51 +411,20 @@ export class Component {
      * @returns {function(): void} Unsubscribe function — call it to remove this handler early
      */
     on(eventName, handler) {
-        if (!this[EVENTS]) this[EVENTS] = new EventEmitter();
+        if (!this[EVENTS]) this[EVENTS] = new EventEmitter(this);
         return this[EVENTS].on(eventName, handler);
     }
 
     /**
      * Emit an event, calling all registered handlers with the given arguments.
      * Intended for use within the component's own methods (subclass-internal).
-     * Warns if called during a lifecycle hook, since listeners may not be registered yet.
      * All handlers are called even if one throws — errors are logged via the component console.
      * @param {string} eventName - Event name to emit
      * @param {...*} args - Arguments forwarded to each handler
      */
     emit(eventName, ...args) {
-        if (this[LIFECYCLE_ACTIVE]) {
-            this[CONSOLE].warn(
-                `emit('${eventName}') called during ${this[LIFECYCLE_ACTIVE]}() — listeners may not be registered yet`,
-            );
-        }
         if (!this[EVENTS]) return;
-        for (const err of this[EVENTS].emit(eventName, ...args)) {
-            this[CONSOLE].error(`emit('${eventName}') listener threw: ${err.message}`);
-        }
-    }
-
-    /**
-     * Emit an event and check if propagation was stopped.
-     * Works like emit(), but returns true if any handler returned false.
-     * @param {string} eventName - Event name to emit
-     * @param {...*} args - Arguments forwarded to each handler
-     * @returns {boolean} True if propagation was stopped
-     */
-    emitCancellable(eventName, ...args) {
-        if (this[LIFECYCLE_ACTIVE]) {
-            this[CONSOLE].warn(
-                `emitCancellable('${eventName}') called during ${this[LIFECYCLE_ACTIVE]}() — listeners may not be registered yet`,
-            );
-        }
-        if (!this[EVENTS]) return false;
-
-        // We can reuse emitBroadcast logic from EventEmitter since it already tracks 'stopped'
-        const result = this[EVENTS].emitBroadcast(eventName, ...args);
-        for (const err of result.errors) {
-            this[CONSOLE].error(`emitCancellable('${eventName}') listener threw: ${err.message}`);
-        }
-        return result.stopped;
+        this[EVENTS].emit(eventName, ...args);
     }
 
     /**
@@ -467,24 +436,10 @@ export class Component {
      * @param {...*} args - Arguments forwarded to each handler
      */
     broadcast(eventName, ...args) {
-        if (this[LIFECYCLE_ACTIVE]) {
-            this[CONSOLE].warn(
-                `broadcast('${eventName}') called during ${this[LIFECYCLE_ACTIVE]}() — listeners may not be registered yet`,
-            );
-        }
         if (!this[REACTOR]) {
             throw new Error('Component: Cannot broadcast - reactor not attached');
         }
         this[REACTOR].broadcastFrom(this[COMPONENT_ID], eventName, ...args);
-    }
-
-    /**
-     * Destroy a child component and remove it from the registry.
-     * @param {Child|Component} child - The child component or reference
-     */
-    destroyChild(child) {
-        if (!this[REACTOR]) return;
-        this[REACTOR].instanceRegistry.remove(child.toComponentId());
     }
 
     /**
@@ -493,15 +448,6 @@ export class Component {
      */
     get basePath() {
         return this[REACTOR] ? this[REACTOR].basePath : '';
-    }
-
-    /**
-     * Peek at the current route segment without consuming it.
-     * @returns {import('./route-segment.js').RouteSegment|null} The current route segment
-     */
-    peekRouteSegment() {
-        if (!this[REACTOR] || !this[REACTOR].router) return null;
-        return this[REACTOR].router.peekSegment();
     }
 
     /**
@@ -669,6 +615,8 @@ export class Child {
         this._creationPromise = null;
         this._detachedContainer = null;
         this._creationError = null;
+
+        this[EVENTS] = new EventEmitter(this);
     }
 
     /**
@@ -799,7 +747,8 @@ export class Child {
         // If already replaced, emit on the real instance since listeners were replayed.
         // We don't iterate buffered events here because they were moved to the instance.
         if (this._replaced && this._realInstance) {
-            return this._realInstance.emitCancellable(eventName, ...args);
+            if (!this._realInstance[EVENTS]) return false;
+            return this._realInstance[EVENTS].emitBroadcast(eventName, ...args).stopped;
         }
 
         for (const entry of this._bufferedEvents) {

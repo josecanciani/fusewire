@@ -8,7 +8,7 @@ import { Renderer } from '../src/renderer.js';
 import { TemplateStore } from '../src/template-store.js';
 import { FuseWire } from '../src/fusewire.js';
 import { JSDOM } from 'jsdom';
-import { REACTOR, LIFECYCLE_ACTIVE } from '../src/symbols.js';
+import { REACTOR, LIFECYCLE_ACTIVE, EVENTS } from '../src/symbols.js';
 import { ComponentNotFoundError } from '../src/errors/error-hierarchy.js';
 import { StrictConsole } from './strict-console.js';
 
@@ -223,6 +223,8 @@ describe('Reactor', () => {
             let createCalled = false;
             let receivedRef = null;
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 _reactor: null,
                 async createFromReference(ref, container) {
                     createCalled = true;
@@ -345,6 +347,8 @@ describe('Reactor', () => {
             let renderCalled = false;
             const fakeInstance = { afterRender() { } };
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 async render(componentId) {
                     renderCalled = true;
                     assert.ok(componentId instanceof ComponentId);
@@ -367,6 +371,8 @@ describe('Reactor', () => {
             let renderCalled = false;
             const fakeInstance = { afterRender() { } };
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 async render(componentId) {
                     renderCalled = true;
                     assert.ok(componentId instanceof ComponentId);
@@ -389,6 +395,8 @@ describe('Reactor', () => {
         it('defaults to CSR mode', async () => {
             const fakeInstance = { afterRender() { } };
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 async render() { },
                 get() { return fakeInstance; },
             };
@@ -404,6 +412,8 @@ describe('Reactor', () => {
 
         it('throws for unsupported render mode', async () => {
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 async render() { },
                 get() { return null; },
             };
@@ -423,6 +433,8 @@ describe('Reactor', () => {
             let renderCalled = false;
             const fakeInstance = { afterRender() { } };
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 async render(componentId) {
                     renderCalled = true;
                 },
@@ -445,6 +457,8 @@ describe('Reactor', () => {
                 afterRender() { afterRenderCalled = true; },
             };
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 async render() { },
                 get() { return fakeInstance; },
             };
@@ -466,6 +480,8 @@ describe('Reactor', () => {
 
             let getCount = 0;
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 async render() { },
                 get() { 
                     getCount++;
@@ -678,6 +694,8 @@ describe('Reactor', () => {
             let renderCount = 0;
             const fakeInstance = { afterRender() { } };
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 async render() { renderCount++; },
                 get() { return fakeInstance; },
             };
@@ -706,6 +724,8 @@ describe('Reactor', () => {
             const fakeA = { afterRender() { order.push('afterA'); } };
             const fakeB = { afterRender() { order.push('afterB'); } };
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 async render(id) { order.push(`render:${id.code}`); },
                 get(id) { return id.code === 'A#1' ? fakeA : fakeB; },
             };
@@ -737,6 +757,8 @@ describe('Reactor', () => {
             };
             const fakeB = { afterRender() { order.push('afterB'); } };
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 async render(id) { order.push(`render:${id.code}`); },
                 get(id) { return id.code === 'A#1' ? fakeA : fakeB; },
             };
@@ -758,6 +780,8 @@ describe('Reactor', () => {
         it('is not draining after queue is empty', async () => {
             const fakeInstance = { afterRender() { } };
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 async render() { },
                 get() { return fakeInstance; },
             };
@@ -782,6 +806,8 @@ describe('Reactor', () => {
                 },
             };
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 async render() { },
                 get() { return fakeInstance; },
             };
@@ -807,9 +833,13 @@ describe('Reactor', () => {
                 afterRender() {
                     throw new Error('afterRender failed');
                 },
-                emitCancellable: () => false,
+                [EVENTS]: {
+                    emitBroadcast: () => ({ stopped: false }),
+                },
             };
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 async render() { },
                 get() { return fakeInstance; },
             };
@@ -924,6 +954,8 @@ describe('Reactor', () => {
         it('registers a handler that broadcast() calls', () => {
             const calls = [];
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 _reactor: null,
                 broadcastFromRoots() { },
             };
@@ -942,6 +974,8 @@ describe('Reactor', () => {
         it('returns an unsubscribe function', () => {
             const calls = [];
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 _reactor: null,
                 broadcastFromRoots() { },
             };
@@ -962,6 +996,8 @@ describe('Reactor', () => {
         it('supports multiple handlers for the same event', () => {
             const log = [];
             const mockRegistry = {
+                get rootEntries() { return []; },
+                getEntry() { return null; },
                 _reactor: null,
                 broadcastFromRoots() { },
             };
@@ -984,7 +1020,19 @@ describe('Reactor', () => {
             const order = [];
             const mockRegistry = {
                 _reactor: null,
-                broadcastFromRoots() { order.push('components'); },
+                get rootEntries() {
+                    return [{
+                        instance: {
+                            [EVENTS]: {
+                                emitBroadcast() {
+                                    order.push('components');
+                                    return { errors: [], stopped: false };
+                                }
+                            }
+                        }
+                    }];
+                },
+                getEntry() { return null; }
             };
             const reactor = createReactor('test-bcast-1', {
                 instanceRegistry: mockRegistry,
@@ -1003,9 +1051,19 @@ describe('Reactor', () => {
             const registryArgs = [];
             const mockRegistry = {
                 _reactor: null,
-                broadcastFromRoots(eventName, args) {
-                    registryArgs.push({ eventName, args });
+                get rootEntries() {
+                    return [{
+                        instance: {
+                            [EVENTS]: {
+                                emitBroadcast(eventName, ...args) {
+                                    registryArgs.push({ eventName, args });
+                                    return { errors: [], stopped: false };
+                                }
+                            }
+                        }
+                    }];
                 },
+                getEntry() { return null; }
             };
             const reactor = createReactor('test-bcast-2', {
                 instanceRegistry: mockRegistry,
@@ -1024,9 +1082,19 @@ describe('Reactor', () => {
             const registryCalls = [];
             const mockRegistry = {
                 _reactor: null,
-                broadcastFromRoots(eventName, args) {
-                    registryCalls.push(eventName);
+                get rootEntries() {
+                    return [{
+                        instance: {
+                            [EVENTS]: {
+                                emitBroadcast(eventName) {
+                                    registryCalls.push(eventName);
+                                    return { errors: [], stopped: false };
+                                }
+                            }
+                        }
+                    }];
                 },
+                getEntry() { return null; }
             };
             const reactor = createReactor('test-bcast-3', {
                 instanceRegistry: mockRegistry,
@@ -1044,9 +1112,19 @@ describe('Reactor', () => {
             const registryCalls = [];
             const mockRegistry = {
                 _reactor: null,
-                broadcastFromRoots(eventName, args) {
-                    registryCalls.push(eventName);
+                get rootEntries() {
+                    return [{
+                        instance: {
+                            [EVENTS]: {
+                                emitBroadcast(eventName) {
+                                    registryCalls.push(eventName);
+                                    return { errors: [], stopped: false };
+                                }
+                            }
+                        }
+                    }];
                 },
+                getEntry() { return null; }
             };
             const reactor = createReactor('test-bcast-4', {
                 instanceRegistry: mockRegistry,
@@ -1072,9 +1150,21 @@ describe('Reactor', () => {
             const registryCalls = [];
             const mockRegistry = {
                 _reactor: null,
-                broadcastFrom(componentId, eventName, args) {
-                    registryCalls.push({ code: componentId.code, eventName, args });
-                },
+                getEntry(code) {
+                    if (code === 'Panel#main') {
+                        return {
+                            instance: {
+                                [EVENTS]: {
+                                    emitBroadcast(eventName, ...args) {
+                                        registryCalls.push({ code, eventName, args });
+                                        return { errors: [], stopped: false };
+                                    }
+                                }
+                            }
+                        };
+                    }
+                    return null;
+                }
             };
             const reactor = createReactor('test-bfrom-1', {
                 instanceRegistry: mockRegistry,
@@ -1095,9 +1185,18 @@ describe('Reactor', () => {
             const registryCalls = [];
             const mockRegistry = {
                 _reactor: null,
-                broadcastFrom(componentId, eventName, args) {
-                    registryCalls.push({ eventName, args });
-                },
+                getEntry(code) {
+                    return {
+                        instance: {
+                            [EVENTS]: {
+                                emitBroadcast(eventName, ...args) {
+                                    registryCalls.push({ eventName, args });
+                                    return { errors: [], stopped: false };
+                                }
+                            }
+                        }
+                    };
+                }
             };
             const reactor = createReactor('test-bfrom-2', {
                 instanceRegistry: mockRegistry,
@@ -1114,7 +1213,7 @@ describe('Reactor', () => {
             const reactorCalls = [];
             const mockRegistry = {
                 _reactor: null,
-                broadcastFrom() { },
+                getEntry() { return null; }
             };
             const reactor = createReactor('test-bfrom-3', {
                 instanceRegistry: mockRegistry,

@@ -164,7 +164,7 @@ afterRender() {
 
 ### `destroy()`
 
-**When:** Component is removed from DOM or globally replaced
+**When:** Component reference is removed from parent variables, or parent is destroyed
 **Type:** Synchronous (can return opaque object for state preservation)
 **Purpose:** Clean up resources and optionally snapshot private state
 
@@ -188,12 +188,17 @@ destroy() {
 }
 ```
 
+**Garbage Collection vs Conditional Rendering (`fw-if`):**
+The framework strictly uses **JavaScript variables** to determine component lifetimes, not the DOM:
+- **Keep-alive (Teleportation):** If a child component is hidden via `<fw-mount fw-if="false">`, its DOM nodes are physically removed from the document, but the instance **is not destroyed**. Because the parent still holds the `Child` reference in its state variables, the framework keeps it alive in memory. When `fw-if` becomes true again, the existing component and its state are instantly "teleported" back into the new mount point.
+- **Permanent Destruction:** To actually destroy a component and trigger this hook, you must remove the reference from your component's public variables (e.g., `this.myChild = null; this.react();`).
+
 **Guidelines:**
-- Remove event listeners
+- Remove DOM event listeners attached to external targets (`window`, `document`)
 - Cancel pending async operations
 - Clear timers/intervals
-- **Preserve state:** Return a serializable object to save private state into the `Persistence` module. The framework will pass this exact object back as `previousState` into `init()` if the component is lazily/eagerly recreated.
-- Called automatically by framework when component removed
+- **Preserve state:** Return a serializable object to save private state into the `Persistence` module. The framework will pass this exact object back as `previousState` into `init()` if the component is ever recreated.
+- Called automatically by framework when the reference is dropped or the parent dies
 - Event subscriptions (`on()` handlers) are cleared automatically after `destroy()` runs — no manual cleanup needed
 
 ---

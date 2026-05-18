@@ -170,43 +170,6 @@ describe('TemplateStore', () => {
 		});
 	});
 
-	describe('isStale()', () => {
-		it('returns false when ttlMs is 0 (never stale)', () => {
-			const store = new TemplateStore();
-			store.set('Test', {
-				version: 'v1',
-				htmlCode: '<div>Test</div>',
-				fetchedAt: 1, // very old
-			});
-			assert.strictEqual(store.isStale('Test', 0), false);
-		});
-
-		it('returns true for non-existent template', () => {
-			const store = new TemplateStore();
-			assert.strictEqual(store.isStale('NonExistent', 60000), true);
-		});
-
-		it('returns false when template is fresh', () => {
-			const store = new TemplateStore();
-			store.set('Test', {
-				version: 'v1',
-				htmlCode: '<div>Test</div>',
-				fetchedAt: Date.now(),
-			});
-			assert.strictEqual(store.isStale('Test', 60000), false);
-		});
-
-		it('returns true when template is older than TTL', () => {
-			const store = new TemplateStore();
-			store.set('Test', {
-				version: 'v1',
-				htmlCode: '<div>Test</div>',
-				fetchedAt: Date.now() - 120000, // 2 minutes ago
-			});
-			assert.strictEqual(store.isStale('Test', 60000), true);
-		});
-	});
-
 	describe('clear()', () => {
 		it('removes template', () => {
 			const store = new TemplateStore();

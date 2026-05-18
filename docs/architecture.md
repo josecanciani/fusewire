@@ -115,10 +115,15 @@ The framework strictly enforces that **JavaScript state is the single source of 
    - Physically removes its DOM nodes from the document.
    - Deletes its entry from the active instance registry, freeing the memory.
 
-To completely tear down a component, simply drop its reference in JavaScript and let the parent react:
+### Conditional Rendering vs Permanent Destruction
+
+Because the Garbage Collector relies **only** on JavaScript variables and not the DOM, it enables powerful state preservation for conditionally rendered elements:
+
+- **Background State (`fw-if="false"`):** If a child component is still referenced in a parent's public variable but its `<fw-mount>` is hidden via `fw-if`, the template morph will remove its physical DOM nodes. However, **the framework keeps the component instance alive in memory**. When `fw-if="true"` occurs later, the framework finds the living instance and "teleports" its DOM and state back into the new mount point, bypassing `init()`.
+- **Complete Teardown:** To actually destroy a component, you must drop its reference in JavaScript so the GC marks it as orphaned:
 
 ```javascript
-// The child will be garbage collected and unmounted after the next render
+// The child will be permanently garbage collected and unmounted after the next render
 this.myHeavyWidget = null;
 this.react();
 ```

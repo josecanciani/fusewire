@@ -10,7 +10,8 @@ import { ComponentNotFoundError } from './errors/error-hierarchy.js';
 import { Persistence } from './persistence.js';
 import { StateSerializer } from './state-serializer.js';
 import { HistoryRouter } from './history-router.js';
-import { REACTOR, LIFECYCLE_ACTIVE, LIBRARIES } from './symbols.js';
+import { broadcastFromRoots, broadcastFrom } from './broadcast.js';
+import { REACTOR, LIFECYCLE_ACTIVE, LIBRARIES, EVENTS } from './symbols.js';
 
 /**
  * Map of variables passed to a component.
@@ -151,12 +152,12 @@ export class Reactor {
         // so PortalChild instances can find them by ID.
         /**
          * Registry of active portal host components.
-         * @type {Map<string, import('./component.js').PortalHost>}
+         * @type {Map<string, import('./builtins/portal-host.js').PortalHost>}
          */
         this._portalHosts = new Map();
         /**
          * Map of portal host IDs to pending requests waiting for that host.
-         * @type {Map<string, Array<{resolve: function(import('./component.js').PortalHost): void}>>}
+         * @type {Map<string, Array<{resolve: function(import('./builtins/portal-host.js').PortalHost): void}>>}
          */
         this._pendingPortalRequests = new Map();
     }
@@ -249,7 +250,7 @@ export class Reactor {
                 );
             }
         }
-        this._instanceRegistry.broadcastFromRoots(eventName, args);
+        broadcastFromRoots(this._instanceRegistry, eventName, args);
     }
 
     /**
@@ -260,7 +261,7 @@ export class Reactor {
      * @param {...*} args - Arguments forwarded to each handler
      */
     broadcastFrom(componentId, eventName, ...args) {
-        this._instanceRegistry.broadcastFrom(componentId, eventName, args);
+        broadcastFrom(this._instanceRegistry, componentId, eventName, args);
     }
 
     /**
@@ -362,7 +363,7 @@ export class Reactor {
         // Root.app starts as a Child reference but the framework replaces it
         // with the real Component during mount — safe to cast.
         return /** @type {import('./component.js').Component} */ (
-            /** @type {import('./component.js').Root} */ (rootInstance).app
+            /** @type {import('./builtins/root.js').Root} */ (rootInstance).app
         );
     }
 
@@ -371,7 +372,7 @@ export class Reactor {
      * Drains any pending requests waiting for this host.
      * Called by PortalHost.init().
      * @param {string} id - Unique portal host identifier
-     * @param {import('./component.js').PortalHost} host - The PortalHost instance
+     * @param {import('./builtins/portal-host.js').PortalHost} host - The PortalHost instance
      */
     registerPortalHost(id, host) {
         this._portalHosts.set(id, host);
@@ -394,7 +395,7 @@ export class Reactor {
      * Get a PortalHost by ID, waiting for it if not yet registered.
      * Returns a Promise that resolves when the host registers itself.
      * @param {string} id - Portal host identifier
-     * @returns {Promise<import('./component.js').PortalHost>} The PortalHost instance
+     * @returns {Promise<import('./builtins/portal-host.js').PortalHost>} The PortalHost instance
      */
     getPortalHost(id) {
         const host = this._portalHosts.get(id);
@@ -411,7 +412,7 @@ export class Reactor {
      * Get a PortalHost by ID synchronously.
      * Used in destroy paths where the host must exist.
      * @param {string} id - Portal host identifier
-     * @returns {import('./component.js').PortalHost|undefined} The PortalHost instance
+     * @returns {import('./builtins/portal-host.js').PortalHost|undefined} The PortalHost instance
      */
     getPortalHostSync(id) {
         return this._portalHosts.get(id);
@@ -488,10 +489,12 @@ export class Reactor {
                             activeInstance[LIFECYCLE_ACTIVE] = 'afterRender';
                             activeInstance.afterRender();
                         } catch (error) {
-                            const handled = activeInstance.emitCancellable('fw-error', {
-                                error,
-                                failedComponent: id.name,
-                            });
+                            const handled = activeInstance[EVENTS]
+                                ? activeInstance[EVENTS].emitBroadcast('fw-error', {
+                                      error,
+                                      failedComponent: id.name,
+                                  }).stopped
+                                : false;
                             if (!handled) {
                                 throw error;
                             }
@@ -512,27 +515,6 @@ export class Reactor {
         } finally {
             this._draining = false;
         }
-    }
-
-    /**
-     * Pre-fetch a component's class and template, then return a factory function.
-     * The factory is a shorthand for parentComponent.createChild(name, id, vars).
-     * Called by Component.load() — all loading logic lives here in the framework
-     * internals, not in the Component base class.
-     * @param {import('./component.js').Component} parentComponent - The component calling load()
-     * @param {string} name - Component name to pre-fetch
-     * @returns {Promise<function(string, ComponentVars=): (import('./component.js').Child|import('./component.js').Component)>} Factory function
-     */
-    async loadComponentFactory(parentComponent, name) {
-        await this._instanceRegistry.preload(name);
-
-        /**
-         * Factory function for creating child instances of the pre-loaded component.
-         * @param {string} id - Instance identifier
-         * @param {ComponentVars} [vars] - Initial variables for the component
-         * @returns {import('./component.js').Child|import('./component.js').Component} Child reference
-         */
-        return (id, vars) => parentComponent.createChild(name, id, vars);
     }
 
     /**

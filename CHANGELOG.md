@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-05-18
+### Added
+- New `src/builtins/` directory to cleanly separate internal framework components (Root, Lazy, ErrorBoundary, PortalHost, PortalChild) from core engine logic.
+
+### Changed
+- Refactored `Component` base class by stripping out internal event loop logic; error logging is now handled natively by `EventEmitter`.
+- Internal framework broadcasts now utilize `emitBroadcast()` directly, improving performance and isolation.
+- Extracted recursive event broadcasting into a standalone `broadcast.js` utility.
+- Streamlined Demo Playground hydration to instantiate fresh IDs rather than persisting obsolete URL parameters.
+- Improved Component Router lifecycle to fix UI flickering when eagerly creating children with route segments.
+
+### Removed
+- Removed deprecated `_emitCancellable`, `destroyChild`, and `peekRouteSegment` from the Component API.
+- Deleted legacy `logger.js` and `config.js`.
+
 ## [1.4.0] - 2026-05-16
 ### Changed
 - Optimized DOM reconciliation in `Renderer.js` to batch new element insertions using a `DocumentFragment` and avoid detached node tracking during massive component grid renders.
@@ -124,7 +139,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed JS-in-HTML inline execution possibilities to strictly enforce declarative JS state truth.
 
-[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.4.0...main
+[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.4.1...main
+[1.4.1]: https://github.com/josecanciani/fusewire/compare/1.4.0...1.4.1
 [1.4.0]: https://github.com/josecanciani/fusewire/compare/1.3.0...1.4.0
 [1.3.0]: https://github.com/josecanciani/fusewire/compare/1.2.2...1.3.0
 [1.2.2]: https://github.com/josecanciani/fusewire/compare/1.2.1...1.2.2

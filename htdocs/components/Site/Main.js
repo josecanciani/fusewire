@@ -160,10 +160,7 @@ export class Main extends Component {
      * @param {import('../../js/route-segment.js').RouteSegment|null} routeSegment - Parsed URL segment
      */
     async init(previousState, routeSegment) {
-        const peek = this.peekRouteSegment();
-        if (peek) {
-            this.#setPageFromSegment(peek);
-        } else if (routeSegment) {
+        if (routeSegment) {
             this.#setPageFromSegment(routeSegment);
         }
         await this.#loadPage();
@@ -177,22 +174,17 @@ export class Main extends Component {
      * @returns {Promise<void>}
      */
     async update(newVars, react = true, routeSegment = null) {
-        let currentSegment = routeSegment;
-        if (!currentSegment) {
-            currentSegment = this.peekRouteSegment() || null;
-        }
-
-        if (currentSegment) {
-            this.#setPageFromSegment(currentSegment);
+        if (routeSegment) {
+            this.#setPageFromSegment(routeSegment);
             await this.#loadPage();
 
             // Forward the route segment to the active child page so it can respond to back/forward
             if (this.page === 'demo' && this.demo) {
-                await this.demo.update({}, false, currentSegment);
+                await this.demo.update({}, false, routeSegment);
             } else if (this.page === 'docs' && this.docs) {
-                await this.docs.update({}, false, currentSegment);
+                await this.docs.update({}, false, routeSegment);
             } else if (this.page === 'home' && this.landing) {
-                await this.landing.update({}, false, currentSegment);
+                await this.landing.update({}, false, routeSegment);
             }
         }
         await super.update(newVars, react, routeSegment);

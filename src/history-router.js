@@ -176,9 +176,8 @@ export class HistoryRouter {
         let segIndex = 0;
 
         // Process root(s)
-        for (const rootCode of registry._roots) {
-            const rootEntry = registry._instances.get(rootCode);
-            if (!rootEntry) continue;
+        for (const rootEntry of registry.rootEntries) {
+            const rootCode = rootEntry.instance.componentCode;
 
             const state = rootEntry.instance.routeState();
             if (state === false) continue;
@@ -207,11 +206,11 @@ export class HistoryRouter {
                     if (top.remaining.has(segment.key)) {
                         const ownerCode = top.remaining.get(segment.key);
                         top.remaining.delete(segment.key);
-                        const ownerEntry = registry._instances.get(ownerCode);
+                        const ownerEntry = registry.getEntry(ownerCode);
                         const childCode = this.#resolveChildCode(ownerEntry, segment.key);
                         if (childCode) {
                             result.set(childCode, segment);
-                            const childEntry = registry._instances.get(childCode);
+                            const childEntry = registry.getEntry(childCode);
                             if (childEntry) {
                                 const childState = childEntry.instance.routeState();
                                 if (this.#hasRouteProperties(childState)) {
@@ -251,8 +250,8 @@ export class HistoryRouter {
      */
     async #walkAndApply(assignments) {
         const registry = this.#reactor.instanceRegistry;
-        for (const rootCode of registry._roots) {
-            await this.#applyToSubtree(rootCode, assignments, null);
+        for (const rootEntry of registry.rootEntries) {
+            await this.#applyToSubtree(rootEntry.instance.componentCode, assignments, null);
         }
     }
 
@@ -264,7 +263,7 @@ export class HistoryRouter {
      */
     async #applyToSubtree(code, assignments, inheritedSegment = null) {
         const registry = this.#reactor.instanceRegistry;
-        const entry = registry._instances.get(code);
+        const entry = registry.getEntry(code);
         if (!entry) return;
 
         const state = entry.instance.routeState();
@@ -324,8 +323,8 @@ export class HistoryRouter {
          */
         const parts = [];
         const registry = this.#reactor.instanceRegistry;
-        for (const rootCode of registry._roots || []) {
-            this.#serializeSubtree(rootCode, parts);
+        for (const rootEntry of registry.rootEntries) {
+            this.#serializeSubtree(rootEntry.instance.componentCode, parts);
         }
         return '/' + parts.join('/');
     }
@@ -337,7 +336,7 @@ export class HistoryRouter {
      */
     #serializeSubtree(code, parts) {
         const registry = this.#reactor.instanceRegistry;
-        const entry = registry._instances.get(code);
+        const entry = registry.getEntry(code);
         if (!entry || !entry.container.isConnected) return;
 
         const state = entry.instance.routeState();
@@ -387,7 +386,7 @@ export class HistoryRouter {
             const name = entry.instance[COMPONENT_ID].name;
             return name.split('/').pop().toLowerCase();
         }
-        const parentEntry = this.#reactor.instanceRegistry._instances.get(entry.parent.code);
+        const parentEntry = this.#reactor.instanceRegistry.getEntry(entry.parent.code);
         if (!parentEntry) return entry.instance.componentCode;
         return (
             findVarName(parentEntry.instance, entry.instance.componentCode) ??
@@ -421,7 +420,7 @@ export class HistoryRouter {
 
         const registry = this.#reactor.instanceRegistry;
         for (const [childCode] of entry.children) {
-            const childEntry = registry._instances.get(childCode);
+            const childEntry = registry.getEntry(childCode);
             if (!childEntry) continue;
             const state = childEntry.instance.routeState();
             if (state === false) continue;

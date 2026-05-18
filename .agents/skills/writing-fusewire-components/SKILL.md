@@ -247,6 +247,17 @@ async init() {
 The template places the child via `((logs))` (or the specific var name). The
 engine auto-mounts it — no manual wiring needed.
 
+### Garbage Collection & Conditional Rendering
+
+A component's lifetime is controlled **entirely by JavaScript state**, not the DOM.
+
+- **Permanent Destruction:** To destroy a child component permanently, drop its reference from your component's public variables. The framework's Garbage Collector will immediately call its `destroy()` hook and wipe it from memory:
+  ```javascript
+  this.logs = []; // Children are immediately garbage collected
+  this.react();
+  ```
+- **Conditional Rendering (`fw-if`):** If a child is hidden by an `<div fw-if="false">` in the template, its DOM nodes are removed from the screen, **but the instance is kept alive in memory** as long as it is still assigned to a public variable (e.g. `this.myChild`). When the `fw-if` becomes true again, the existing component is instantly "teleported" back into the DOM with its state perfectly preserved. Use this explicitly to keep heavy components alive in the background!
+
 ### Modals, overlays, and portals
 
 `createChild()` nests the child DOM physically inside the parent's subtree.

@@ -485,18 +485,7 @@ describe('Component', () => {
             assert.strictEqual(calls.length, 0);
         });
 
-        it('emit() warns when called during a lifecycle hook but still fires handlers', () => {
-            const comp = new Component();
-            const testConsole = new StrictConsole();
-            testConsole.expectWarning(/init/);
-            const calls = [];
-            comp[CONSOLE] = testConsole;
-            comp.on('ready', () => calls.push(1));
-            comp[LIFECYCLE_ACTIVE] = 'init';
-            comp.emit('ready');
-            testConsole.assertClean();
-            assert.strictEqual(calls.length, 1, 'handler should still be called');
-        });
+
 
         it('emit() calls all handlers even if one throws, and logs the error', () => {
             const comp = new Component();
@@ -600,25 +589,7 @@ describe('Component', () => {
             );
         });
 
-        it('warns during lifecycle hook but still broadcasts', () => {
-            const comp = new Component();
-            comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
-            const testConsole = new StrictConsole();
-            testConsole.expectWarning(/init/);
-            const broadcastCalls = [];
-            comp[CONSOLE] = testConsole;
-            comp[REACTOR] = {
-                broadcastFrom(componentId, eventName, ...args) {
-                    broadcastCalls.push({ eventName, args });
-                },
-            };
 
-            comp[LIFECYCLE_ACTIVE] = 'init';
-            comp.broadcast('theme', 'dark');
-
-            testConsole.assertClean();
-            assert.strictEqual(broadcastCalls.length, 1, 'broadcast still fires');
-        });
 
         it('forwards multiple arguments', () => {
             const comp = new Component();

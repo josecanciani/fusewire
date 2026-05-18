@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { Component, ErrorBoundary } from '../src/component.js';
+import { Component } from '../src/component.js';
+import { ErrorBoundary } from '../src/builtins/error-boundary.js';
 import { ComponentId } from '../src/component-id.js';
 import { Reactor } from '../src/reactor.js';
 import { JSDOM } from 'jsdom';

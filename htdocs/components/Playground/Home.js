@@ -40,7 +40,7 @@ export class Home extends Component {
 
     /**
      * demo property.
-     * @type {import('../../js/component.js').ErrorBoundary}
+     * @type {import('../../js/builtins/error-boundary.js').ErrorBoundary}
      */
     demo = null;
     /**
@@ -404,21 +404,8 @@ export class Home extends Component {
         const demoFiles = files.map((f) => ({ id: f.id, label: f.label }));
         const defaultFileId = demo.defaultFile || demo.name + '/js';
 
-        // Check if we are hydrating from an initial URL load
-        let isHydratingFromUrl = false;
-        const nextSegment = this.peekRouteSegment();
-        if (nextSegment && nextSegment.key.startsWith('demo-')) {
-            const parsed = parseInt(nextSegment.key.substring(5), 10);
-            if (!Number.isNaN(parsed)) {
-                this.#demoRunId = parsed;
-                isHydratingFromUrl = true;
-            }
-        }
-
-        // Generate a new ID if we are switching demos or clicking Run
-        if (!isHydratingFromUrl) {
-            this.#demoRunId = Date.now();
-        }
+        // Generate a new ID every time to force a fresh instance
+        this.#demoRunId = Date.now();
 
         this.demo = this.createErrorBoundedChild(
             this.createChild(demo.name, `demo-${this.#demoRunId}`, demo.vars || {}),

@@ -75,45 +75,6 @@ function createTestRig(testName) {
 }
 
 describe('State Restoration', () => {
-    describe('load()', () => {
-        it('returns a factory function after pre-fetching', async () => {
-            const { registry, templateStore } = createTestRig('state-load-1');
-
-            class Item extends Component { }
-            registry.registerComponent('Item', Item);
-            templateStore.set('Item', {
-                version: 'v1',
-                htmlCode: '<div>((name))</div>',
-                cssCode: '',
-            });
-
-            // Create a parent component to call load() on
-            class Parent extends Component { }
-            registry.registerComponent('Parent', Parent);
-            templateStore.set('Parent', {
-                version: 'v1',
-                htmlCode: '<div>parent</div>',
-                cssCode: '',
-            });
-
-            const dom = new JSDOM('<!DOCTYPE html><div id="p"></div>');
-            global.document = dom.window.document;
-            const parentContainer = dom.window.document.getElementById('p');
-            const parentId = new ComponentId('Parent', 'main', 'v1');
-            const parent = await registry.create(parentId, Parent, {}, parentContainer);
-
-            // Call load() on the parent
-            const createItem = await parent.load('Item');
-
-            assert.strictEqual(typeof createItem, 'function');
-
-            // The factory creates a child reference
-            const childRef = createItem('item-1', { name: 'test' });
-            assert.ok(childRef instanceof Child);
-            assert.strictEqual(childRef.componentName, 'Item');
-            assert.strictEqual(childRef.componentId, 'item-1');
-        });
-    });
 
     describe('preload()', () => {
         it('caches component class and template for instant createFromReference', async () => {
