@@ -56,12 +56,12 @@ import { broadcastFromRoots, broadcastFrom } from '../src/broadcast.js';
 import { Renderer } from '../src/renderer.js';
 import { TemplateStore } from '../src/template-store.js';
 import { Component } from '../src/component.js';
-import { ComponentId } from '../src/component-id.js';
+import { createComponentId, componentIdFromCode, componentIdsEqual } from '../src/component-id.js';
 import { ComponentNotFoundError } from '../src/errors/error-hierarchy.js';
 import { Idiomorph } from 'idiomorph';
 import { Child } from '../src/component.js';
 import { COMPONENT_ID, LIFECYCLE_ACTIVE, EVENTS, CONSOLE, LIBRARIES, REACTOR, IS_CHILD, IS_COMPONENT } from '../src/symbols.js';
-import { EventEmitter } from '../src/event-emitter.js';
+
 import { findChildMountPoints } from '../src/utils/dom-helpers.js';
 import { StateSerializer } from '../src/state-serializer.js';
 import { Persistence } from '../src/persistence.js';
@@ -170,7 +170,7 @@ describe('InstanceRegistry', () => {
 
     describe('create()', () => {
         it('creates a new component instance', async () => {
-            const id = new ComponentId('TestComponent', 'test1');
+            const id = createComponentId('TestComponent', 'test1');
             const instance = await registry.create(id, TestComponent, {}, container);
 
             assert.ok(instance instanceof TestComponent);
@@ -183,7 +183,7 @@ describe('InstanceRegistry', () => {
             class InitComponent extends Component {
                 async init() { initCalled = true; }
             }
-            const id = new ComponentId('InitComponent', 'test1');
+            const id = createComponentId('InitComponent', 'test1');
             await registry.create(id, InitComponent, {}, container);
 
             assert.ok(initCalled);
@@ -194,21 +194,21 @@ describe('InstanceRegistry', () => {
             class AfterRenderComponent extends Component {
                 afterRender() { afterRenderCalled = true; }
             }
-            const id = new ComponentId('AfterRenderComponent', 'test1');
+            const id = createComponentId('AfterRenderComponent', 'test1');
             await registry.create(id, AfterRenderComponent, {}, container);
 
             assert.ok(afterRenderCalled);
         });
 
         it('stores instance in registry', async () => {
-            const id = new ComponentId('TestComponent', 'test1');
+            const id = createComponentId('TestComponent', 'test1');
             const instance = await registry.create(id, TestComponent, {}, container);
 
             assert.strictEqual(registry.get(id), instance);
         });
 
         it('throws if instance already exists', async () => {
-            const id = new ComponentId('TestComponent', 'test1');
+            const id = createComponentId('TestComponent', 'test1');
             await registry.create(id, TestComponent, {}, container);
 
             await assert.rejects(
@@ -218,7 +218,7 @@ describe('InstanceRegistry', () => {
         });
 
         it('sets container on instance', async () => {
-            const id = new ComponentId('TestComponent', 'test1');
+            const id = createComponentId('TestComponent', 'test1');
             const instance = await registry.create(id, TestComponent, {}, container);
 
             assert.strictEqual(instance.componentContainer, container);
@@ -226,7 +226,7 @@ describe('InstanceRegistry', () => {
 
         it('renders component to container', async () => {
             templateStore.set('TestComponent', { version: 'v1', htmlCode: '<div class="test-content">hello</div>', cssCode: '' });
-            const id = new ComponentId('TestComponent', 'test1', 'v1');
+            const id = createComponentId('TestComponent', 'test1', 'v1');
             await registry.create(id, TestComponent, {}, container);
 
             assert.ok(container.querySelector('.test-content'));
@@ -240,7 +240,7 @@ describe('InstanceRegistry', () => {
                     await this.react();
                 }
             }
-            const id = new ComponentId('InitReacter', 'test1');
+            const id = createComponentId('InitReacter', 'test1');
             
             // Should warn and ignore, not throw
             await registry.create(id, InitReacter, {}, container);
@@ -257,14 +257,14 @@ describe('InstanceRegistry', () => {
                     this.react();
                 }
             }
-            const id = new ComponentId('AfterRenderReacter', 'test1');
+            const id = createComponentId('AfterRenderReacter', 'test1');
             await registry.create(id, AfterRenderReacter, {}, container);
 
             assert.ok(reactCalled);
         });
 
         it('clears LIFECYCLE_ACTIVE after create() completes', async () => {
-            const id = new ComponentId('TestComponent', 'test1');
+            const id = createComponentId('TestComponent', 'test1');
             const instance = await registry.create(id, TestComponent, {}, container);
 
             assert.strictEqual(instance[LIFECYCLE_ACTIVE], null);
@@ -274,7 +274,7 @@ describe('InstanceRegistry', () => {
             class ThrowingInit extends Component {
                 async init() { throw new Error('init failed'); }
             }
-            const id = new ComponentId('ThrowingInit', 'test1');
+            const id = createComponentId('ThrowingInit', 'test1');
 
             await assert.rejects(() => registry.create(id, ThrowingInit, {}, container), /init failed/);
             assert.strictEqual(registry.has(id), false);
@@ -287,7 +287,7 @@ describe('InstanceRegistry', () => {
                 }
             }
             registry.registerComponent('UpdateReacter', UpdateReacter);
-            const id = new ComponentId('UpdateReacter', 'test1');
+            const id = createComponentId('UpdateReacter', 'test1');
             const instance = await registry.create(id, UpdateReacter, {}, container);
 
             // Mock reactor.react to detect call
@@ -306,20 +306,20 @@ describe('InstanceRegistry', () => {
 
     describe('get()', () => {
         it('returns existing instance', async () => {
-            const id = new ComponentId('TestComponent', 'test1');
+            const id = createComponentId('TestComponent', 'test1');
             const instance = await registry.create(id, TestComponent, {}, container);
             assert.strictEqual(registry.get(id), instance);
         });
 
         it('returns null for non-existent instance', () => {
-            const id = new ComponentId('NonExistent', 'test1');
+            const id = createComponentId('NonExistent', 'test1');
             assert.strictEqual(registry.get(id), null);
         });
     });
 
     describe('get() with string', () => {
         it('returns existing instance by code string', async () => {
-            const id = new ComponentId('TestComponent', 'test1');
+            const id = createComponentId('TestComponent', 'test1');
             const instance = await registry.create(id, TestComponent, {}, container);
             assert.strictEqual(registry.get('TestComponent#test1'), instance);
         });
@@ -331,7 +331,7 @@ describe('InstanceRegistry', () => {
 
     describe('update()', () => {
         it('updates instance vars', async () => {
-            const id = new ComponentId('TestComponent', 'test1');
+            const id = createComponentId('TestComponent', 'test1');
             const instance = await registry.create(id, TestComponent, { msg: 'old' }, container);
             
             await registry.update(id, { msg: 'new' });
@@ -347,7 +347,7 @@ describe('InstanceRegistry', () => {
             class AfterRenderComponent extends Component {
                 afterRender() { afterRenderCalled++; }
             }
-            const id = new ComponentId('AfterRenderComponent', 'test1');
+            const id = createComponentId('AfterRenderComponent', 'test1');
             await registry.create(id, AfterRenderComponent, {}, container);
             const initialCount = afterRenderCalled;
 
@@ -357,7 +357,7 @@ describe('InstanceRegistry', () => {
 
         it('re-renders component', async () => {
             templateStore.set('TestComponent', { version: 'v1', htmlCode: '<div>((msg))</div>', cssCode: '' });
-            const id = new ComponentId('TestComponent', 'test1', 'v1');
+            const id = createComponentId('TestComponent', 'test1', 'v1');
             await registry.create(id, TestComponent, { msg: 'old' }, container);
 
             await registry.update(id, { msg: 'new' });
@@ -365,7 +365,7 @@ describe('InstanceRegistry', () => {
         });
 
         it('throws for non-existent instance', async () => {
-            const id = new ComponentId('NonExistent', 'test1');
+            const id = createComponentId('NonExistent', 'test1');
             await assert.rejects(() => registry.update(id, {}), ComponentNotFoundError);
         });
     });
@@ -376,7 +376,7 @@ describe('InstanceRegistry', () => {
             class DestroyComponent extends Component {
                 destroy() { destroyCalled = true; }
             }
-            const id = new ComponentId('DestroyComponent', 'test1');
+            const id = createComponentId('DestroyComponent', 'test1');
             await registry.create(id, DestroyComponent, {}, container);
 
             registry.remove(id);
@@ -384,7 +384,7 @@ describe('InstanceRegistry', () => {
         });
 
         it('removes instance from registry', async () => {
-            const id = new ComponentId('TestComponent', 'test1');
+            const id = createComponentId('TestComponent', 'test1');
             await registry.create(id, TestComponent, {}, container);
 
             registry.remove(id);
@@ -392,7 +392,7 @@ describe('InstanceRegistry', () => {
         });
 
         it('removes DOM element', async () => {
-            const id = new ComponentId('TestComponent', 'test1');
+            const id = createComponentId('TestComponent', 'test1');
             await registry.create(id, TestComponent, {}, container);
             assert.ok(container.parentNode);
 
@@ -401,7 +401,7 @@ describe('InstanceRegistry', () => {
         });
 
         it('silently ignores non-existent instance', () => {
-            const id = new ComponentId('NonExistent', 'test1');
+            const id = createComponentId('NonExistent', 'test1');
             assert.doesNotThrow(() => registry.remove(id));
         });
     });
@@ -409,7 +409,7 @@ describe('InstanceRegistry', () => {
     describe('render()', () => {
         it('renders existing instance', async () => {
             templateStore.set('TestComponent', { version: 'v1', htmlCode: '<div>updated</div>', cssCode: '' });
-            const id = new ComponentId('TestComponent', 'test1', 'v1');
+            const id = createComponentId('TestComponent', 'test1', 'v1');
             await registry.create(id, TestComponent, {}, container);
 
             await registry.render(id);
@@ -417,12 +417,12 @@ describe('InstanceRegistry', () => {
         });
 
         it('throws for non-existent instance', async () => {
-            const id = new ComponentId('NonExistent', 'test1');
+            const id = createComponentId('NonExistent', 'test1');
             await assert.rejects(() => registry.render(id), ComponentNotFoundError);
         });
 
         it('throws if template not found', async () => {
-            const id = new ComponentId('NoTemplate', 'test1');
+            const id = createComponentId('NoTemplate', 'test1');
             const instance = new Component();
             instance[COMPONENT_ID] = id;
             registry._instances.set(id.code, { instance, container });
@@ -432,7 +432,7 @@ describe('InstanceRegistry', () => {
 
         it('uses compiled template cache', async () => {
             templateStore.set('TestComponent', { version: 'v1', htmlCode: '<div>cached</div>', cssCode: '' });
-            const id = new ComponentId('TestComponent', 'test1', 'v1');
+            const id = createComponentId('TestComponent', 'test1', 'v1');
             await registry.create(id, TestComponent, {}, container);
 
             const initialCompiled = templateStore.getCompiled('TestComponent');
@@ -451,7 +451,7 @@ describe('InstanceRegistry', () => {
                         this.child = this.createChild('ChildComponent', 'child1');
                     }
                 }
-                const id = new ComponentId('Parent', 'test1', 'v1');
+                const id = createComponentId('Parent', 'test1', 'v1');
                 
                 await assert.rejects(() => registry.create(id, EagerParent, {}, container), /not referenced in the template/);
             });
@@ -464,7 +464,7 @@ describe('InstanceRegistry', () => {
                         this.child = this.createChild('ChildComponent', 'child1');
                     }
                 }
-                const id = new ComponentId('Parent', 'test2', 'v1');
+                const id = createComponentId('Parent', 'test2', 'v1');
                 
                 await registry.create(id, EagerParent, {}, container);
                 assert.ok(registry.has(id));
@@ -474,34 +474,34 @@ describe('InstanceRegistry', () => {
 
     describe('has()', () => {
         it('returns true for existing instance', async () => {
-            const id = new ComponentId('TestComponent', 'test1');
+            const id = createComponentId('TestComponent', 'test1');
             await registry.create(id, TestComponent, {}, container);
             assert.strictEqual(registry.has(id), true);
         });
 
         it('returns false for non-existent instance', () => {
-            const id = new ComponentId('NonExistent', 'test1');
+            const id = createComponentId('NonExistent', 'test1');
             assert.strictEqual(registry.has(id), false);
         });
     });
 
     describe('getContainer()', () => {
         it('returns container for existing instance', async () => {
-            const id = new ComponentId('TestComponent', 'test1');
+            const id = createComponentId('TestComponent', 'test1');
             await registry.create(id, TestComponent, {}, container);
             assert.strictEqual(registry.getContainer(id), container);
         });
 
         it('returns null for non-existent instance', () => {
-            const id = new ComponentId('NonExistent', 'test1');
+            const id = createComponentId('NonExistent', 'test1');
             assert.strictEqual(registry.getContainer(id), null);
         });
     });
 
     describe('clearAll()', () => {
         it('removes all instances', async () => {
-            await registry.create(new ComponentId('C1', '1'), TestComponent, {}, document.createElement('div'));
-            await registry.create(new ComponentId('C2', '2'), TestComponent, {}, document.createElement('div'));
+            await registry.create(createComponentId('C1', '1'), TestComponent, {}, document.createElement('div'));
+            await registry.create(createComponentId('C2', '2'), TestComponent, {}, document.createElement('div'));
             
             registry.clearAll();
             assert.strictEqual(registry._instances.size, 0);
@@ -512,8 +512,8 @@ describe('InstanceRegistry', () => {
             class DestroyComponent extends Component {
                 destroy() { destroyed++; }
             }
-            await registry.create(new ComponentId('C1', '1'), DestroyComponent, {}, document.createElement('div'));
-            await registry.create(new ComponentId('C2', '2'), DestroyComponent, {}, document.createElement('div'));
+            await registry.create(createComponentId('C1', '1'), DestroyComponent, {}, document.createElement('div'));
+            await registry.create(createComponentId('C2', '2'), DestroyComponent, {}, document.createElement('div'));
 
             registry.clearAll();
             assert.strictEqual(destroyed, 2);
@@ -535,7 +535,7 @@ describe('InstanceRegistry', () => {
                     this.child = this.createChild('ChildComponent', 'child1');
                 }
             }
-                const id = new ComponentId('Parent', 'root', 'v1');
+                const id = createComponentId('Parent', 'root', 'v1');
                 await registry.create(id, Parent, {}, container);
 
                 assert.ok(container.querySelector('.child'), 'Child should be rendered');
@@ -608,7 +608,7 @@ describe('InstanceRegistry', () => {
                     this.child = this.createChild('ChildComponent', 'child1', { msg: 'eager' });
                 }
             }
-            await registry.create(new ComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
+            await registry.create(createComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
             
             assert.ok(container.querySelector('.child'));
             assert.strictEqual(container.querySelector('.child').textContent, 'eager');
@@ -626,7 +626,7 @@ describe('InstanceRegistry', () => {
                     ];
                 }
             }
-            await registry.create(new ComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
+            await registry.create(createComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
             
             const children = container.querySelectorAll('.child');
             assert.strictEqual(children.length, 2);
@@ -643,7 +643,7 @@ describe('InstanceRegistry', () => {
                     this.child = this.createChild('ChildComponent', 'child1', { msg: 'hello' });
                 }
             }
-            await registry.create(new ComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
+            await registry.create(createComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
             
             const childInstance = registry.get('ChildComponent#child1');
             assert.strictEqual(childInstance.msg, 'hello');
@@ -659,7 +659,7 @@ describe('InstanceRegistry', () => {
                     this.child = this.createChild('ChildComponent', 'child1');
                 }
             }
-            const parentId = new ComponentId('Parent', 'p1', 'v1');
+            const parentId = createComponentId('Parent', 'p1', 'v1');
             const parent = await registry.create(parentId, Parent, {}, container);
             
             const childInstance = registry.get('ChildComponent#child1');
@@ -676,7 +676,7 @@ describe('InstanceRegistry', () => {
                     this.children = [this.createChild('ChildComponent', 'c1')];
                 }
             }
-            const parent = await registry.create(new ComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
+            const parent = await registry.create(createComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
             
             const childInstance = registry.get('ChildComponent#c1');
             assert.strictEqual(parent.children[0], childInstance);
@@ -689,7 +689,7 @@ describe('InstanceRegistry', () => {
                 child = null;
                 async init() { this.child = this.createChild('ChildComponent', 'child1', { msg: 'initial' }); }
             }
-            const parent = await registry.create(new ComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
+            const parent = await registry.create(createComponentId('Parent', 'p1', 'v1'), Parent, {}, container);
             
             const childInstance = parent.child;
             await childInstance.update({ msg: 'updated' });
@@ -735,7 +735,7 @@ describe('InstanceRegistry', () => {
 
     describe('broadcastFromRoots()', () => {
         it('calls handlers on a single root component', async () => {
-            const id = new ComponentId('Root', 'r1');
+            const id = createComponentId('Root', 'r1');
             const instance = await registry.create(id, TestComponent, {}, container);
             
             let called = false;
@@ -773,7 +773,7 @@ describe('InstanceRegistry', () => {
             registry.registerComponent('Parent', ParentComp);
             registry.registerComponent('Child', ChildComp);
 
-            const parent = await registry.create(new ComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
+            const parent = await registry.create(createComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
             const child = parent.child;
             const grandchild = child.grandchild;
 
@@ -801,7 +801,7 @@ describe('InstanceRegistry', () => {
             }
             registry.registerComponent('Parent', ParentComp);
 
-            const parent = await registry.create(new ComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
+            const parent = await registry.create(createComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
             const child = parent.child;
 
             parent.on('theme', () => { calls.push('parent'); return false; });
@@ -830,7 +830,7 @@ describe('InstanceRegistry', () => {
             }
             registry.registerComponent('Root', RootComp);
 
-            const root = await registry.create(new ComponentId('Root', 'p1', 'v1'), RootComp, {}, container);
+            const root = await registry.create(createComponentId('Root', 'p1', 'v1'), RootComp, {}, container);
             root.on('theme', () => calls.push('root'));
             root.left.on('theme', () => { calls.push('left'); return false; });
             root.right.on('theme', () => calls.push('right'));
@@ -852,7 +852,7 @@ describe('InstanceRegistry', () => {
                     this.child = this.createChild('Child', 'c1');
                 }
             }
-            const parent = await registry.create(new ComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
+            const parent = await registry.create(createComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
             
             const calls = [];
             parent.child.on('theme', () => calls.push('child'));
@@ -874,7 +874,7 @@ describe('InstanceRegistry', () => {
                     this.child = this.createChild('Child', 'c1');
                 }
             }
-            const parent = await registry.create(new ComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
+            const parent = await registry.create(createComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
             
             parent.on('theme', () => { throw new Error('boom'); });
             const calls = [];
@@ -887,7 +887,7 @@ describe('InstanceRegistry', () => {
         });
 
         it('forwards arguments to all handlers', async () => {
-            const id = new ComponentId('Root', 'r1');
+            const id = createComponentId('Root', 'r1');
             const instance = await registry.create(id, TestComponent, {}, container);
             
             let receivedArgs = null;
@@ -915,7 +915,7 @@ describe('InstanceRegistry', () => {
                     this.child = this.createChild('Child', 'c1');
                 }
             }
-            const parent = await registry.create(new ComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
+            const parent = await registry.create(createComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
             
             parent.on('theme', () => calls.push('root'));
             parent.child.on('theme', () => calls.push('child'));
@@ -959,7 +959,7 @@ describe('InstanceRegistry', () => {
             registry.registerComponent('Parent', ParentComp);
             registry.registerComponent('ChildWithGrandchild', ChildWithGrandchild);
 
-            const parent = await registry.create(new ComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
+            const parent = await registry.create(createComponentId('Parent', 'p1', 'v1'), ParentComp, {}, container);
             
             parent.on('theme', () => calls.push('parent'));
             parent.child.on('theme', () => calls.push('child'));
@@ -972,21 +972,21 @@ describe('InstanceRegistry', () => {
         });
 
         it('does nothing for a non-existent component', () => {
-            assert.doesNotThrow(() => broadcastFrom(registry, new ComponentId('Fake', '1'), 'test', []));
+            assert.doesNotThrow(() => broadcastFrom(registry, createComponentId('Fake', '1'), 'test', []));
         });
 
         it('respects false return to stop subtree propagation', async () => {
             const calls = [];
-            const childId = new ComponentId("Child", "c1");
-            const grandId = new ComponentId("Grandchild", "g1");
+            const childId = createComponentId("Child", "c1");
+            const grandId = createComponentId("Grandchild", "g1");
             
             const child = new Component();
             child[COMPONENT_ID] = childId;
-            child[EVENTS] = new EventEmitter();
+            child[EVENTS] = new Map();
             
             const grand = new Component();
             grand[COMPONENT_ID] = grandId;
-            grand[EVENTS] = new EventEmitter();
+            grand[EVENTS] = new Map();
 
             registry._instances.set(childId.code, { instance: child, container: document.createElement('div') });
             registry._instances.set(grandId.code, { instance: grand, container: document.createElement('div') });
@@ -1005,7 +1005,7 @@ describe('InstanceRegistry', () => {
             class HydrateComponent extends Component {
                 hydrate() { hydrateCalled = true; }
             }
-            await registry.create(new ComponentId('HydrateComponent', 'test1'), HydrateComponent, {}, container);
+            await registry.create(createComponentId('HydrateComponent', 'test1'), HydrateComponent, {}, container);
             assert.ok(hydrateCalled);
         });
 
@@ -1017,7 +1017,7 @@ describe('InstanceRegistry', () => {
                 afterRender() { order.push('afterRender'); }
             }
             templateStore.set('OrderComponent', { version: 'v1', htmlCode: '<div></div>', cssCode: '' });
-            await registry.create(new ComponentId('OrderComponent', 'test1', 'v1'), OrderComponent, {}, container);
+            await registry.create(createComponentId('OrderComponent', 'test1', 'v1'), OrderComponent, {}, container);
             
             // Note: render() is called after init and before hydrate
             assert.deepStrictEqual(order, ['init', 'hydrate', 'afterRender']);
@@ -1028,7 +1028,7 @@ describe('InstanceRegistry', () => {
             class CheckActive extends Component {
                 hydrate() { activeDuringHydrate = this[LIFECYCLE_ACTIVE]; }
             }
-            await registry.create(new ComponentId('CheckActive', 'test1'), CheckActive, {}, container);
+            await registry.create(createComponentId('CheckActive', 'test1'), CheckActive, {}, container);
             assert.strictEqual(activeDuringHydrate, 'hydrate');
         });
 
@@ -1039,7 +1039,7 @@ describe('InstanceRegistry', () => {
             class HydrateReacter extends Component {
                 hydrate() { this.react(); }
             }
-            await registry.create(new ComponentId('HydrateReacter', 'test1'), HydrateReacter, {}, container);
+            await registry.create(createComponentId('HydrateReacter', 'test1'), HydrateReacter, {}, container);
             assert.ok(reactCalled);
         });
 
@@ -1048,7 +1048,7 @@ describe('InstanceRegistry', () => {
             class TestComponent extends Component {
                 hydrate() { hydrateCalls++; }
             }
-            const id = new ComponentId('TestComponent', 'test1');
+            const id = createComponentId('TestComponent', 'test1');
             await registry.create(id, TestComponent, {}, container);
             assert.strictEqual(hydrateCalls, 1);
 
@@ -1063,7 +1063,7 @@ describe('InstanceRegistry', () => {
             class CheckInit extends Component {
                 async init() { activeDuringInit = this[LIFECYCLE_ACTIVE]; }
             }
-            await registry.create(new ComponentId('CheckInit', 'test1'), CheckInit, {}, container);
+            await registry.create(createComponentId('CheckInit', 'test1'), CheckInit, {}, container);
             assert.strictEqual(activeDuringInit, 'init');
         });
 
@@ -1072,7 +1072,7 @@ describe('InstanceRegistry', () => {
             class CheckAfterRender extends Component {
                 afterRender() { activeDuringAfterRender = this[LIFECYCLE_ACTIVE]; }
             }
-            await registry.create(new ComponentId('CheckAfterRender', 'test1'), CheckAfterRender, {}, container);
+            await registry.create(createComponentId('CheckAfterRender', 'test1'), CheckAfterRender, {}, container);
             assert.strictEqual(activeDuringAfterRender, 'afterRender');
         });
 
@@ -1084,7 +1084,7 @@ describe('InstanceRegistry', () => {
                 afterRender() { states.push('afterRender:' + this[LIFECYCLE_ACTIVE]); }
             }
             templateStore.set('LifecycleTracker', { version: 'v1', htmlCode: '<div></div>', cssCode: '' });
-            await registry.create(new ComponentId('LifecycleTracker', 'test1', 'v1'), LifecycleTracker, {}, container);
+            await registry.create(createComponentId('LifecycleTracker', 'test1', 'v1'), LifecycleTracker, {}, container);
 
             assert.deepStrictEqual(states, [
                 'init:init',
@@ -1096,7 +1096,7 @@ describe('InstanceRegistry', () => {
 
     describe('_resolveLibraries()', () => {
         it('resolves library promises and stores modules', async () => {
-            const id = new ComponentId('Test', '1');
+            const id = createComponentId('Test', '1');
             const instance = new Component();
             const libPromise = Promise.resolve({ exported: 'value' });
             
@@ -1143,7 +1143,7 @@ describe('InstanceRegistry', () => {
                 child = null;
                 async init() { this.child = this.createChild('Child', 'main', {}); }
             }
-            const parentId = new ComponentId('Parent', 'root', 'v1');
+            const parentId = createComponentId('Parent', 'root', 'v1');
             
             const parent = await registry.create(parentId, Parent, {}, container);
             
@@ -1174,7 +1174,7 @@ describe('InstanceRegistry', () => {
                     this.c2 = this.createChild('Child', '2');
                 }
             }
-            await registry.create(new ComponentId('Parent', 'root', 'v1'), Parent, {}, container);
+            await registry.create(createComponentId('Parent', 'root', 'v1'), Parent, {}, container);
         });
 
         it('deferred hydration: hydrate runs after DOM attachment (bottom-up)', async () => {
@@ -1196,7 +1196,7 @@ describe('InstanceRegistry', () => {
             registry.registerComponent('Parent', Parent);
             registry.registerComponent('Child', ChildComp);
 
-            await registry.create(new ComponentId('Parent', 'root', 'v1'), Parent, {}, container);
+            await registry.create(createComponentId('Parent', 'root', 'v1'), Parent, {}, container);
             
             assert.deepStrictEqual(events, ['child-hydrate', 'parent-hydrate']);
         });
@@ -1214,7 +1214,7 @@ describe('InstanceRegistry', () => {
                     this.child = this.createChild('Child', 'main');
                 }
             }
-            await registry.create(new ComponentId('Parent', 'root', 'v1'), Parent, {}, container);
+            await registry.create(createComponentId('Parent', 'root', 'v1'), Parent, {}, container);
             
             assert.ok(container.querySelector('.inner'));
         });
@@ -1223,7 +1223,7 @@ describe('InstanceRegistry', () => {
             templateStore.set('Cell', { version: 'v1', htmlCode: '<div>cell</div>', cssCode: '' });
             registry.registerComponent('Cell', TestComponent);
 
-            const cellId = new ComponentId('Cell', '0', 'v1');
+            const cellId = createComponentId('Cell', '0', 'v1');
             await registry.create(cellId, TestComponent, {}, document.createElement('div'));
 
             const ref = new Child('Cell', '0');
@@ -1241,11 +1241,11 @@ describe('InstanceRegistry', () => {
             }
             templateStore.set('Fallback', { version: 'v1', htmlCode: '<span>((errorMessage)) ((failedComponent))</span>', cssCode: '' });
 
-            const parentId = new ComponentId('Parent', 'root', 'v1');
+            const parentId = createComponentId('Parent', 'root', 'v1');
 
             registry._reactor.react = async (target) => {
                 try {
-                    const cid = target instanceof ComponentId ? target : target[COMPONENT_ID];
+                    const cid = target.code ? target : target[COMPONENT_ID];
                     if (cid) await registry.render(cid);
                 } catch (e) {
                     console.error("[MOCK] REACTOR ERR", e);
@@ -1297,14 +1297,14 @@ describe('InstanceRegistry', () => {
             registry.registerComponent('Broken', Broken);
             templateStore.set('Broken', { version: 'v1', htmlCode: '<div></div>', cssCode: '' });
 
-            const id = new ComponentId('Broken', '1', 'v1');
+            const id = createComponentId('Broken', '1', 'v1');
             await assert.rejects(() => registry.create(id, Broken, {}, container), /boom/);
         });
     });
 
     describe('_hydrateSubtree', () => {
         it('skips components that are already hydrated', async () => {
-            const id = new ComponentId('Test', '1');
+            const id = createComponentId('Test', '1');
             const instance = new TestComponent();
             const entry = { instance, container, needsHydration: false };
             registry._instances.set(id.code, entry);

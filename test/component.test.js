@@ -2,7 +2,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { JSDOM } from 'jsdom';
 import { Component } from '../src/component.js';
-import { ComponentId } from '../src/component-id.js';
+import { createComponentId, componentIdFromCode, componentIdsEqual } from '../src/component-id.js';
 import { Child } from '../src/component.js';
 import { COMPONENT_ID, REGISTRY_ENTRY, CONSOLE, REACTOR, LIFECYCLE_ACTIVE, EVENTS, LIBRARIES } from '../src/symbols.js';
 import { StrictConsole } from './strict-console.js';
@@ -100,7 +100,7 @@ describe('Component', () => {
 
         it('triggers react() by default', () => {
             const comp = Object.assign(new Component(), { x: 0 });
-            comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
+            comp[COMPONENT_ID] = createComponentId('Test', 'u1');
             const reactCalls = [];
             comp[REACTOR] = {
                 react(componentId, mode) {
@@ -116,7 +116,7 @@ describe('Component', () => {
 
         it('does not react when react=false', () => {
             const comp = Object.assign(new Component(), { x: 0 });
-            comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
+            comp[COMPONENT_ID] = createComponentId('Test', 'u1');
             const reactCalls = [];
             comp[REACTOR] = {
                 react(componentId, mode) {
@@ -133,7 +133,7 @@ describe('Component', () => {
     describe('react()', () => {
         it('calls reactor.react when attached', () => {
             const comp = new Component();
-            comp[COMPONENT_ID] = new ComponentId('Component', 'test');
+            comp[COMPONENT_ID] = createComponentId('Component', 'test');
             const reactCalls = [];
 
             comp[REACTOR] = {
@@ -151,7 +151,7 @@ describe('Component', () => {
 
         it('defaults to CSR mode', () => {
             const comp = new Component();
-            comp[COMPONENT_ID] = new ComponentId('Component', 'test');
+            comp[COMPONENT_ID] = createComponentId('Component', 'test');
             const reactCalls = [];
 
             comp[REACTOR] = {
@@ -167,7 +167,7 @@ describe('Component', () => {
 
         it('skips react() and warns when LIFECYCLE_ACTIVE is init or update', () => {
             const comp = new Component();
-            comp[COMPONENT_ID] = new ComponentId('Component', 'test');
+            comp[COMPONENT_ID] = createComponentId('Component', 'test');
             const reactCalls = [];
             const testConsole = new StrictConsole();
             testConsole.expectWarning(/init/);
@@ -192,7 +192,7 @@ describe('Component', () => {
 
         it('queues react() when LIFECYCLE_ACTIVE is render, hydrate or afterRender', () => {
             const comp = new Component();
-            comp[COMPONENT_ID] = new ComponentId('Component', 'test');
+            comp[COMPONENT_ID] = createComponentId('Component', 'test');
             const reactCalls = [];
             const testConsole = new StrictConsole();
 
@@ -218,7 +218,7 @@ describe('Component', () => {
 
         it('allows react() when LIFECYCLE_ACTIVE is null', () => {
             const comp = new Component();
-            comp[COMPONENT_ID] = new ComponentId('Component', 'test');
+            comp[COMPONENT_ID] = createComponentId('Component', 'test');
             const reactCalls = [];
 
             comp[REACTOR] = {
@@ -524,7 +524,7 @@ describe('Component', () => {
          */
         function makeComponent(name, id, containerHTML) {
             const comp = new Component();
-            const cid = new ComponentId(name, id);
+            const cid = createComponentId(name, id);
             comp[COMPONENT_ID] = cid;
             const container = document.createElement('div');
             container.setAttribute('data-fusewire-id', cid.code);
@@ -563,7 +563,7 @@ describe('Component', () => {
     describe('broadcast()', () => {
         it('delegates to reactor.broadcastFrom() with own componentId', () => {
             const comp = new Component();
-            const cid = new ComponentId('Test', 'u1');
+            const cid = createComponentId('Test', 'u1');
             comp[COMPONENT_ID] = cid;
             const broadcastCalls = [];
             comp[REACTOR] = {
@@ -582,7 +582,7 @@ describe('Component', () => {
 
         it('throws when reactor not attached', () => {
             const comp = new Component();
-            comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
+            comp[COMPONENT_ID] = createComponentId('Test', 'u1');
             assert.throws(
                 () => comp.broadcast('theme'),
                 /Cannot broadcast - reactor not attached/,
@@ -593,7 +593,7 @@ describe('Component', () => {
 
         it('forwards multiple arguments', () => {
             const comp = new Component();
-            comp[COMPONENT_ID] = new ComponentId('Test', 'u1');
+            comp[COMPONENT_ID] = createComponentId('Test', 'u1');
             const broadcastCalls = [];
             comp[REACTOR] = {
                 broadcastFrom(componentId, eventName, ...args) {

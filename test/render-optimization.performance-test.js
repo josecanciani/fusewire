@@ -5,7 +5,7 @@ import { InstanceRegistry } from '../src/instance.js';
 import { Renderer } from '../src/renderer.js';
 import { TemplateStore } from '../src/template-store.js';
 import { Component } from '../src/component.js';
-import { ComponentId } from '../src/component-id.js';
+import { createComponentId, componentIdFromCode, componentIdsEqual } from '../src/component-id.js';
 import { Child } from '../src/component.js';
 import { Idiomorph } from 'idiomorph';
 import { Persistence } from '../src/persistence.js';
@@ -77,7 +77,7 @@ describe('Render Optimizations', () => {
         it('returns declarations Map alongside children Map for Component vars', () => {
             const instance = new Component();
             const child = new ChildComponent();
-            child[COMPONENT_ID] = new ComponentId('ChildComponent', 'c1');
+            child[COMPONENT_ID] = createComponentId('ChildComponent', 'c1');
             instance.child = child;
 
             const result = registry._collectChildComponents(instance);
@@ -105,7 +105,7 @@ describe('Render Optimizations', () => {
             const children = [];
             for (let i = 0; i < 5; i++) {
                 const child = new ChildComponent();
-                child[COMPONENT_ID] = new ComponentId('ChildComponent', `c${i}`);
+                child[COMPONENT_ID] = createComponentId('ChildComponent', `c${i}`);
                 children.push(child);
             }
             instance.cells = children;
@@ -125,7 +125,7 @@ describe('Render Optimizations', () => {
             const childInstances = [];
             for (let i = 0; i < count; i++) {
                 const child = new ChildComponent();
-                child[COMPONENT_ID] = new ComponentId('ChildComponent', `c${i}`);
+                child[COMPONENT_ID] = createComponentId('ChildComponent', `c${i}`);
                 childInstances.push(child);
             }
             instance.cells = childInstances;
@@ -162,14 +162,14 @@ describe('Render Optimizations', () => {
                 version: 'v1',
             });
 
-            const parentId = new ComponentId('TestComponent', 'p1', 'v1');
+            const parentId = createComponentId('TestComponent', 'p1', 'v1');
             const childDecl = new ChildComponent();
-            childDecl[COMPONENT_ID] = new ComponentId('ChildComponent', 'child1');
+            childDecl[COMPONENT_ID] = createComponentId('ChildComponent', 'child1');
 
             await registry.create(parentId, Component, { child: childDecl }, container);
 
             // Verify child was created
-            const childId = new ComponentId('ChildComponent', 'child1');
+            const childId = createComponentId('ChildComponent', 'child1');
             assert.strictEqual(registry.has(childId), true);
 
             // Get the child's current container — this is the mount point element
@@ -210,13 +210,13 @@ describe('Render Optimizations', () => {
                 version: 'v1',
             });
 
-            const parentId = new ComponentId('TestComponent', 'p1', 'v1');
+            const parentId = createComponentId('TestComponent', 'p1', 'v1');
             const childDecl = new ChildComponent();
-            childDecl[COMPONENT_ID] = new ComponentId('ChildComponent', 'child1');
+            childDecl[COMPONENT_ID] = createComponentId('ChildComponent', 'child1');
 
             await registry.create(parentId, Component, { child: childDecl }, container);
 
-            const childId = new ComponentId('ChildComponent', 'child1');
+            const childId = createComponentId('ChildComponent', 'child1');
             assert.strictEqual(registry.has(childId), true);
 
             // Create a DIFFERENT mount point element (simulates morph replacing the element)
@@ -281,13 +281,13 @@ describe('Render Optimizations', () => {
                 version: 'v1',
             });
 
-            const parentId = new ComponentId('Parent', 'root', 'v1');
+            const parentId = createComponentId('Parent', 'root', 'v1');
             await registry.create(parentId, Parent, {}, container);
 
             // Verify all children were created
             for (let i = 0; i < childCount; i++) {
                 assert.strictEqual(
-                    registry.has(new ComponentId('Cell', `c${i}`)),
+                    registry.has(createComponentId('Cell', `c${i}`)),
                     true,
                     `Cell#c${i} should exist`,
                 );

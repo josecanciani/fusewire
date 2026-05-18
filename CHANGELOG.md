@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-05-18
+### Changed
+- Migrated framework to a stateless functional architecture for events and component identification.
+- `ComponentId` is now a plain object factory rather than an instantiated class, improving memory efficiency.
+- Refactored event emission (`EventEmitter`) from a stateful class to pure functional helpers (`onEvent`, `emitEvent`, `emitBroadcast`).
+- Replaced strict `instanceof ComponentId` checks across the framework with duck typing to support factory initialization.
+- Re-enabled strict TypeScript compliance (`tsc`) alongside comprehensive JSDoc updates across all core files.
+
+### Removed
+- Removed the `EventEmitter` class entirely.
+
 ## [1.4.1] - 2026-05-18
 ### Added
 - New `src/builtins/` directory to cleanly separate internal framework components (Root, Lazy, ErrorBoundary, PortalHost, PortalChild) from core engine logic.
@@ -139,7 +150,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed JS-in-HTML inline execution possibilities to strictly enforce declarative JS state truth.
 
-[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.4.1...main
+[Unreleased]: https://github.com/josecanciani/fusewire/compare/1.4.2...main
+[1.4.2]: https://github.com/josecanciani/fusewire/compare/1.4.1...1.4.2
 [1.4.1]: https://github.com/josecanciani/fusewire/compare/1.4.0...1.4.1
 [1.4.0]: https://github.com/josecanciani/fusewire/compare/1.3.0...1.4.0
 [1.3.0]: https://github.com/josecanciani/fusewire/compare/1.2.2...1.3.0

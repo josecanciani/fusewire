@@ -5,7 +5,7 @@ import { InstanceRegistry } from '../src/instance.js';
 import { Renderer } from '../src/renderer.js';
 import { TemplateStore } from '../src/template-store.js';
 import { Component } from '../src/component.js';
-import { ComponentId } from '../src/component-id.js';
+import { createComponentId, componentIdFromCode, componentIdsEqual } from '../src/component-id.js';
 import { Child } from '../src/component.js';
 import { Idiomorph } from 'idiomorph';
 import { COMPONENT_ID } from '../src/symbols.js';
@@ -77,17 +77,17 @@ describe('InstanceRegistry Mounting Thoroughness', () => {
                 version: 'v1'
             });
 
-            const parentId = new ComponentId('TestComponent', 'test1');
+            const parentId = createComponentId('TestComponent', 'test1');
             const card1 = new ChildComponent();
-            card1[COMPONENT_ID] = new ComponentId('ChildComponent', 'c1');
+            card1[COMPONENT_ID] = createComponentId('ChildComponent', 'c1');
             const card2 = new ChildComponent();
-            card2[COMPONENT_ID] = new ComponentId('ChildComponent', 'c2');
+            card2[COMPONENT_ID] = createComponentId('ChildComponent', 'c2');
             const cards = [card1, card2];
 
             await registry.create(parentId, TestComponent, { cards }, container);
 
-            assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c1')), true);
-            assert.strictEqual(registry.has(new ComponentId('ChildComponent', 'c2')), true);
+            assert.strictEqual(registry.has(createComponentId('ChildComponent', 'c1')), true);
+            assert.strictEqual(registry.has(createComponentId('ChildComponent', 'c2')), true);
         });
 
         it('passes child vars to created instance', async () => {
@@ -103,13 +103,13 @@ describe('InstanceRegistry Mounting Thoroughness', () => {
                 version: 'v1'
             });
 
-            const parentId = new ComponentId('TestComponent', 'test1');
+            const parentId = createComponentId('TestComponent', 'test1');
             const childDecl = Object.assign(new ChildComponent(), { label: 'Hello' });
-            childDecl[COMPONENT_ID] = new ComponentId('ChildComponent', 'child1');
+            childDecl[COMPONENT_ID] = createComponentId('ChildComponent', 'child1');
 
             await registry.create(parentId, TestComponent, { child: childDecl }, container);
 
-            const childId = new ComponentId('ChildComponent', 'child1');
+            const childId = createComponentId('ChildComponent', 'child1');
             const childInstance = registry.get(childId);
             assert.strictEqual(childInstance.label, 'Hello');
             assert.ok(container.innerHTML.includes('Hello'));
@@ -128,13 +128,13 @@ describe('InstanceRegistry Mounting Thoroughness', () => {
                 version: 'v1'
             });
 
-            const parentId = new ComponentId('TestComponent', 'test1');
+            const parentId = createComponentId('TestComponent', 'test1');
             const childDecl = new ChildComponent();
-            childDecl[COMPONENT_ID] = new ComponentId('ChildComponent', 'child1');
+            childDecl[COMPONENT_ID] = createComponentId('ChildComponent', 'child1');
 
             await registry.create(parentId, TestComponent, { child: childDecl }, container);
 
-            const childId = new ComponentId('ChildComponent', 'child1');
+            const childId = createComponentId('ChildComponent', 'child1');
             const childContainer = registry.getContainer(childId);
             assert.ok(childContainer.classList.contains('ChildComponent'));
         });
@@ -154,11 +154,11 @@ describe('InstanceRegistry Mounting Thoroughness', () => {
                 version: 'v1',
             });
 
-            const parentId = new ComponentId('TestComponent', 'parent1');
+            const parentId = createComponentId('TestComponent', 'parent1');
             const childRef = new Child('ChildComponent', 'child1', {});
 
             const parent = await registry.create(parentId, TestComponent, { child: childRef }, container);
-            const childId = new ComponentId('ChildComponent', 'child1');
+            const childId = createComponentId('ChildComponent', 'child1');
 
             // Intercept renderer to verify detach timing
             let childPresentDuringRender = true;

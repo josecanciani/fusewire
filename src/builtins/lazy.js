@@ -1,5 +1,5 @@
 import { Component } from '../component.js';
-import { EVENTS } from '../symbols.js';
+import { emitBroadcast } from '../event-emitter.js';
 
 /**
  * Built-in lazy-loading wrapper component.
@@ -47,12 +47,10 @@ export class Lazy extends Component {
                 });
                 if (!handled) {
                     // Bubble the error up to the Lazy component's parent
-                    const parentHandled = this[EVENTS]
-                        ? this[EVENTS].emitBroadcast('fw-error', {
-                              error: err,
-                              failedComponent: this.lazyChild.componentName,
-                          }).stopped
-                        : false;
+                    const parentHandled = emitBroadcast(this, 'fw-error', {
+                        error: err,
+                        failedComponent: this.lazyChild.componentName,
+                    }).stopped;
                     if (!parentHandled) {
                         // Unhandled error in background load propagates globally
                         throw err;

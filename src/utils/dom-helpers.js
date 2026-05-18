@@ -1,4 +1,8 @@
-import { ComponentId } from '../component-id.js';
+import { componentIdFromCode } from '../component-id.js';
+/**
+ * Component identifier
+ * @typedef {import('../component-id.js').ComponentId} ComponentId
+ */
 
 /**
  * Find all child component mount points within a container.
@@ -67,7 +71,7 @@ export function getComponentIdFromElement(element) {
 
     const code = element.getAttribute('data-fusewire-id');
     try {
-        return ComponentId.fromCode(code);
+        return componentIdFromCode(code);
     } catch (error) {
         console.warn(`Invalid data-fusewire-id on element: ${code}`, error);
         return null;

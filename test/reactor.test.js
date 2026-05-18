@@ -2,13 +2,14 @@ import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { Reactor } from '../src/reactor.js';
 import { Component } from '../src/component.js';
-import { ComponentId } from '../src/component-id.js';
+import { createComponentId, componentIdFromCode, componentIdsEqual } from '../src/component-id.js';
 import { InstanceRegistry } from '../src/instance.js';
 import { Renderer } from '../src/renderer.js';
 import { TemplateStore } from '../src/template-store.js';
 import { FuseWire } from '../src/fusewire.js';
 import { JSDOM } from 'jsdom';
 import { REACTOR, LIFECYCLE_ACTIVE, EVENTS } from '../src/symbols.js';
+import { onEvent } from '../src/event-emitter.js';
 import { ComponentNotFoundError } from '../src/errors/error-hierarchy.js';
 import { StrictConsole } from './strict-console.js';
 
@@ -351,7 +352,7 @@ describe('Reactor', () => {
                 getEntry() { return null; },
                 async render(componentId) {
                     renderCalled = true;
-                    assert.ok(componentId instanceof ComponentId);
+                    assert.strictEqual(componentId.code, 'Counter#main');
                 },
                 get() { return fakeInstance; },
             };
@@ -360,7 +361,7 @@ describe('Reactor', () => {
                 instanceRegistry: mockRegistry,
                 morphFunction: mockMorph
             });
-            const componentId = new ComponentId('Counter', 'main');
+            const componentId = createComponentId('Counter', 'main');
 
             await reactor.react(componentId, 'CSR');
 
@@ -375,7 +376,7 @@ describe('Reactor', () => {
                 getEntry() { return null; },
                 async render(componentId) {
                     renderCalled = true;
-                    assert.ok(componentId instanceof ComponentId);
+                    assert.strictEqual(componentId.code, 'Counter#main');
                     assert.strictEqual(componentId.name, 'Counter');
                     assert.strictEqual(componentId.id, 'main');
                 },
@@ -833,9 +834,7 @@ describe('Reactor', () => {
                 afterRender() {
                     throw new Error('afterRender failed');
                 },
-                [EVENTS]: {
-                    emitBroadcast: () => ({ stopped: false }),
-                },
+                toComponentId() { return createComponentId('Test', 't1'); }
             };
             const mockRegistry = {
                 get rootEntries() { return []; },
@@ -1022,14 +1021,11 @@ describe('Reactor', () => {
                 _reactor: null,
                 get rootEntries() {
                     return [{
-                        instance: {
-                            [EVENTS]: {
-                                emitBroadcast() {
-                                    order.push('components');
-                                    return { errors: [], stopped: false };
-                                }
-                            }
-                        }
+                        instance: (() => {
+                            const inst = {};
+                            onEvent(inst, 'theme', () => { order.push('components'); });
+                            return inst;
+                        })()
                     }];
                 },
                 getEntry() { return null; }
@@ -1048,19 +1044,16 @@ describe('Reactor', () => {
 
         it('forwards arguments to reactor listeners and component tree', () => {
             const reactorArgs = [];
-            const registryArgs = [];
+            const componentArgs = [];
             const mockRegistry = {
                 _reactor: null,
                 get rootEntries() {
                     return [{
-                        instance: {
-                            [EVENTS]: {
-                                emitBroadcast(eventName, ...args) {
-                                    registryArgs.push({ eventName, args });
-                                    return { errors: [], stopped: false };
-                                }
-                            }
-                        }
+                        instance: (() => {
+                            const inst = {};
+                            onEvent(inst, 'config', (arg1, arg2) => { componentArgs.push(arg1, arg2); });
+                            return inst;
+                        })()
                     }];
                 },
                 getEntry() { return null; }
@@ -1075,7 +1068,7 @@ describe('Reactor', () => {
             reactor.broadcast('config', 'key', 42);
 
             assert.deepStrictEqual(reactorArgs, [['key', 42]]);
-            assert.deepStrictEqual(registryArgs, [{ eventName: 'config', args: ['key', 42] }]);
+            assert.deepStrictEqual(componentArgs, ['key', 42]);
         });
 
         it('works with no registered listeners', () => {
@@ -1084,14 +1077,11 @@ describe('Reactor', () => {
                 _reactor: null,
                 get rootEntries() {
                     return [{
-                        instance: {
-                            [EVENTS]: {
-                                emitBroadcast(eventName) {
-                                    registryCalls.push(eventName);
-                                    return { errors: [], stopped: false };
-                                }
-                            }
-                        }
+                        instance: (() => {
+                            const inst = {};
+                            onEvent(inst, 'theme', (val) => { registryCalls.push(val); });
+                            return inst;
+                        })()
                     }];
                 },
                 getEntry() { return null; }
@@ -1104,7 +1094,7 @@ describe('Reactor', () => {
 
             // Should not throw and should still propagate to components
             reactor.broadcast('theme', 'dark');
-            assert.deepStrictEqual(registryCalls, ['theme']);
+            assert.deepStrictEqual(registryCalls, ['dark']);
         });
 
         it('logs errors from reactor listeners and continues propagation', () => {
@@ -1114,14 +1104,11 @@ describe('Reactor', () => {
                 _reactor: null,
                 get rootEntries() {
                     return [{
-                        instance: {
-                            [EVENTS]: {
-                                emitBroadcast(eventName) {
-                                    registryCalls.push(eventName);
-                                    return { errors: [], stopped: false };
-                                }
-                            }
-                        }
+                        instance: (() => {
+                            const inst = {};
+                            onEvent(inst, 'theme', () => { registryCalls.push('theme'); });
+                            return inst;
+                        })()
                     }];
                 },
                 getEntry() { return null; }
@@ -1153,14 +1140,11 @@ describe('Reactor', () => {
                 getEntry(code) {
                     if (code === 'Panel#main') {
                         return {
-                            instance: {
-                                [EVENTS]: {
-                                    emitBroadcast(eventName, ...args) {
-                                        registryCalls.push({ code, eventName, args });
-                                        return { errors: [], stopped: false };
-                                    }
-                                }
-                            }
+                            instance: (() => {
+                                const inst = {};
+                                onEvent(inst, 'theme', (val) => { registryCalls.push({ code, eventName: 'theme', args: [val] }); });
+                                return inst;
+                            })()
                         };
                     }
                     return null;
@@ -1172,7 +1156,7 @@ describe('Reactor', () => {
                 console: { log() { }, warn() { }, error() { } },
             });
 
-            const cid = new ComponentId('Panel', 'main');
+            const cid = createComponentId('Panel', 'main');
             reactor.broadcastFrom(cid, 'theme', 'dark');
 
             assert.strictEqual(registryCalls.length, 1);
@@ -1187,14 +1171,11 @@ describe('Reactor', () => {
                 _reactor: null,
                 getEntry(code) {
                     return {
-                        instance: {
-                            [EVENTS]: {
-                                emitBroadcast(eventName, ...args) {
-                                    registryCalls.push({ eventName, args });
-                                    return { errors: [], stopped: false };
-                                }
-                            }
-                        }
+                        instance: (() => {
+                            const inst = {};
+                            onEvent(inst, 'config', (...args) => { registryCalls.push({ eventName: 'config', args }); });
+                            return inst;
+                        })()
                     };
                 }
             };
@@ -1204,7 +1185,7 @@ describe('Reactor', () => {
                 console: { log() { }, warn() { }, error() { } },
             });
 
-            reactor.broadcastFrom(new ComponentId('Panel', 'main'), 'config', 'key', 42);
+            reactor.broadcastFrom(createComponentId('Panel', 'main'), 'config', 'key', 42);
 
             assert.deepStrictEqual(registryCalls[0].args, ['key', 42]);
         });
@@ -1222,7 +1203,7 @@ describe('Reactor', () => {
             });
 
             reactor.on('theme', () => reactorCalls.push('fired'));
-            reactor.broadcastFrom(new ComponentId('Panel', 'main'), 'theme', 'dark');
+            reactor.broadcastFrom(createComponentId('Panel', 'main'), 'theme', 'dark');
 
             assert.deepStrictEqual(reactorCalls, [], 'reactor listeners should not fire for scoped broadcast');
         });

@@ -1,6 +1,9 @@
-import { ComponentId } from './component-id.js';
+import { componentIdFromCode } from './component-id.js';
+/**
+ * Component identifier
+ * @typedef {import('./component-id.js').ComponentId} ComponentId
+ */
 import { Child } from './component.js';
-import { EventEmitter } from './event-emitter.js';
 import { FuseWire } from './fusewire.js';
 import { TemplateStore } from './template-store.js';
 import { InstanceRegistry } from './instance.js';
@@ -12,6 +15,7 @@ import { StateSerializer } from './state-serializer.js';
 import { HistoryRouter } from './history-router.js';
 import { broadcastFromRoots, broadcastFrom } from './broadcast.js';
 import { REACTOR, LIFECYCLE_ACTIVE, LIBRARIES, EVENTS } from './symbols.js';
+import { emitBroadcast, onEvent, emitEvent } from './event-emitter.js';
 
 /**
  * Map of variables passed to a component.
@@ -230,8 +234,7 @@ export class Reactor {
      * @returns {function(): void} Unsubscribe function
      */
     on(eventName, handler) {
-        if (!this._events) this._events = new EventEmitter();
-        return this._events.on(eventName, handler);
+        return onEvent(this, eventName, handler);
     }
 
     /**
@@ -243,10 +246,11 @@ export class Reactor {
      * @param {...*} args - Arguments forwarded to each handler
      */
     broadcast(eventName, ...args) {
-        if (this._events) {
-            for (const err of this._events.emit(eventName, ...args)) {
+        const hasEvents = /** @type {Record<symbol, *>} */ (this)[EVENTS];
+        if (hasEvents) {
+            for (const err of emitEvent(this, eventName, ...args)) {
                 this._console.error(
-                    `broadcast('${eventName}') reactor listener threw: ${/** @type {Error} */ (err).message}`,
+                    `broadcast('${eventName}') reactor listener threw: ${err instanceof Error ? err.message : String(err)}`,
                 );
             }
         }
@@ -435,8 +439,7 @@ export class Reactor {
         }
 
         // Accept both ComponentId and code string (from legacy callers)
-        const id =
-            typeof componentId === 'string' ? ComponentId.fromCode(componentId) : componentId;
+        const id = typeof componentId === 'string' ? componentIdFromCode(componentId) : componentId;
 
         // Deduplicate: skip if this component is already waiting in the queue
         const code = id.code;
@@ -489,12 +492,10 @@ export class Reactor {
                             activeInstance[LIFECYCLE_ACTIVE] = 'afterRender';
                             activeInstance.afterRender();
                         } catch (error) {
-                            const handled = activeInstance[EVENTS]
-                                ? activeInstance[EVENTS].emitBroadcast('fw-error', {
-                                      error,
-                                      failedComponent: id.name,
-                                  }).stopped
-                                : false;
+                            const handled = emitBroadcast(activeInstance, 'fw-error', {
+                                error,
+                                failedComponent: activeInstance.toComponentId().code,
+                            }).stopped;
                             if (!handled) {
                                 throw error;
                             }

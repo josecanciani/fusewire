@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { JSDOM } from 'jsdom';
-import { ComponentId } from '../src/component-id.js';
+import { createComponentId, componentIdFromCode, componentIdsEqual } from '../src/component-id.js';
 import { compileTemplate } from '../src/template-compiler.js';
 import { Child } from '../src/component.js';
 
@@ -14,7 +14,7 @@ describe('Template Compiler', () => {
     describe('Variable Interpolation', () => {
         it('interpolates simple variable', () => {
             const template = compileTemplate('<div>((name))</div>');
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ name: 'Alice' }, componentId);
 
             assert.ok(result.includes('Alice'));
@@ -22,7 +22,7 @@ describe('Template Compiler', () => {
 
         it('interpolates nested property', () => {
             const template = compileTemplate('<div>((user.name))</div>');
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ user: { name: 'Bob' } }, componentId);
 
             assert.ok(result.includes('Bob'));
@@ -30,7 +30,7 @@ describe('Template Compiler', () => {
 
         it('handles deeply nested properties', () => {
             const template = compileTemplate('<div>((user.profile.role))</div>');
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render(
                 { user: { profile: { role: 'admin' } } },
                 componentId,
@@ -41,7 +41,7 @@ describe('Template Compiler', () => {
 
         it('handles undefined variables as empty string', () => {
             const template = compileTemplate('<div>((missing))</div>');
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({}, componentId);
 
             assert.ok(result.includes('><'));
@@ -50,7 +50,7 @@ describe('Template Compiler', () => {
 
         it('handles null variables as empty string', () => {
             const template = compileTemplate('<div>((value))</div>');
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ value: null }, componentId);
 
             assert.ok(!result.includes('null'));
@@ -58,7 +58,7 @@ describe('Template Compiler', () => {
 
         it('converts numbers to strings', () => {
             const template = compileTemplate('<div>((count))</div>');
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ count: 42 }, componentId);
 
             assert.ok(result.includes('42'));
@@ -66,7 +66,7 @@ describe('Template Compiler', () => {
 
         it('interpolates $-prefixed calculated vars', () => {
             const template = compileTemplate('<span>(($formattedTotal))</span>');
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ $formattedTotal: '$1,234.56' }, componentId);
 
             assert.ok(result.includes('$1,234.56'));
@@ -74,7 +74,7 @@ describe('Template Compiler', () => {
 
         it('handles multiple interpolations', () => {
             const template = compileTemplate('<div>((first)) ((last))</div>');
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ first: 'John', last: 'Doe' }, componentId);
 
             assert.ok(result.includes('John'));
@@ -87,7 +87,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<div><span fw-if="isVisible">Hello</span></div>',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ isVisible: true }, componentId);
 
             assert.ok(result.includes('Hello'));
@@ -97,7 +97,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<div><span fw-if="isVisible">Hello</span></div>',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ isVisible: false }, componentId);
 
             assert.ok(!result.includes('Hello'));
@@ -107,7 +107,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<div><span fw-if="!isHidden">Visible</span></div>',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ isHidden: false }, componentId);
 
             assert.ok(result.includes('Visible'));
@@ -117,7 +117,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<div><span fw-if="!isHidden">Visible</span></div>',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ isHidden: true }, componentId);
 
             assert.ok(!result.includes('Visible'));
@@ -127,7 +127,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<div><span fw-if="user.isAdmin">Admin</span></div>',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render(
                 { user: { isAdmin: true } },
                 componentId,
@@ -140,7 +140,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<div><ul fw-if="items.length"><li>Has items</li></ul></div>',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ items: [1, 2, 3] }, componentId);
 
             assert.ok(result.includes('Has items'));
@@ -150,7 +150,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<div><ul fw-if="items.length"><li>Has items</li></ul></div>',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ items: [] }, componentId);
 
             assert.ok(!result.includes('Has items'));
@@ -160,7 +160,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<div fw-if="show"><div class="inner"><div class="deep">Content</div></div></div>',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
 
             const shown = template.render({ show: true }, componentId);
             assert.ok(shown.includes('Content'));
@@ -175,7 +175,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<div fw-if="outer"><div fw-if="inner">Both true</div></div>',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
 
             const both = template.render({ outer: true, inner: true }, componentId);
             assert.ok(both.includes('Both true'));
@@ -194,7 +194,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<ul><li fw-each="item in items">((item))</li></ul>',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ items: ['a', 'b', 'c'] }, componentId);
 
             assert.ok(result.includes('a'));
@@ -206,7 +206,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<ul><li fw-each="user in users">((user.name))</li></ul>',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render(
                 {
                     users: [{ name: 'Alice' }, { name: 'Bob' }],
@@ -222,7 +222,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<ul><li fw-each="item in items">((item))</li></ul>',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ items: [] }, componentId);
 
             // Should have <ul></ul> but no <li>
@@ -234,7 +234,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<ul><li fw-each="item in items">((item))</li></ul>',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({}, componentId);
 
             assert.ok(!result.includes('<li'));
@@ -249,7 +249,7 @@ describe('Template Compiler', () => {
                     </div>
                 </div>
             `);
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render(
                 {
                     categories: [
@@ -271,7 +271,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<ul><div fw-each="item in items"><div class="inner">((item))</div></div></ul>',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ items: ['x', 'y'] }, componentId);
 
             assert.ok(result.includes('class="inner"'));
@@ -290,7 +290,7 @@ describe('Template Compiler', () => {
                     </li>
                 </ul>
             `);
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render(
                 {
                     groups: [
@@ -312,7 +312,7 @@ describe('Template Compiler', () => {
                 '',
                 'testApp',
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render(
                 { items: [{ id: '1', name: 'Alice' }, { id: '2', name: 'Bob' }] },
                 componentId,
@@ -333,7 +333,7 @@ describe('Template Compiler', () => {
                     </div>
                 </div>
             `);
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render(
                 {
                     groupedItems: [
@@ -360,7 +360,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<ul><li fw-if="item.isVisible" fw-each="item in items">((item.name))</li></ul>'
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render(
                 {
                     items: [
@@ -382,7 +382,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<ul><li fw-each="item in items" fw-if="item.active">((item.name))</li></ul>'
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render(
                 {
                     items: [
@@ -402,7 +402,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<ul><li class="item" fw-if="item.ok" fw-each="item in items" data-x="1">((item.v))</li></ul>'
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render(
                 { items: [{ v: 'A', ok: true }, { v: 'B', ok: false }] },
                 componentId,
@@ -418,7 +418,7 @@ describe('Template Compiler', () => {
             const template = compileTemplate(
                 '<ul><li fw-if="item.show" fw-each="item in items">((item.name))</li></ul>'
             );
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render(
                 { items: [{ name: 'A', show: false }, { name: 'B', show: false }] },
                 componentId,
@@ -433,7 +433,7 @@ describe('Template Compiler', () => {
     describe('Component Mount Points', () => {
         it('renders component as mount point', () => {
             const template = compileTemplate('<div>((child))</div>');
-            const componentId = new ComponentId('Parent', 'main');
+            const componentId = createComponentId('Parent', 'main');
             const child = new Child('ChildComponent', 'child1');
             const result = template.render({ child }, componentId);
 
@@ -443,7 +443,7 @@ describe('Template Compiler', () => {
 
         it('renders array of components as mount points in reconciliation container', () => {
             const template = compileTemplate('<div>((cards))</div>');
-            const componentId = new ComponentId('CardList', 'main');
+            const componentId = createComponentId('CardList', 'main');
             const cards = [
                 new Child('Card', 'card1'),
                 new Child('Card', 'card2'),
@@ -458,7 +458,7 @@ describe('Template Compiler', () => {
 
         it('reconciliation container wraps all mount points', () => {
             const template = compileTemplate('<div>((items))</div>');
-            const componentId = new ComponentId('List', 'main');
+            const componentId = createComponentId('List', 'main');
             const items = [
                 new Child('Item', 'a'),
                 new Child('Item', 'b'),
@@ -480,7 +480,7 @@ describe('Template Compiler', () => {
 
         it('single component does not get reconciliation container', () => {
             const template = compileTemplate('<div>((child))</div>');
-            const componentId = new ComponentId('Parent', 'main');
+            const componentId = createComponentId('Parent', 'main');
             const child = new Child('Child', 'one');
             const result = template.render({ child }, componentId);
 
@@ -496,7 +496,7 @@ describe('Template Compiler', () => {
                 '',
                 'testApp',
             );
-            const componentId = new ComponentId('Counter', 'main');
+            const componentId = createComponentId('Counter', 'main');
             const result = template.render({}, componentId);
 
             assert.ok(result.includes("FuseWire.get('testApp', 'Counter#main')"));
@@ -510,7 +510,7 @@ describe('Template Compiler', () => {
                     <button onclick="((this)).dec()">-</button>
                 </div>
             `, '', 'testApp');
-            const componentId = new ComponentId('Counter', 'main');
+            const componentId = createComponentId('Counter', 'main');
             const result = template.render({}, componentId);
 
             const matches = result.match(/FuseWire\.get\('testApp', 'Counter#main'\)/g);
@@ -523,7 +523,7 @@ describe('Template Compiler', () => {
                 '',
                 'testApp',
             );
-            const componentId = new ComponentId('Nav', 'main');
+            const componentId = createComponentId('Nav', 'main');
             const result = template.render({
                 dots: [
                     { index: 0, label: 'First' },
@@ -563,7 +563,7 @@ h1 { font-size: 2rem; }`;
     describe('Edge Cases', () => {
         it('handles empty template', () => {
             const template = compileTemplate('');
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({}, componentId);
 
             assert.strictEqual(result, '');
@@ -571,7 +571,7 @@ h1 { font-size: 2rem; }`;
 
         it('handles template with only text', () => {
             const template = compileTemplate('<div>Plain text</div>');
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({}, componentId);
 
             assert.ok(result.includes('Plain text'));
@@ -579,7 +579,7 @@ h1 { font-size: 2rem; }`;
 
         it('handles special characters in interpolation', () => {
             const template = compileTemplate('<div>((text))</div>');
-            const componentId = new ComponentId('Test', 'main');
+            const componentId = createComponentId('Test', 'main');
             const result = template.render({ text: '<script>alert("xss")</script>' }, componentId);
 
             // Should escape HTML

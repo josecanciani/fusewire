@@ -1,10 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { Child } from '../src/component.js';
-import { ComponentId } from '../src/component-id.js';
+import { createComponentId, componentIdFromCode, componentIdsEqual } from '../src/component-id.js';
 import { Component } from '../src/component.js';
 import { COMPONENT_ID, EVENTS } from '../src/symbols.js';
-import { EventEmitter } from '../src/event-emitter.js';
+
 
 describe('Child', () => {
     describe('constructor', () => {
@@ -66,7 +66,7 @@ describe('Child', () => {
         it('returns a ComponentId with correct name and id', () => {
             const ref = new Child('UserList', 'main');
             const cid = ref.toComponentId();
-            assert.ok(cid instanceof ComponentId);
+            assert.strictEqual(cid.code, 'UserList#main');
             assert.strictEqual(cid.name, 'UserList');
             assert.strictEqual(cid.id, 'main');
         });
@@ -74,7 +74,7 @@ describe('Child', () => {
         it('handles empty id', () => {
             const ref = new Child('Counter');
             const cid = ref.toComponentId();
-            assert.ok(cid instanceof ComponentId);
+            assert.strictEqual(cid.code, 'Counter');
             assert.strictEqual(cid.name, 'Counter');
             assert.strictEqual(cid.id, '');
         });
@@ -207,8 +207,8 @@ describe('Child', () => {
          */
         function makeComponent() {
             const comp = new Component();
-            comp[COMPONENT_ID] = new ComponentId('Child', 'c1');
-            comp[EVENTS] = new EventEmitter();
+            comp[COMPONENT_ID] = createComponentId('Child', 'c1');
+            comp[EVENTS] = new Map();
             return comp;
         }
 

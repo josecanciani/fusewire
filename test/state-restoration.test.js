@@ -4,7 +4,7 @@ import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { Reactor } from '../src/reactor.js';
 import { Component, Child } from '../src/component.js';
-import { ComponentId } from '../src/component-id.js';
+import { createComponentId, componentIdFromCode, componentIdsEqual } from '../src/component-id.js';
 import { InstanceRegistry, collectVars } from '../src/instance.js';
 import { Renderer } from '../src/renderer.js';
 import { TemplateStore } from '../src/template-store.js';
@@ -115,7 +115,7 @@ describe('State Restoration', () => {
             global.document = dom.window.document;
             const container = dom.window.document.getElementById('c');
 
-            const id = new ComponentId('Counter', 'main', 'v1');
+            const id = createComponentId('Counter', 'main', 'v1');
             const instance = await registry.create(id, Counter, { count: 42 }, container);
             assert.strictEqual(instance.count, 42);
 
@@ -156,7 +156,7 @@ describe('State Restoration', () => {
             global.document = dom.window.document;
             const container = dom.window.document.getElementById('d');
 
-            const id = new ComponentId('Dashboard', 'main', 'v1');
+            const id = createComponentId('Dashboard', 'main', 'v1');
             await registry.create(id, Dashboard, { title: 'My Dashboard' }, container);
             await registry.remove(id);
 
@@ -193,7 +193,7 @@ describe('State Restoration', () => {
             global.document = dom.window.document;
             const container = dom.window.document.getElementById('a');
 
-            const appId = new ComponentId('App', 'main', 'v1');
+            const appId = createComponentId('App', 'main', 'v1');
             const headerChild = new Child('Header', 'h1', {});
             const app = await registry.create(appId, App, { header: headerChild }, container);
 
@@ -234,7 +234,7 @@ describe('State Restoration', () => {
             global.document = dom.window.document;
             const container = dom.window.document.getElementById('c');
 
-            const id = new ComponentId('Counter', 'main', 'v1');
+            const id = createComponentId('Counter', 'main', 'v1');
             // Pass default vars (count: 0) — should be overridden by stored state
             const instance = await registry.create(id, Counter, { count: 0 }, container);
 
@@ -275,7 +275,7 @@ describe('State Restoration', () => {
             global.document = dom.window.document;
             const container = dom.window.document.getElementById('d');
 
-            const id = new ComponentId('Dashboard', 'main', 'v1');
+            const id = createComponentId('Dashboard', 'main', 'v1');
             await registry.create(id, Dashboard, {}, container);
 
             assert.deepStrictEqual(receivedPreviousState, { secretData: 'from-destroy' });
@@ -306,7 +306,7 @@ describe('State Restoration', () => {
             global.document = dom.window.document;
             const container = dom.window.document.getElementById('f');
 
-            const id = new ComponentId('Fresh', 'main', 'v1');
+            const id = createComponentId('Fresh', 'main', 'v1');
             await registry.create(id, Fresh, {}, container);
 
             assert.strictEqual(receivedPreviousState, null);
@@ -337,7 +337,7 @@ describe('State Restoration', () => {
 
             // First create — restores from store
             const container1 = dom.window.document.createElement('div');
-            const id = new ComponentId('Counter', 'main', 'v1');
+            const id = createComponentId('Counter', 'main', 'v1');
             const instance1 = await registry.create(id, Counter, { count: 0 }, container1);
             assert.strictEqual(instance1.count, 99);
 
@@ -379,7 +379,7 @@ describe('State Restoration', () => {
 
             // Create, modify, destroy
             const container1 = dom.window.document.createElement('div');
-            const id = new ComponentId('Counter', 'main', 'v1');
+            const id = createComponentId('Counter', 'main', 'v1');
             const instance1 = await registry.create(
                 id,
                 Counter,
@@ -438,7 +438,7 @@ describe('State Restoration', () => {
 
             // Create and destroy
             const container1 = dom.window.document.createElement('div');
-            const id = new ComponentId('Dashboard', 'main', 'v1');
+            const id = createComponentId('Dashboard', 'main', 'v1');
             await registry.create(id, Dashboard, { title: 'Test' }, container1);
             await registry.remove(id);
 

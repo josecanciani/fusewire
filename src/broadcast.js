@@ -1,6 +1,7 @@
-import { EVENTS, CONSOLE } from './symbols.js';
+import { EVENTS } from './symbols.js';
 import { PortalHost } from './builtins/portal-host.js';
 import { PortalChild } from './builtins/portal-child.js';
+import { emitBroadcast } from './event-emitter.js';
 
 /**
  * Broadcast an event top-down through the component tree starting from root(s).
@@ -48,11 +49,11 @@ function _broadcastToEntry(registry, entry, eventName, args) {
         EVENTS
     ];
     if (events) {
-        const result =
-            /** @type {{emitBroadcast: function(string, ...unknown): {errors: Error[], stopped: boolean}}} */ (
-                events
-            ).emitBroadcast(eventName, ...args);
-        stopped = result.stopped;
+        stopped = emitBroadcast(
+            /** @type {import('./component.js').Component} */ (instance),
+            eventName,
+            ...args,
+        ).stopped;
     }
     if (stopped) return;
 

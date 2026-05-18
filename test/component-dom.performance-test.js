@@ -2,7 +2,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { JSDOM } from 'jsdom';
 import { Component } from '../src/component.js';
-import { ComponentId } from '../src/component-id.js';
+import { createComponentId, componentIdFromCode, componentIdsEqual } from '../src/component-id.js';
 import { COMPONENT_ID, REGISTRY_ENTRY } from '../src/symbols.js';
 
 describe('Scoped DOM queries (Thorough)', () => {
@@ -32,7 +32,7 @@ describe('Scoped DOM queries (Thorough)', () => {
      */
     function makeComponent(name, id, containerHTML) {
         const comp = new Component();
-        const cid = new ComponentId(name, id);
+        const cid = createComponentId(name, id);
         comp[COMPONENT_ID] = cid;
         const container = document.createElement('div');
         container.setAttribute('data-fusewire-id', cid.code);

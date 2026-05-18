@@ -1,4 +1,8 @@
-import { ComponentId } from './component-id.js';
+import { createComponentId } from './component-id.js';
+/**
+ * Component identifier
+ * @typedef {import('./component-id.js').ComponentId} ComponentId
+ */
 import { Child } from './component.js';
 import { Component } from './component.js';
 import { DIRECTIVE_REGEX, INTERPOLATION_REGEX, findMatchingClose } from './template-parser.js';
@@ -166,7 +170,7 @@ function renderMountPoint(decl, parentId) {
         name = /** @type {ComponentConstructor} */ (decl.constructor).componentName;
         id = decl.componentId || '';
     }
-    const childId = new ComponentId(name, id);
+    const childId = createComponentId(name, id);
     return `<fw-mount id="${childId.code}" data-fusewire-id="${childId.code}" data-fusewire-parent-id="${parentId.code}"></fw-mount>`;
 }
 

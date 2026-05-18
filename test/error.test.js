@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { Component } from '../src/component.js';
 import { ErrorBoundary } from '../src/builtins/error-boundary.js';
-import { ComponentId } from '../src/component-id.js';
+import { createComponentId, componentIdFromCode, componentIdsEqual } from '../src/component-id.js';
 import { Reactor } from '../src/reactor.js';
 import { JSDOM } from 'jsdom';
 import { StrictConsole } from './strict-console.js';
@@ -159,7 +159,7 @@ describe('ErrorBoundary complete flow', () => {
         await reactor.start(container, 'Parent', 'root', { failingChildName: 'FailComponent', failId: 'init' });
         await new Promise((r) => setTimeout(r, 50));
 
-        const parentInstance = reactor.instanceRegistry.get(new ComponentId('Parent', 'root'));
+        const parentInstance = reactor.instanceRegistry.get(createComponentId('Parent', 'root'));
 
         assert.ok(parentInstance, 'Parent instance not found in registry');
         assert.strictEqual(parentInstance.errorCount, 1);

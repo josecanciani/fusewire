@@ -1,20 +1,24 @@
-import { ComponentId } from './component-id.js';
+import { createComponentId, componentIdFromCode } from './component-id.js';
 import { Component, Child } from './component.js';
 import { Lazy } from './builtins/lazy.js';
 import { ErrorBoundary } from './builtins/error-boundary.js';
 import { Root } from './builtins/root.js';
 import { PortalHost } from './builtins/portal-host.js';
 import { PortalChild } from './builtins/portal-child.js';
+import { emitBroadcast, clearEvents } from './event-emitter.js';
 import {
     COMPONENT_ID,
     REGISTRY_ENTRY,
     LIFECYCLE_ACTIVE,
-    EVENTS,
     ROUTE_DEFAULTS,
     REACTOR,
     CONSOLE,
     LIBRARIES,
 } from './symbols.js';
+/**
+ * Component identifier
+ * @typedef {import('./component-id.js').ComponentId} ComponentId
+ */
 import { ComponentNotFoundError } from './errors/error-hierarchy.js';
 import { compileTemplate } from './template-compiler.js';
 import { getComponentIdFromElement, toCssName } from './utils/dom-helpers.js';
@@ -184,7 +188,7 @@ export class InstanceRegistry {
             ref.componentName ||
             /** @type {ComponentConstructor} */ (ref.constructor).componentName;
         const version = await this._ensureTemplate(componentName);
-        const componentId = new ComponentId(componentName, ref.componentId, version);
+        const componentId = createComponentId(componentName, ref.componentId, version);
 
         const vars =
             ref instanceof Child ? { ...ref.vars } : collectVars(/** @type {Component} */ (ref));
@@ -459,7 +463,7 @@ export class InstanceRegistry {
         }
 
         // Clear event subscriptions so handlers don't keep parent instances alive
-        if (instance[EVENTS]) instance[EVENTS].clear();
+        clearEvents(instance);
 
         // Remove from DOM
         if (container.parentNode) {
@@ -767,12 +771,10 @@ export class InstanceRegistry {
                         existingEntry.instance[LIFECYCLE_ACTIVE] = 'afterRender';
                         existingEntry.instance.afterRender();
                     } catch (error) {
-                        const handled = existingEntry.instance[EVENTS]
-                            ? existingEntry.instance[EVENTS].emitBroadcast('fw-error', {
-                                  error,
-                                  failedComponent: childId.name,
-                              }).stopped
-                            : false;
+                        const handled = emitBroadcast(existingEntry.instance, 'fw-error', {
+                            error,
+                            failedComponent: childId.name,
+                        }).stopped;
                         if (!handled) {
                             throw error;
                         }
@@ -884,7 +886,7 @@ export class InstanceRegistry {
      * @param {import('./route-segment.js').RouteSegment|null} routeSegment - Optional segment to pass to init()
      */
     startEagerCreation(ref, routeSegment = null) {
-        const code = new ComponentId(ref.componentName, ref.componentId || '').code;
+        const code = createComponentId(ref.componentName, ref.componentId || '').code;
 
         // If the component already exists in the registry (e.g. re-render with
         // same children), skip eager creation — _mountChild will re-render it.
@@ -925,7 +927,7 @@ export class InstanceRegistry {
      * @returns {Promise<Component>} The created instance (pending hydration)
      */
     async _eagerCreate(ref, container, routeSegment = null) {
-        const code = new ComponentId(ref.componentName, ref.componentId || '').code;
+        const code = createComponentId(ref.componentName, ref.componentId || '').code;
         try {
             return await this.createFromReference(ref, container, {
                 deferHydration: true,
@@ -1006,7 +1008,7 @@ export class InstanceRegistry {
                 }
             }
 
-            const childId = ComponentId.fromCode(code);
+            const childId = componentIdFromCode(code);
             mountPoint.classList.add(toCssName(childId.name));
 
             // Replace reference in parent's vars with real instance
@@ -1083,12 +1085,11 @@ export class InstanceRegistry {
             } catch (error) {
                 entry.needsHydration = false;
                 instance[LIFECYCLE_ACTIVE] = null;
-                const handled = instance[EVENTS]
-                    ? instance[EVENTS].emitBroadcast('fw-error', {
-                          error,
-                          failedComponent: componentId.name,
-                      }).stopped
-                    : false;
+                // Find child ref from declarations if possible, otherwise use name
+                const handled = emitBroadcast(instance, 'fw-error', {
+                    error,
+                    failedComponent: componentId.name,
+                }).stopped;
                 if (!handled) {
                     throw error;
                 }
@@ -1160,7 +1161,7 @@ export class InstanceRegistry {
             } else {
                 return;
             }
-            const compId = new ComponentId(name, id);
+            const compId = createComponentId(name, id);
             children.set(compId.code, compId);
             declarations.set(compId.code, value);
         };
@@ -1296,7 +1297,7 @@ export class InstanceRegistry {
     clearAll() {
         const codes = Array.from(this._instances.keys());
         for (const code of codes) {
-            const componentId = ComponentId.fromCode(code);
+            const componentId = componentIdFromCode(code);
             this.remove(componentId);
         }
     }

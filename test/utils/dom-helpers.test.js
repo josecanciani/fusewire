@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { JSDOM } from 'jsdom';
-import { ComponentId } from '../../src/component-id.js';
+import { createComponentId, componentIdFromCode, componentIdsEqual } from '../../src/component-id.js';
 import {
 	findChildMountPoints,
 	createMountPoint,
@@ -29,7 +29,7 @@ describe('DOM Helpers', () => {
 		});
 
 		it('sets data-fusewire-id attribute from ComponentId', () => {
-			const componentId = new ComponentId('UserList', 'main');
+			const componentId = createComponentId('UserList', 'main');
 			const div = createMountPoint(componentId);
 			assert.strictEqual(div.getAttribute('data-fusewire-id'), 'UserList#main');
 		});
@@ -48,8 +48,8 @@ describe('DOM Helpers', () => {
 		});
 
 		it('sets data-fusewire-parent-id from ComponentId', () => {
-			const childId = new ComponentId('UserList', 'main');
-			const parentId = new ComponentId('Dashboard', '10');
+			const childId = createComponentId('UserList', 'main');
+			const parentId = createComponentId('Dashboard', '10');
 			const div = createMountPoint(childId, parentId);
 			assert.strictEqual(
 				div.getAttribute('data-fusewire-parent-id'),
@@ -96,7 +96,7 @@ describe('DOM Helpers', () => {
 			div.setAttribute('data-fusewire-id', 'UserList#main');
 
 			const componentId = getComponentIdFromElement(div);
-			assert.ok(componentId instanceof ComponentId);
+			assert.strictEqual(componentId.code, 'UserList#main');
 			assert.strictEqual(componentId.name, 'UserList');
 			assert.strictEqual(componentId.id, 'main');
 		});

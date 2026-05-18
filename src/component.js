@@ -1,12 +1,15 @@
-import { ComponentId } from './component-id.js';
-import { EventEmitter } from './event-emitter.js';
+import { createComponentId } from './component-id.js';
+/**
+ * Component identifier
+ * @typedef {import('./component-id.js').ComponentId} ComponentId
+ */
+import { onEvent, emitEvent, emitBroadcast } from './event-emitter.js';
 import {
     COMPONENT_ID,
     REGISTRY_ENTRY,
     CONSOLE,
     REACTOR,
     LIFECYCLE_ACTIVE,
-    EVENTS,
     ROUTE_DEFAULTS,
 } from './symbols.js';
 
@@ -126,7 +129,7 @@ export class Component {
      * @returns {ComponentId} The component id
      */
     toComponentId() {
-        return new ComponentId(this.componentName, this.componentId, this.componentVersion);
+        return createComponentId(this.componentName, this.componentId, this.componentVersion);
     }
 
     /**
@@ -411,8 +414,7 @@ export class Component {
      * @returns {function(): void} Unsubscribe function — call it to remove this handler early
      */
     on(eventName, handler) {
-        if (!this[EVENTS]) this[EVENTS] = new EventEmitter(this);
-        return this[EVENTS].on(eventName, handler);
+        return onEvent(this, eventName, handler);
     }
 
     /**
@@ -423,8 +425,7 @@ export class Component {
      * @param {...*} args - Arguments forwarded to each handler
      */
     emit(eventName, ...args) {
-        if (!this[EVENTS]) return;
-        this[EVENTS].emit(eventName, ...args);
+        emitEvent(this, eventName, ...args);
     }
 
     /**
@@ -601,7 +602,7 @@ export class Child {
         if (!componentName || typeof componentName !== 'string') {
             throw new Error('Child: componentName must be a non-empty string');
         }
-        this[COMPONENT_ID] = new ComponentId(componentName, id, version || '');
+        this[COMPONENT_ID] = createComponentId(componentName, id, version || '');
         this.vars = vars;
         this._options = options;
         this._listeners = new Map();
@@ -615,8 +616,6 @@ export class Child {
         this._creationPromise = null;
         this._detachedContainer = null;
         this._creationError = null;
-
-        this[EVENTS] = new EventEmitter(this);
     }
 
     /**
@@ -747,8 +746,7 @@ export class Child {
         // If already replaced, emit on the real instance since listeners were replayed.
         // We don't iterate buffered events here because they were moved to the instance.
         if (this._replaced && this._realInstance) {
-            if (!this._realInstance[EVENTS]) return false;
-            return this._realInstance[EVENTS].emitBroadcast(eventName, ...args).stopped;
+            return emitBroadcast(this._realInstance, eventName, ...args).stopped;
         }
 
         for (const entry of this._bufferedEvents) {

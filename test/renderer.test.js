@@ -2,7 +2,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { JSDOM } from 'jsdom';
 import { Renderer } from '../src/renderer.js';
-import { ComponentId } from '../src/component-id.js';
+import { createComponentId, componentIdFromCode, componentIdsEqual } from '../src/component-id.js';
 import { Idiomorph } from 'idiomorph';
 
 describe('Renderer', () => {
@@ -60,7 +60,7 @@ describe('Renderer', () => {
                 render: (vars) => `<div class="counter">${vars.count}</div>`,
                 css: '.counter { color: red; }',
             };
-            const componentId = new ComponentId('Counter', '1');
+            const componentId = createComponentId('Counter', '1');
 
             const mountPoints = renderer.render(
                 container,
@@ -81,7 +81,7 @@ describe('Renderer', () => {
                 render: (vars) => `<div class="counter">${vars.count}</div>`,
                 css: '',
             };
-            const componentId = new ComponentId('Counter', '1');
+            const componentId = createComponentId('Counter', '1');
 
             // First render
             renderer.render(container, compiledTemplate, { count: 5 }, componentId);
@@ -102,7 +102,7 @@ describe('Renderer', () => {
                 render: () => '<div>Test</div>',
                 css: '.test { color: blue; }',
             };
-            const componentId = new ComponentId('TestComponent', '1');
+            const componentId = createComponentId('TestComponent', '1');
 
             renderer.render(container, compiledTemplate, {}, componentId);
 
@@ -128,7 +128,7 @@ describe('Renderer', () => {
                 container,
                 compiledTemplate,
                 {},
-                new ComponentId('TestComponent', '1'),
+                createComponentId('TestComponent', '1'),
             );
 
             // Render second instance
@@ -137,7 +137,7 @@ describe('Renderer', () => {
                 container2,
                 compiledTemplate,
                 {},
-                new ComponentId('TestComponent', '2'),
+                createComponentId('TestComponent', '2'),
             );
 
             // Only one style tag should exist
@@ -153,7 +153,7 @@ describe('Renderer', () => {
                 render: () => '<div>Test</div>',
                 css: '',
             };
-            const componentId = new ComponentId('NoCSS', '1');
+            const componentId = createComponentId('NoCSS', '1');
 
             renderer.render(container, compiledTemplate, {}, componentId);
 
@@ -171,7 +171,7 @@ describe('Renderer', () => {
                     </div>`,
                 css: '',
             };
-            const componentId = new ComponentId('Parent', '1');
+            const componentId = createComponentId('Parent', '1');
 
             const mountPoints = renderer.render(
                 container,
@@ -198,7 +198,7 @@ describe('Renderer', () => {
                 render: (vars) => `<div><span>${vars.text}</span></div>`,
                 css: '',
             };
-            const componentId = new ComponentId('Text', '1');
+            const componentId = createComponentId('Text', '1');
 
             renderer.render(container, compiledTemplate, { text: 'Hello' }, componentId);
             const span = container.querySelector('span');
@@ -215,7 +215,7 @@ describe('Renderer', () => {
                 render: (vars) => `<div><button class="${vars.btnClass}">Click</button></div>`,
                 css: '',
             };
-            const componentId = new ComponentId('Button', '1');
+            const componentId = createComponentId('Button', '1');
 
             renderer.render(
                 container,
@@ -275,7 +275,7 @@ describe('Renderer', () => {
                 render: () => '<div>Content</div>',
                 css: '',
             };
-            const componentId = new ComponentId('Test', '1');
+            const componentId = createComponentId('Test', '1');
 
             // First render (uses innerHTML, no morph)
             renderer.render(container, compiledTemplate, {}, componentId);
@@ -299,7 +299,7 @@ describe('Renderer', () => {
                 render: () => '<div>Content</div>',
                 css: '',
             };
-            const componentId = new ComponentId('Test', '1');
+            const componentId = createComponentId('Test', '1');
 
             // First render, then re-render to capture callback
             renderer.render(container, compiledTemplate, {}, componentId);
@@ -326,7 +326,7 @@ describe('Renderer', () => {
                 render: () => '<div>Content</div>',
                 css: '',
             };
-            const componentId = new ComponentId('Test', '1');
+            const componentId = createComponentId('Test', '1');
 
             renderer.render(container, compiledTemplate, {}, componentId);
             renderer.render(container, compiledTemplate, {}, componentId);
@@ -348,7 +348,7 @@ describe('Renderer', () => {
                 render: () => '<div>Content</div>',
                 css: '',
             };
-            const componentId = new ComponentId('Test', '1');
+            const componentId = createComponentId('Test', '1');
 
             renderer.render(container, compiledTemplate, {}, componentId);
             renderer.render(container, compiledTemplate, {}, componentId);
@@ -370,7 +370,7 @@ describe('Renderer', () => {
                 render: () => '<div>Content</div>',
                 css: '',
             };
-            const componentId = new ComponentId('Test', '1');
+            const componentId = createComponentId('Test', '1');
 
             renderer.render(container, compiledTemplate, {}, componentId);
             renderer.render(container, compiledTemplate, {}, componentId);
@@ -563,7 +563,7 @@ describe('Renderer', () => {
     describe('render() with reconciliation containers', () => {
         it('finds mount points inside reconciliation containers on first render', () => {
             const renderer = new Renderer(Idiomorph.morph, appName);
-            const parentId = new ComponentId('Console', 'main');
+            const parentId = createComponentId('Console', 'main');
             const compiledTemplate = {
                 render: (vars, compId) =>
                     `<div class="console-logs"><div data-fusewire-each="logs">` +
@@ -593,7 +593,7 @@ describe('Renderer', () => {
                 // For simplicity, we just leave the DOM unchanged (morph is a no-op).
             };
             const renderer = new Renderer(mockMorph, appName);
-            const parentId = new ComponentId('Console', 'main');
+            const parentId = createComponentId('Console', 'main');
 
             // First render: one log line
             const template1 = {

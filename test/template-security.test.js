@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { JSDOM } from 'jsdom';
-import { ComponentId } from '../src/component-id.js';
+import { createComponentId, componentIdFromCode, componentIdsEqual } from '../src/component-id.js';
 import { compileTemplate } from '../src/template-compiler.js';
 
 // Set up JSDOM global document
@@ -12,7 +12,7 @@ global.HTMLElement = dom.window.HTMLElement;
 describe('Template Compiler: Security', () => {
     it('mitigates unquoted attribute injection by escaping spaces and equals', () => {
         const template = compileTemplate('<div class=((myClass))></div>');
-        const componentId = new ComponentId('Test', 'main');
+        const componentId = createComponentId('Test', 'main');
         const result = template.render(
             { myClass: 'foo onclick=alert(1)' },
             componentId,
@@ -27,7 +27,7 @@ describe('Template Compiler: Security', () => {
 
     it('blocks javascript: URIs in href attributes', () => {
         const template = compileTemplate('<a href=((link))>Click</a>');
-        const componentId = new ComponentId('Test', 'main');
+        const componentId = createComponentId('Test', 'main');
         const result = template.render(
             { link: 'javascript:alert(1)' },
             componentId,
@@ -38,7 +38,7 @@ describe('Template Compiler: Security', () => {
 
     it('blocks javascript: URIs in src attributes', () => {
         const template = compileTemplate('<img src=((url))>');
-        const componentId = new ComponentId('Test', 'main');
+        const componentId = createComponentId('Test', 'main');
         const result = template.render(
             { url: 'javascript:alert(1)' },
             componentId,
@@ -49,7 +49,7 @@ describe('Template Compiler: Security', () => {
 
     it('blocks javascript: URIs in event attributes (on*)', () => {
         const template = compileTemplate('<div onclick=((code))></div>');
-        const componentId = new ComponentId('Test', 'main');
+        const componentId = createComponentId('Test', 'main');
         const result = template.render(
             { code: 'javascript:alert(1)' },
             componentId,
@@ -60,7 +60,7 @@ describe('Template Compiler: Security', () => {
 
     it('handles mixed content correctly (only escapes in tags)', () => {
         const template = compileTemplate('<div>((val))</div><span title=((val))></span>');
-        const componentId = new ComponentId('Test', 'main');
+        const componentId = createComponentId('Test', 'main');
         const result = template.render({ val: 'foo bar' }, componentId);
 
         // In text content, space is NOT escaped
@@ -71,7 +71,7 @@ describe('Template Compiler: Security', () => {
 
     it('sanitizes data: and vbscript: URIs', () => {
         const template = compileTemplate('<a href=((link))>Click</a>');
-        const componentId = new ComponentId('Test', 'main');
+        const componentId = createComponentId('Test', 'main');
         
         const dataResult = template.render({ link: 'data:text/html,<script>alert(1)</script>' }, componentId);
         assert.ok(dataResult.includes('href="about:blank"') || dataResult.includes('href=about:blank'), 'Should sanitize data: URI');
